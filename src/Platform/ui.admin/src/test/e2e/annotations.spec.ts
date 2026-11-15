@@ -164,6 +164,9 @@ test('new annotations start in the default time zone of the project', async ({ p
   await page.getByPlaceholder('Search time zones').fill('Tokyo')
   await page.getByRole('option', { name: /Asia\/Tokyo/ }).click()
   await expect(page.getByRole('button', { name: 'Default time zone' })).toContainText('Asia/Tokyo')
+  // The project settings are saved for everyone in the project (424-266).
+  await page.getByRole('button', { name: 'Save project settings' }).click()
+  await expect(page.getByText('Project settings saved', { exact: true })).toBeVisible()
 
   await goto(page, '/acme/billing/default/annotations')
   await openNewAnnotation()
@@ -176,6 +179,19 @@ test('new annotations start in the default time zone of the project', async ({ p
 
   await goto(page, '/acme/billing/default/annotations/sbt.cyberdyne')
   await expect(page.getByRole('button', { name: 'Time zone', exact: true })).toContainText('Asia/Tokyo')
+})
+
+// The zone comes from the API (424-266): set by someone else, it is the start of New annotation after the next read.
+test('new annotations start in the time zone the project settings have on the server', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/annotations')
+  await page.evaluate(() =>
+    window.storytellerMock!.changeProjectSettings('acme.billing', { DefaultTimeZone: 'Europe/Oslo' }),
+  )
+  await goto(page, '/acme/billing/default/annotations')
+
+  await page.getByRole('button', { name: isMobile(testInfo) ? 'New annotation' : 'New', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'New annotation' })
+  await expect(dialog.getByRole('button', { name: 'Time zone', exact: true })).toContainText('Europe/Oslo')
 })
 
 test('creates annotations in bulk from a list of keys, with their missing ancestors', async ({ page }, testInfo) => {

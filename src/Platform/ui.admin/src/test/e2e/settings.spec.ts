@@ -67,6 +67,13 @@ async function setName(page: Page, field: string, value: string) {
 const stExe = (page: Page) =>
   page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--st-exe').trim())
 
+/** Saves the draft of the project settings (424-266): one Save for the time zone, the date format and the types. */
+async function saveSettings(page: Page) {
+  await page.getByRole('button', { name: 'Save project settings' }).click()
+  await expect(page.getByText('Project settings saved', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save project settings' })).toBeDisabled()
+}
+
 test('type names, colors and icons come from the project settings and Preferences', async ({ page }) => {
   await openApp(page, '/acme/billing/settings')
   expect(await stExe(page)).toBe('#047857')
@@ -83,6 +90,9 @@ test('type names, colors and icons come from the project settings and Preference
     'placeholder',
     'Jobs',
   )
+  // Only the previews show the draft; the app keeps the saved settings until Save.
+  expect(await stExe(page)).toBe('#047857')
+  await saveSettings(page)
   expect(await stExe(page)).toBe('#b91c1c')
 
   await goto(page, templates)
@@ -105,6 +115,7 @@ test('type names, colors and icons come from the project settings and Preference
   await goto(page, '/acme/billing/settings')
   await page.getByRole('button', { name: 'Reset to built-in' }).click()
   await expect(page.getByTestId('type-preview-exe')).toHaveText('Execution')
+  await saveSettings(page)
   expect(await stExe(page)).toBe('#047857')
 })
 
@@ -113,6 +124,7 @@ test('type names, colors and icons come from the project settings and Preference
 test('the configurations grid shows the type names of the settings', async ({ page }, testInfo) => {
   await openApp(page, '/acme/billing/settings')
   await setName(page, 'Execution name', 'Job')
+  await saveSettings(page)
   await goto(page, '/acme/billing/default/configurations?q=type:exe')
 
   if (isMobile(testInfo)) {
@@ -139,6 +151,10 @@ test('dates follow the date format of the project settings and Preferences', asy
     await goto(page, path)
     await page.getByRole('combobox', { name: 'Date format', exact: true }).click()
     await page.getByRole('option', { name: option }).click()
+    // The project's format is saved for everyone (424-266); a personal one applies at once.
+    if (path.endsWith('/settings')) {
+      await saveSettings(page)
+    }
     await goto(page, certificates)
   }
 
@@ -155,4 +171,88 @@ test('dates follow the date format of the project settings and Preferences', asy
 
   await pick('/account', 'Project default')
   await expect(expires).toHaveText(`${day}.${month}.${year}`)
+})
+
+// The project settings are stored by the API for everyone in the project (424-266): an Administrator saves them in one
+// draft, everyone else sees them read-only.
+test('an Administrator saves the project settings, and they stay after a reload', async ({ page }) => {
+  const save = page.getByRole('button', { name: 'Save project settings' })
+  await openApp(page, '/acme/billing/settings')
+  await expect(save).toBeDisabled()
+
+  await page.getByRole('button', { name: 'Default time zone' }).click()
+  await page.getByPlaceholder('Search time zones').fill('Tokyo')
+  await page.getByRole('option', { name: /Asia\/Tokyo/ }).click()
+  await page.getByRole('combobox', { name: 'Date format', exact: true }).click()
+  await page.getByRole('option', { name: /\(dd\.mm\.yyyy\)$/ }).click()
+  await setName(page, 'Subject name', 'Company')
+  await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible()
+  await saveSettings(page)
+
+  await page.reload()
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByRole('button', { name: 'Default time zone' })).toContainText('Asia/Tokyo')
+  await expect(page.getByRole('combobox', { name: 'Date format', exact: true })).toContainText('dd.mm.yyyy')
+  await expect(page.getByRole('textbox', { name: 'Subject name', exact: true })).toHaveValue('Company')
+  await expect(page.getByTestId('type-preview-sbt')).toHaveText('Company')
+  await expect(save).toBeDisabled()
+
+  // Back to the defaults, which are sent as unset.
+  await page.getByRole('button', { name: 'Use the default: UTC' }).click()
+  await page.getByRole('button', { name: 'Use the default: yyyy-mm-dd' }).click()
+  await page.getByRole('button', { name: 'Reset to built-in' }).click()
+  await saveSettings(page)
+  await goto(page, '/acme/billing/settings')
+  await expect(page.getByRole('button', { name: 'Default time zone' })).toContainText('UTC')
+  await expect(page.getByRole('combobox', { name: 'Date format', exact: true })).toContainText('yyyy-mm-dd')
+  await expect(page.getByTestId('type-preview-sbt')).toHaveText('Subject')
+})
+
+for (const [role, path, key] of [
+  ['A Contributor', '/acme/shipping/settings', 'acme.shipping'],
+  ['A Reader', '/northwind/portal/settings', 'northwind.portal'],
+] as const) {
+  test(`${role} sees the project settings read-only`, async ({ page }) => {
+    await openApp(page, path)
+    // An Administrator of the project set them.
+    await page.evaluate(
+      (project) => window.storytellerMock!.changeProjectSettings(project, { DefaultTimeZone: 'Asia/Tokyo' }),
+      key,
+    )
+    await goto(page, path)
+
+    for (const title of ['Annotations', 'Dates', 'Annotation types']) {
+      const card = page
+        .locator('[data-slot="root"]')
+        .filter({ has: page.getByRole('heading', { name: title, exact: true }) })
+        .last()
+      await expect(card.getByText('Administrator', { exact: true })).toBeVisible()
+      await expect(card.getByText('Only Administrators change the project settings.', { exact: true })).toBeVisible()
+    }
+    await expect(page.getByRole('button', { name: 'Default time zone' })).toContainText('Asia/Tokyo')
+    await expect(page.getByRole('button', { name: 'Default time zone' })).toBeDisabled()
+    await expect(page.getByRole('combobox', { name: 'Date format', exact: true })).toBeDisabled()
+    await expect(page.getByRole('textbox', { name: 'Execution name', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Save project settings' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Reset to built-in' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Use the default: UTC' })).toHaveCount(0)
+  })
+}
+
+test('a change by someone else meanwhile keeps the draft and loads the new settings on request', async ({ page }) => {
+  await openApp(page, '/acme/billing/settings')
+  await setName(page, 'Execution name', 'Job')
+
+  // Someone else saves the settings: the Save of the draft names the version it read and gets a 412.
+  await page.evaluate(() => window.storytellerMock!.changeProjectSettings('acme.billing', { DateFormat: 'dd.mm.yyyy' }))
+  await page.getByRole('button', { name: 'Save project settings' }).click()
+  await expect(
+    page.getByText('Someone changed the project settings meanwhile; your changes were not saved', { exact: true }),
+  ).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Execution name', exact: true })).toHaveValue('Job')
+
+  await page.getByRole('button', { name: 'Load the new settings' }).click()
+  await expect(page.getByRole('textbox', { name: 'Execution name', exact: true })).toHaveValue('')
+  await expect(page.getByRole('combobox', { name: 'Date format', exact: true })).toContainText('dd.mm.yyyy')
+  await expect(page.getByRole('button', { name: 'Save project settings' })).toBeDisabled()
 })

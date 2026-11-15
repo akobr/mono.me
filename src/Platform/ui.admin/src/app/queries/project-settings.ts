@@ -26,18 +26,39 @@ function listedSettings(client: QueryClient, projectKey: string): ProjectSetting
 }
 
 /**
- * The settings of the current project (GET v1/{organization}/{project}/settings, 424-266), mounted once in App.vue. The
- * first answer comes from the cached list of the caller's projects when it is loaded, which carries every project's
- * settings, so a project opened from the overview shows its types at once; the query reads them again once that list
- * is a minute old. Every answer of a settings query, also one a save writes into the cache, goes to the project
- * settings store, which the type appearance, the date format and the New annotation dialog read.
+ * The query of the settings of the current project (GET v1/{organization}/{project}/settings, 424-266), for App.vue
+ * (useCurrentProjectSettings) and the Settings page, which share it. The first answer comes from the cached list of the
+ * caller's projects when it is loaded, which carries every project's settings, so a project opened from the overview
+ * shows its types at once; the query reads them again once that list is a minute old.
  */
-export function useCurrentProjectSettings() {
+export function useProjectSettingsQuery() {
   const session = useSessionStore()
   const context = useContextStore()
-  const store = useProjectSettingsStore()
   const queryClient = useQueryClient()
-  const cache = queryClient.getQueryCache()
+
+  return useGetProjectSettings(
+    () => context.org ?? '',
+    () => context.project ?? '',
+    {
+      query: {
+        enabled: () => !!session.account && !!context.projectKey && context.access === 'ok',
+        staleTime: 60_000,
+        meta: { silent: true },
+        initialData: () => (context.projectKey ? listedSettings(queryClient, context.projectKey) : undefined),
+        initialDataUpdatedAt: () => queryClient.getQueryState(getGetProjectsQueryKey())?.dataUpdatedAt,
+      },
+    },
+  )
+}
+
+/**
+ * The settings of the current project, mounted once in App.vue: the query of useProjectSettingsQuery, and every answer
+ * of a settings query, also one a save writes into the cache, goes to the project settings store, which the type
+ * appearance, the date format and the New annotation dialog read.
+ */
+export function useCurrentProjectSettings() {
+  const store = useProjectSettingsStore()
+  const cache = useQueryClient().getQueryCache()
 
   const receive = (queryKey: readonly unknown[], data: unknown) => {
     const projectKey = projectKeyOf(queryKey)
@@ -56,17 +77,5 @@ export function useCurrentProjectSettings() {
   })
   onScopeDispose(unsubscribe)
 
-  return useGetProjectSettings(
-    () => context.org ?? '',
-    () => context.project ?? '',
-    {
-      query: {
-        enabled: () => !!session.account && !!context.projectKey && context.access === 'ok',
-        staleTime: 60_000,
-        meta: { silent: true },
-        initialData: () => (context.projectKey ? listedSettings(queryClient, context.projectKey) : undefined),
-        initialDataUpdatedAt: () => queryClient.getQueryState(getGetProjectsQueryKey())?.dataUpdatedAt,
-      },
-    },
-  )
+  return useProjectSettingsQuery()
 }

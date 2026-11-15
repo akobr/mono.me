@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { isCatalogTimeZone } from '@42for.net/2splatform.sdk'
 
-/** Searchable IANA time zones with their current offset (spec section 11.1). */
+/**
+ * Searchable IANA time zones with their current offset (spec section 11.1): the zones the browser knows that the API
+ * accepts too (the time zones of the catalog of project settings, 424-266), so no zone is offered that a save refuses.
+ */
 const model = defineModel<string>({ default: '' })
 withDefaults(defineProps<{ disabled?: boolean }>(), { disabled: false })
 
@@ -18,7 +22,7 @@ const offset = (timeZone: string) => {
 
 const zones = computed(() => {
   const names = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
-  return ['UTC', ...names.filter((name) => name !== 'UTC')].map((name) => ({
+  return ['UTC', ...names.filter((name) => name !== 'UTC' && isCatalogTimeZone(name))].map((name) => ({
     label: name,
     value: name,
     suffix: offset(name),
