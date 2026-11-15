@@ -27,14 +27,38 @@
     {
       "command": "account settings set",
       "argument": "arg0",
-      "values": [ "editor.type", "editor.command", "access.project", "access.view" ],
-      "source": "AccountSettingsSetCommand.FindDefinition: UserSettingDefinitions.Find (Configuration/UserSettingDefinitions.cs, UserSettingDefinitions.All, the key in any case); another key, or none, ends with exit 2 (\"'<key>' is no setting sform knows; the settings are editor.type, editor.command, access.project, access.view.\")."
+      "values": [ "editor.type", "editor.command", "access.project", "access.view", "output.icons", "output.projectSettings" ],
+      "source": "AccountSettingsSetCommand.FindDefinition: UserSettingDefinitions.Find (Configuration/UserSettingDefinitions.cs, UserSettingDefinitions.All, the key in any case); another key, or none, ends with exit 2 (\"'<key>' is no setting sform knows; the settings are editor.type, editor.command, access.project, access.view, output.icons, output.projectSettings.\"). The value (arg1) is no fixed set: editor.command, access.project and access.view take any text, and the choices of editor.type, output.icons (auto, always, never) and output.projectSettings (project, builtin) depend on the key (UserSettingDefinition.AllowedValues; another one ends with exit 2)."
     },
     {
       "command": "account settings unset",
       "argument": "arg0",
-      "values": [ "editor.type", "editor.command", "access.project", "access.view" ],
+      "values": [ "editor.type", "editor.command", "access.project", "access.view", "output.icons", "output.projectSettings" ],
       "source": "AccountSettingsUnsetCommand: AccountSettingsSetCommand.FindDefinition, as for set (UserSettingDefinitions.All); another key, or none, ends with exit 2."
+    },
+    {
+      "command": "project settings",
+      "option": "--format",
+      "values": [ "text", "json" ],
+      "source": "ProjectSettingsCommand.ExecuteAsync: text (the default, the table for people) or json (the settings as the API answers them), in any case (ProjectSettingsCommand.TextFormat, JsonFormat); another value ends with exit 2 (\"Unknown format '<format>'; use text or json.\")."
+    },
+    {
+      "command": "project settings set",
+      "option": "--color",
+      "values": [ "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose", "gray" ],
+      "source": "ProjectSettingsSetCommand: sent as the Color of the --type in the merge patch; the shared rules (ProjectSettingsRules over the catalog conformance/project-settings.json, ProjectSettingsCatalog.Colors, in any case) refuse another one: the API with 400 InvalidSettings, --dry-run locally, both exit 2 with \"$.Types.<code>.Color: '<color>' is not a color of the catalog; …\"; an empty value removes the color."
+    },
+    {
+      "command": "project settings set",
+      "option": "--icon",
+      "values": [ "i-lucide-target", "i-lucide-box", "i-lucide-sun", "i-lucide-link", "i-lucide-layers", "i-lucide-play", "i-lucide-cpu", "i-lucide-activity", "i-lucide-anchor", "i-lucide-atom", "i-lucide-bell", "i-lucide-bookmark", "i-lucide-bot", "i-lucide-boxes", "i-lucide-brain", "i-lucide-briefcase", "i-lucide-bug", "i-lucide-building-2", "i-lucide-calendar", "i-lucide-circle", "i-lucide-clock", "i-lucide-cloud", "i-lucide-code", "i-lucide-cog", "i-lucide-compass", "i-lucide-component", "i-lucide-container", "i-lucide-crown", "i-lucide-database", "i-lucide-factory", "i-lucide-file", "i-lucide-flag", "i-lucide-flame", "i-lucide-folder", "i-lucide-gauge", "i-lucide-gem", "i-lucide-git-branch", "i-lucide-globe", "i-lucide-heart", "i-lucide-hexagon", "i-lucide-key", "i-lucide-landmark", "i-lucide-layout-grid", "i-lucide-leaf", "i-lucide-lightbulb", "i-lucide-map-pin", "i-lucide-monitor", "i-lucide-network", "i-lucide-package", "i-lucide-puzzle", "i-lucide-rocket", "i-lucide-server", "i-lucide-shield", "i-lucide-smartphone", "i-lucide-square", "i-lucide-star", "i-lucide-store", "i-lucide-tag", "i-lucide-triangle", "i-lucide-truck", "i-lucide-user", "i-lucide-users", "i-lucide-workflow", "i-lucide-wrench", "i-lucide-zap" ],
+      "source": "ProjectSettingsSetCommand: ProjectSettingsDocuments.ToIconName (the short name building-2 is i-lucide-building-2), sent as the Icon of the --type; the shared rules (ProjectSettingsCatalog.Icons, in any case) refuse another one: the API with 400 InvalidSettings, --dry-run locally, both exit 2 with \"$.Types.<code>.Icon: '<icon>' is not an icon of the catalog, …\"; an empty value removes the icon."
+    },
+    {
+      "command": "project settings set",
+      "option": "--date-format",
+      "values": [ "yyyy-mm-dd", "dd.mm.yyyy", "dd/mm/yyyy", "mm/dd/yyyy", "d mmm yyyy" ],
+      "source": "ProjectSettingsSetCommand: sent as DateFormat in the merge patch; the shared rules (ProjectSettingsCatalog.DateFormats, in any case) refuse another one: the API with 400 InvalidSettings, --dry-run locally, both exit 2 with \"$.DateFormat: '<format>' is not a date format; …\"; an empty value goes back to yyyy-mm-dd. (--date-format of project settings reset takes no value.)"
     },
     {
       "command": "account machine create",
