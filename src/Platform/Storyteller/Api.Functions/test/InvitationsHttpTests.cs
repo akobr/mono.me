@@ -332,6 +332,20 @@ public class InvitationsHttpTests
         service.LastCreated.ShouldBeNull();
     }
 
+    // An invitation grants its role later, so it needs a recent sign-in as a grant does (Auth:StepUp, 424-264).
+    [Fact]
+    public async Task Create_WithAStaleSignIn_RequiresAStepUp()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+        var body = FunctionTestDoubles.ToJsonBody(new InvitationCreate { Email = "ada@example.com", Role = AccountRole.Reader });
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.CreateInvitation(Request([new("sub", "user_01")], body).WithSignIn(TestRequests.StaleSignIn), "acme.billing"));
+
+        service.Calls.ShouldBeEmpty();
+        service.LastCreated.ShouldBeNull();
+    }
+
     // Lower roles pass through a restricted actor, and every role passes without the restriction.
     [Theory]
     [InlineData(AccountRole.Reader, true)]
@@ -402,6 +416,7 @@ public class InvitationsHttpTests
         var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, body: body);
         claims.Add(new Claim("scp", Scopes.User.Impersonation));
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
+        context.Items[FunctionContextItemKeys.SignInRecency] = TestRequests.RecentSignIn;
 
         if (delegatedActor)
         {

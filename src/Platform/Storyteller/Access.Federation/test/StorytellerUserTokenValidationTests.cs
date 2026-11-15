@@ -93,6 +93,37 @@ public sealed class StorytellerUserTokenValidationTests
         delegation.Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);
     }
 
+    // The person's sign-in time the exchange copied reaches the API as an auth_time claim, for its step-up (424-264).
+    [Fact]
+    public async Task IssuedUserToken_WithAnAuthTime_CarriesItAsAClaim()
+    {
+        var authTime = _time.GetUtcNow().AddMinutes(-3);
+        var issued = await _issuer.IssueUserAsync(UserRequest() with { AuthTime = authTime });
+
+        var result = await _validator.ValidateAsync(issued.AccessToken);
+
+        result.ShouldNotBeNull().Claims.Single(claim => claim.Type == "auth_time").Value
+            .ShouldBe(authTime.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture));
+        UserSubjectTokenRules.GetAuthTime(result.Claims).ShouldBe(DateTimeOffset.FromUnixTimeSeconds(authTime.ToUnixTimeSeconds()));
+    }
+
+    // Only a non-negative integer is a sign-in time; anything else gives no claim, so the API finds no recent sign-in.
+    [Theory]
+    [InlineData("\"1793000000\"")]
+    [InlineData("1793000000.5")]
+    [InlineData("-1")]
+    [InlineData("null")]
+    [InlineData("true")]
+    public async Task UserToken_WithAnAuthTimeThatIsNoInteger_HasNoAuthTimeClaim(string json)
+    {
+        var payload = UserPayload();
+        Set(payload, "auth_time", json);
+
+        var result = await _validator.ValidateAsync(await SignAsync(payload));
+
+        result.ShouldNotBeNull().Claims.ShouldNotContain(claim => claim.Type == "auth_time");
+    }
+
     [Fact]
     public async Task IssuedUserToken_WithoutRestrictions_HasADelegationWithout()
     {

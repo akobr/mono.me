@@ -300,6 +300,46 @@ public class ConfigurationConditionalReadTests
         Headers(restricted)[SecretRights.WithheldHeader].ToString().ShouldBe(SecretRights.WithheldByActor);
     }
 
+    // A user whose sign-in is not recent (Auth:StepUp) is read without secrets and learns why, on the 200 and the 304; the
+    // tag is its own, so after a new sign-in the old tag never answers 304 (424-264).
+    [Fact]
+    public async Task GetConfigurationResolved_WithAStaleSignIn_IsEvaluatedWithoutSecretsAndSaysWhy()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"), role: AccountRole.ContributorWithSecrets);
+        using var provider = Manifests();
+        var first = WithHttpContext(KeyValueRequests.User().WithSignIn(TestRequests.StaleSignIn), ifNoneMatch: null, provider);
+        var result = await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var second = WithHttpContext(KeyValueRequests.User().WithSignIn(TestRequests.StaleSignIn), Headers(first).ETag.ToString(), provider);
+        var notModified = await http.GetConfigurationResolved(second, Org, Project, View, Key);
+        var fresh = WithHttpContext(KeyValueRequests.User(), Headers(first).ETag.ToString(), provider);
+        var afterSignIn = await http.GetConfigurationResolved(fresh, Org, Project, View, Key);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        notModified.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        afterSignIn.ShouldBeOfType<OkObjectResult>("the stale variant's tag never matches the read with secrets");
+        configurations.IncludeSecrets.ShouldBe([false, true]);
+
+        foreach (var request in new[] { first, second })
+        {
+            Headers(request)[SecretRights.WithheldHeader].ToString().ShouldBe(SecretRights.WithheldByStepUp);
+            Headers(request).CacheControl.ToString().ShouldBe("private, no-cache");
+        }
+
+        Headers(fresh).ContainsKey(SecretRights.WithheldHeader).ShouldBeFalse();
+    }
+
+    // The actor wins: a new sign-in would not lift NoSecretReveal, so a stale delegated user learns about the actor.
+    [Fact]
+    public async Task GetConfigurationResolved_ThroughARestrictedActorWithAStaleSignIn_NamesTheActor()
+    {
+        var (http, _) = Create(() => Stored(), Resolve("db-1"), role: AccountRole.ContributorWithSecrets);
+        var request = WithHttpContext(TestRequests.DelegatedUser().WithSignIn(TestRequests.StaleSignIn), ifNoneMatch: null);
+
+        await http.GetConfigurationResolved(request, Org, Project, View, Key);
+
+        Headers(request)[SecretRights.WithheldHeader].ToString().ShouldBe(SecretRights.WithheldByActor);
+    }
+
     // An actor that allows secrets leaves the user the read right: the read is the one with secrets, without the header.
     [Fact]
     public async Task GetConfigurationResolved_ThroughAnActorThatAllowsSecrets_ReadsTheSecrets()
@@ -650,14 +690,16 @@ public class ConfigurationConditionalReadTests
         ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), rights).ToString().ShouldNotBe(tag);
     }
 
-    // Reading, withheld by the mTLS rule, withheld by the actor, and neither: each its own variant of the read.
+    // Reading, withheld by the mTLS rule, withheld by the actor, withheld by the step-up, and neither: each its own variant
+    // of the read.
     [Fact]
-    public void Tags_SplitTheFourSecretRights()
+    public void Tags_SplitTheFiveSecretRights()
     {
         var secret = new byte[32];
         var reading = Rights(canReadSecrets: true, withheld: false);
         var withheld = Rights(canReadSecrets: false, withheld: true);
         var withheldByActor = Rights(canReadSecrets: false, withheld: false, withheldByActor: true);
+        var withheldByStepUp = Rights(canReadSecrets: false, withheld: false) with { IsReadWithheldByStepUp = true };
         var neither = Rights(canReadSecrets: false, withheld: false);
 
         string[] resolved =
@@ -665,6 +707,7 @@ public class ConfigurationConditionalReadTests
             ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), reading).ToString(),
             ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), withheld).ToString(),
             ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), withheldByActor).ToString(),
+            ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), withheldByStepUp).ToString(),
             ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), neither).ToString(),
         ];
         string[] bound =
@@ -672,10 +715,11 @@ public class ConfigurationConditionalReadTests
             ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), reading, secret).ToString(),
             ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), withheld, secret).ToString(),
             ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), withheldByActor, secret).ToString(),
+            ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), withheldByStepUp, secret).ToString(),
             ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), neither, secret).ToString(),
         ];
 
-        resolved.Concat(bound).Distinct().Count().ShouldBe(8);
+        resolved.Concat(bound).Distinct().Count().ShouldBe(10);
         bound.ShouldAllBe(tag => tag.StartsWith("W/\"b.", StringComparison.Ordinal));
     }
 

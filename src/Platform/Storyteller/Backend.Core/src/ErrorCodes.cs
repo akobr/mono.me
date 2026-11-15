@@ -19,6 +19,10 @@ public static class ErrorCodes
     // NoSecretReveal for a request of secret values.
     public const string ActorRestricted = "ActorRestricted";
 
+    // The operation needs a recent sign-in of the user (Auth:StepUp, RFC 9470): 401 with WWW-Authenticate. Signing in
+    // again helps, unlike every 403.
+    public const string StepUpRequired = "StepUpRequired";
+
     public const string AccountExists = "AccountExists";
     public const string AccessPointExists = "AccessPointExists";
     public const string LastOwner = "LastOwner";

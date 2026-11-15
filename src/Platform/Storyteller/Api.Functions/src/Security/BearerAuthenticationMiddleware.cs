@@ -268,15 +268,23 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
     }
 
     // The delegation comes from the result of the Storyteller token validator only, never from claims: the user acts
-    // through that actor, so the audit actor gets Via and the actor's restrictions apply.
+    // through that actor, so the audit actor gets Via and the actor's restrictions apply. Every user also gets the
+    // judgement of their sign-in (Auth:StepUp), from the claims that are stored: a provider token's auth_time, or the one a
+    // Storyteller user token copied from its subject token.
     private static void StoreIdentity(FunctionContext context, BearerValidationResult result, BearerDelegation? delegation)
     {
-        context.Items[FunctionContextItemKeys.CachedClaims] = result.Claims as List<Claim> ?? result.Claims.ToList();
+        var claims = result.Claims as List<Claim> ?? result.Claims.ToList();
+        context.Items[FunctionContextItemKeys.CachedClaims] = claims;
 
         if (!result.IsMachine && delegation is not null)
         {
             context.Items[FunctionContextItemKeys.DelegatedActor] = delegation.ActorId;
             context.Items[FunctionContextItemKeys.DelegatedRestrictions] = delegation.Restrictions;
+        }
+
+        if (!result.IsMachine)
+        {
+            context.Items[FunctionContextItemKeys.SignInRecency] = JudgeSignIn(context, claims);
         }
 
         if (result.IsMachine && !string.IsNullOrEmpty(result.MachineId))
@@ -297,6 +305,17 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
                 context.Items[FunctionContextItemKeys.MachineProject] = result.Project;
             }
         }
+    }
+
+    // The step-up settings, the deployment's provider and the clock of the host; their defaults where a host (a test)
+    // registers none.
+    private static SignInRecency JudgeSignIn(FunctionContext context, IReadOnlyList<Claim> claims)
+    {
+        var services = context.InstanceServices;
+        var options = services.GetService<IOptions<StepUpOptions>>()?.Value ?? new StepUpOptions();
+        var provider = services.GetService<IOptions<UserAuthenticationOptions>>()?.Value.Provider ?? new UserAuthenticationOptions().Provider;
+        var time = services.GetService<TimeProvider>() ?? TimeProvider.System;
+        return SignInRecency.Evaluate(claims, options, provider, time.GetUtcNow(), HttpRequestDataExtensions.IsDevelopmentAuthentication);
     }
 
     private void RespondUnauthorized(FunctionContext context, HttpRequestData request)

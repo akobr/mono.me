@@ -72,7 +72,7 @@ public class InvitationsHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "Not an email address, the role None, or an invalid validity.")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The access point doesn't exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A pending invitation for the email already exists (InvitationExists).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenRoleGrant)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> CreateInvitation(
@@ -94,6 +94,9 @@ public class InvitationsHttp
         }
 
         AccessHttp.EnsureActorMayGrantRole(request, model.Role);
+
+        // An invitation is a role granted later: it needs a recent sign-in (Auth:StepUp) as a grant does.
+        request.EnsureRecentSignIn();
 
         try
         {

@@ -476,7 +476,9 @@ public class OpenApiExportTests
             }
             else if (UserOnlyOperations.Contains(id))
             {
-                unauthorized.ShouldBe(Definitions.Descriptions.ResponseUnauthorizedUserOnly, id);
+                unauthorized.ShouldBe(
+                    OperationAccess.StepUp.Contains(id) ? Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly : Definitions.Descriptions.ResponseUnauthorizedUserOnly,
+                    id);
                 var description = responses.GetProperty("403").GetProperty("description").GetString()!;
                 description.ShouldStartWith(Definitions.Descriptions.ResponseForbiddenUserOnly, customMessage: id, caseSensitivity: Case.Sensitive);
                 NamedScopes(description).ShouldBeEmpty(id);
@@ -662,6 +664,39 @@ public class OpenApiExportTests
         Definitions.Descriptions.ResponseForbiddenRoleGrant.ShouldBe(
             Definitions.Descriptions.ResponseForbiddenUserOnly
             + " Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).");
+    }
+
+    // The step-up (Auth:StepUp, RFC 9470): exactly the operations of OperationAccess.StepUp document a 401 with an
+    // ErrorResponse and the WWW-Authenticate challenge, with the 401 text of their callers plus the step-up; every other
+    // 401 stays without a body.
+    [Fact]
+    public async Task Document_StepUpOperations_DocumentTheChallengeInTheir401()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        var withBody = document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject())
+            .Where(operation => operation.Value.GetProperty("responses").TryGetProperty("401", out var response) && response.TryGetProperty("content", out _))
+            .Select(operation => operation.Value.GetProperty("operationId").GetString()!)
+            .ToList();
+
+        withBody.ShouldBe(OperationAccess.StepUp, ignoreOrder: true);
+
+        foreach (var id in OperationAccess.StepUp)
+        {
+            var response = Operation(document, id).GetProperty("responses").GetProperty("401");
+            response.GetProperty("content").GetProperty(Definitions.ContentTypes.Json).GetProperty("schema").GetProperty("$ref").GetString()
+                .ShouldBe("#/components/schemas/ErrorResponse", id);
+            response.GetProperty("headers").GetProperty("WWW-Authenticate").GetProperty("description").GetString()
+                .ShouldBe(Definitions.Descriptions.StepUpChallenge, id);
+            response.GetProperty("description").GetString()
+                .ShouldBe(UserOnlyOperations.Contains(id) ? Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly : Definitions.Descriptions.ResponseUnauthorizedStepUp, id);
+        }
+
+        Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly.ShouldStartWith(Definitions.Descriptions.ResponseUnauthorizedUserOnly, Case.Sensitive);
+        Definitions.Descriptions.ResponseUnauthorizedStepUp.ShouldStartWith(Definitions.Descriptions.ResponseUnauthorized, Case.Sensitive);
+        Definitions.Descriptions.StepUpUnauthorized.ShouldContain("insufficient_user_authentication");
+        Definitions.Descriptions.SecretsWithheld.ShouldContain(SecretRights.WithheldByStepUp);
     }
 
     // An actor under NoSecretReveal refuses the reads of secret values (ActorRestricted), never the writes: only the 403

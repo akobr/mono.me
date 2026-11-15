@@ -639,6 +639,37 @@ public class MachineHttpTests
         access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
     }
 
+    // New credentials need a recent sign-in (Auth:StepUp), in every build, after the role checks and before anything is
+    // created or reset; the delete gives nothing out and passes (424-264).
+    [Fact]
+    public async Task CreateAndReset_WithAStaleSignIn_RequireAStepUp_DeleteDoesNot()
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.ContributorWithSecrets };
+        var http = CreateHttp(access);
+        var body = FunctionTestDoubles.ToJsonBody(MachineCreate(null));
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.PostMachines(ContributorRequest(body).WithSignIn(TestRequests.StaleSignIn), "org1", "proj1"));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.PutMachine(ContributorRequest().WithSignIn(TestRequests.StaleSignIn), "org1", "proj1", KeycloakId));
+
+        access.Created.ShouldBeNull();
+        access.Calls.ShouldNotContain(call => call.StartsWith("reset:", StringComparison.Ordinal));
+
+        (await http.DeleteMachine(ContributorRequest().WithSignIn(TestRequests.StaleSignIn), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkResult>();
+    }
+
+    [Fact]
+    public async Task CreateAndReset_WithARecentSignIn_GiveOutTheCredentials()
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.ContributorWithSecrets };
+        var http = CreateHttp(access);
+        var body = FunctionTestDoubles.ToJsonBody(MachineCreate(null));
+
+        (await http.PostMachines(ContributorRequest(body), "org1", "proj1")).ShouldBeOfType<OkObjectResult>();
+        (await http.PutMachine(ContributorRequest(), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkObjectResult>();
+
+        access.Created.ShouldNotBeNull();
+    }
+
     [Fact]
     public async Task PutMachine_OfAMachineWithoutASecretsScope_ThroughARestrictedActor_IsReset()
     {
@@ -870,6 +901,7 @@ public class MachineHttpTests
             new("sub", "user-1"),
             new("scp", Scopes.User.Impersonation),
         };
+        context.Items[FunctionContextItemKeys.SignInRecency] = TestRequests.RecentSignIn;
         return request;
     }
 

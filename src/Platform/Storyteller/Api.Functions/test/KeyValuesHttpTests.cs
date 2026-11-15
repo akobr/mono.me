@@ -755,6 +755,79 @@ public class KeyValuesHttpTests
         service.LastExport!.IncludeSecrets.ShouldBeFalse();
     }
 
+    // A sign-in that is not recent (Auth:StepUp): a reveal of a secret is 401 StepUpRequired once the service refused it,
+    // a public pair is revealed; reads without reveal answer as before (424-264).
+    [Fact]
+    public async Task GetKeyValue_RevealWithAStaleSignIn_RequiresAStepUpForASecretOnly()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.GetKeyValue(Stale(KeyValueRequests.User(query: q => q["reveal"] = "true")), Org, Project, View, "db.password"));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.GetKeyValueVersion(Stale(KeyValueRequests.User(query: q => q["reveal"] = "true")), Org, Project, View, "db.password", 1));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.GetKeyValueVersionDiff(Stale(KeyValueRequests.User()), Org, Project, View, "db.password", 2));
+        var withoutReveal = await http.GetKeyValue(Stale(KeyValueRequests.User()), Org, Project, View, "db.password");
+        service.Pair = RecordingKeyValueService.Public("db.host", "db-1");
+        var revealPublic = await http.GetKeyValue(Stale(KeyValueRequests.User(query: q => q["reveal"] = "true")), Org, Project, View, "db.host");
+
+        withoutReveal.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBeNull();
+        revealPublic.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBe("db-1");
+        service.LastCaller!.CanReadSecrets.ShouldBeFalse();
+    }
+
+    // Writes of secrets need a recent sign-in too: 401 for a secret, public writes pass; an export with secrets and a
+    // protect are refused before the service is asked.
+    [Fact]
+    public async Task SecretWrites_WithAStaleSignIn_RequireAStepUp_PublicWritesDoNot()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+        var secretWrite = FunctionTestDoubles.ToJsonBody(new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s3cret" });
+        var publicWrite = FunctionTestDoubles.ToJsonBody(new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "db-1" });
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.SetKeyValue(Stale(KeyValueRequests.User("PUT", body: secretWrite)), Org, Project, View, "db.password"));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.ExportKeyValues(Stale(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true }))), Org, Project, View));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.ProtectKeyValues(Stale(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["db.password"], Protection = KeyValueProtection.Hsm }))), Org, Project, View));
+        service.Calls.ShouldBe(["set:db.password"]);
+
+        var @public = await http.SetKeyValue(Stale(KeyValueRequests.User("PUT", body: publicWrite)), Org, Project, View, "db.host");
+        var export = await http.ExportKeyValues(Stale(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest()))), Org, Project, View);
+
+        @public.ShouldBeOfType<OkObjectResult>();
+        export.ShouldBeOfType<OkObjectResult>();
+        service.LastExport!.IncludeSecrets.ShouldBeFalse();
+    }
+
+    // Machines never need a step-up: a machine with a stray stale judgement reveals over mTLS as before.
+    [Fact]
+    public async Task Machine_WithAStaleJudgement_RevealsAsBefore()
+    {
+        var (http, service) = Create(AccountRole.None);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+        var request = KeyValueRequests.Machine(mtls: true, query: q => q["reveal"] = "true");
+        request.FunctionContext.Items[FunctionContextItemKeys.SignInRecency] = TestRequests.StaleSignIn;
+
+        var result = await http.GetKeyValue(request, Org, Project, View, "db.password");
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBe("s3cret");
+    }
+
+    // Adding or enabling a recipient lets its key holder read what is encrypted for it: a recent sign-in first; removing
+    // one does not need it.
+    [Fact]
+    public async Task Recipients_AddAndUpdateWithAStaleSignIn_RequireAStepUp_RemoveDoesNot()
+    {
+        var policies = new RecordingPolicyService();
+        var http = new KeyValuePolicyHttp(policies, new FixedKeyValuePolicies(), new RoleAccess(AccountRole.Administrator), FunctionTestDoubles.ApiJsonOptions);
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.AddRecipient(Stale(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new ClientEncryptionRecipientCreate { Name = "api", PublicKey = "-----BEGIN PUBLIC KEY-----" }))), Org, Project));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.UpdateRecipient(Stale(KeyValueRequests.User("PATCH", body: FunctionTestDoubles.ToJsonBody(new ClientEncryptionRecipientUpdate { IsEnabled = true }))), Org, Project, "r1"));
+        var removed = await http.RemoveRecipient(Stale(KeyValueRequests.User("DELETE")), Org, Project, "r1");
+
+        removed.ShouldBeOfType<NoContentResult>();
+        policies.Calls.ShouldBe(["remove:r1"]);
+    }
+
     // NoSecretReveal is about reading: the writes of secrets keep the write right of the role.
     [Fact]
     public async Task Writes_ThroughARestrictedActor_KeepTheWriteRight()
@@ -1228,6 +1301,11 @@ public class KeyValuesHttpTests
         await http.GetKeyValueUsage(KeyValueRequests.User(), Org, Project);
 
         usage.LastRange.ShouldBe((new DateOnly(2026, 9, 13), new DateOnly(2026, 10, 13)));
+    }
+
+    private static TestHttpRequestData Stale(TestHttpRequestData request)
+    {
+        return request.WithSignIn(TestRequests.StaleSignIn);
     }
 
     // The machine of the access double has the six runtime scopes and the given management scopes (none by default), or

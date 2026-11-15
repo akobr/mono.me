@@ -58,7 +58,7 @@ public class MembersHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The access point doesn't exist, or the account is not a member (MemberNotFound).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The last owner can't be demoted (LastOwner), and members can't change their own role (SelfRoleChange).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenRoleGrant)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetMemberRole(
@@ -82,6 +82,9 @@ public class MembersHttp
 
         AccessHttp.EnsureActorMayGrantRole(request, update.Role);
 
+        // A role change needs a recent sign-in (Auth:StepUp): 401 otherwise.
+        request.EnsureRecentSignIn();
+
         var member = await _accessService.SetMemberRoleAsync(NormalizeKey(key), accountId, update.Role, request.GetIdentityUniqueId());
         return new OkObjectResult(member);
     }
@@ -95,7 +98,7 @@ public class MembersHttp
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "The member was removed.")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The access point doesn't exist, or the account is not a member (MemberNotFound).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The last owner can't be removed (LastOwner).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> RemoveMember(
@@ -105,7 +108,15 @@ public class MembersHttp
         string accountId)
     {
         request.EnsureUser();
-        await _accessService.RemoveMemberAsync(NormalizeKey(key), accountId, request.GetIdentityUniqueId());
+        var actorId = request.GetIdentityUniqueId();
+
+        // Removing another member needs a recent sign-in (Auth:StepUp); leaving, the way the service tells it, does not.
+        if (!string.Equals(actorId, accountId, StringComparison.Ordinal))
+        {
+            request.EnsureRecentSignIn();
+        }
+
+        await _accessService.RemoveMemberAsync(NormalizeKey(key), accountId, actorId);
         return new NoContentResult();
     }
 

@@ -4,6 +4,7 @@ using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
+using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -153,7 +154,7 @@ public class CertificatesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(SharedCertificateCreate), Description = "The label and optional lifetime for the shared certificate.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(SharedCertificate), Description = "The issued shared certificate with PKCS#12 data.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "An invalid label, or the project does not enable CertificateAndApiKey, which shared certificates belong to (MachineAccessNotSupported).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     public async Task<IActionResult> PostSharedCertificate(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.SharedCertificates)]
@@ -184,6 +185,9 @@ public class CertificatesHttp
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = "Invalid certificate label. Only letters, digits, hyphens, underscores, and dots are allowed." });
         }
+
+        // The answer is a credential, its private key and password (Auth:StepUp); before the try, which drops the header.
+        request.EnsureRecentSignIn();
 
         try
         {

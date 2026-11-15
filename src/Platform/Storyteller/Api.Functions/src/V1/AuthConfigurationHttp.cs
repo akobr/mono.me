@@ -17,13 +17,16 @@ public class AuthConfigurationHttp
 {
     private readonly AuthConfiguration _configuration;
 
-    public AuthConfigurationHttp(IOptions<UserAuthenticationOptions> options, IOptions<TokenExchangeOptions>? tokenExchangeOptions = null)
+    public AuthConfigurationHttp(
+        IOptions<UserAuthenticationOptions> options,
+        IOptions<TokenExchangeOptions>? tokenExchangeOptions = null,
+        IOptions<StepUpOptions>? stepUpOptions = null)
     {
-        _configuration = Describe(options.Value, tokenExchangeOptions?.Value);
+        _configuration = Describe(options.Value, tokenExchangeOptions?.Value, stepUpOptions?.Value);
     }
 
     [Function(nameof(GetAuthConfiguration))]
-    [OpenApiOperation(Definitions.RouteIds.Access.GetAuthConfiguration, Definitions.Tags.Access, Description = "Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.")]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetAuthConfiguration, Definitions.Tags.Access, Description = "Anonymous. Tells clients which identity provider signs users in and with which public settings, whether the user token exchange is enabled, and the step-up of users (whether secrets, role changes and machine credentials need a recent sign-in, and its max age in seconds).")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AuthConfiguration), Description = "The user identity provider of this deployment.")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public IActionResult GetAuthConfiguration(
@@ -34,9 +37,15 @@ public class AuthConfigurationHttp
     }
 
     // Only public identifiers. The WorkOS management key and other secrets stay out, and so do the actors of the exchange.
-    internal static AuthConfiguration Describe(UserAuthenticationOptions options, TokenExchangeOptions? tokenExchangeOptions = null)
+    internal static AuthConfiguration Describe(UserAuthenticationOptions options, TokenExchangeOptions? tokenExchangeOptions = null, StepUpOptions? stepUpOptions = null)
     {
         var tokenExchange = new TokenExchangeConfiguration { Enabled = tokenExchangeOptions?.Enabled == true };
+        var stepUpSettings = stepUpOptions ?? new StepUpOptions();
+        var stepUp = new StepUpConfiguration
+        {
+            Enabled = stepUpSettings.IsEnabledFor(options.Provider, Security.HttpRequestDataExtensions.IsDevelopmentAuthentication),
+            MaxAge = (long)Math.Floor(stepUpSettings.MaxAge.TotalSeconds),
+        };
 
         if (options.Provider == IdentityProviderKind.AuthKit)
         {
@@ -48,6 +57,7 @@ public class AuthConfigurationHttp
                 ClientId = options.AuthKit.ClientId,
                 AuthKitDomain = string.IsNullOrWhiteSpace(authKitDomain) ? null : authKitDomain,
                 TokenExchange = tokenExchange,
+                StepUp = stepUp,
             };
         }
 
@@ -60,6 +70,7 @@ public class AuthConfigurationHttp
                 ClientId = options.Keycloak.ClientId?.Trim() ?? string.Empty,
                 Issuer = options.Keycloak.GetIssuer(),
                 TokenExchange = tokenExchange,
+                StepUp = stepUp,
             };
         }
 
@@ -76,6 +87,7 @@ public class AuthConfigurationHttp
                 $"api://{clientId}/{Scopes.User.Impersonation}",
             ],
             TokenExchange = tokenExchange,
+            StepUp = stepUp,
         };
     }
 }

@@ -108,6 +108,117 @@ public class SecretRightsTests
         rights.Caller.Actor.Via.ShouldBe(TestRequests.ActorId);
     }
 
+    // A sign-in that is not recent (Auth:StepUp) withholds both rights the role gives and says so, in every build; a recent
+    // one changes nothing (424-264).
+    [Theory]
+    [InlineData(AccountRole.ContributorWithSecrets)]
+    [InlineData(AccountRole.Owner)]
+    public async Task User_WithAStaleSignIn_IsWithheldBothRightsForTheStepUp(AccountRole role)
+    {
+        var request = TestRequests.User().WithSignIn(SignInRecency.Stale(TimeSpan.FromMinutes(5)));
+
+        var rights = await request.GetSecretRightsAsync(new RoleAccess(role), new FixedKeyValuePolicies(requireMtls: true), Org, Project);
+
+        rights.CanReadSecrets.ShouldBeFalse();
+        rights.CanWriteSecrets.ShouldBeFalse();
+        rights.IsReadWithheldByStepUp.ShouldBeTrue();
+        rights.IsWriteWithheldByStepUp.ShouldBeTrue();
+        rights.IsReadWithheldByActor.ShouldBeFalse();
+        rights.IsReadWithheldByMtls.ShouldBeFalse();
+        rights.StepUpMaxAge.ShouldBe(TimeSpan.FromMinutes(5));
+        rights.ReadWithheldReason.ShouldBe(SecretRights.WithheldByStepUp);
+
+        var read = Should.Throw<StepUpRequiredException>(() => KeyValueAuthorization.EnsureSecretReadRights(rights));
+        var write = Should.Throw<StepUpRequiredException>(() => KeyValueAuthorization.EnsureSecretWriteRights(rights));
+        var readByTheService = await Should.ThrowAsync<StepUpRequiredException>(() => KeyValueAuthorization.UnderSecretReadRuleAsync<bool>(rights, RefusedByTheService));
+        var writeByTheService = await Should.ThrowAsync<StepUpRequiredException>(() => KeyValueAuthorization.UnderSecretWriteRuleAsync<bool>(rights, RefusedByTheService));
+
+        foreach (var exception in new[] { read, write, readByTheService, writeByTheService })
+        {
+            exception.ErrorCode.ShouldBe(ErrorCodes.StepUpRequired);
+            exception.MaxAge.ShouldBe(TimeSpan.FromMinutes(5));
+        }
+
+        var recent = await TestRequests.User().GetSecretRightsAsync(new RoleAccess(role), new FixedKeyValuePolicies(requireMtls: true), Org, Project);
+        recent.CanReadSecrets.ShouldBeTrue();
+        recent.CanWriteSecrets.ShouldBeTrue();
+        recent.IsReadWithheldByStepUp.ShouldBeFalse();
+        recent.IsWriteWithheldByStepUp.ShouldBeFalse();
+        recent.ReadWithheldReason.ShouldBeNull();
+    }
+
+    // Without the role nothing is withheld for the step-up: the refusal stays AccessDenied, since a new sign-in would not
+    // help. Debug builds (DEV_AUTH) give every user the rights, so there the step-up withholds them.
+    [Fact]
+    public async Task Reader_WithAStaleSignIn_IsRefusedForTheRoleNotTheStepUp()
+    {
+        var request = TestRequests.User().WithSignIn(TestRequests.StaleSignIn);
+
+        var rights = await request.GetSecretRightsAsync(new RoleAccess(AccountRole.Reader), new FixedKeyValuePolicies(requireMtls: true), Org, Project);
+
+        rights.IsReadWithheldByStepUp.ShouldBe(DevAuth);
+        rights.IsWriteWithheldByStepUp.ShouldBe(DevAuth);
+        Should.Throw<StorytellerException>(() => KeyValueAuthorization.EnsureSecretReadRights(rights))
+            .ErrorCode.ShouldBe(DevAuth ? ErrorCodes.StepUpRequired : ErrorCodes.AccessDenied);
+    }
+
+    // The actor wins for the read (a new sign-in does not lift NoSecretReveal); the write right is withheld by the step-up.
+    [Fact]
+    public async Task DelegatedUser_UnderNoSecretRevealWithAStaleSignIn_IsWithheldTheReadByTheActorAndTheWriteByTheStepUp()
+    {
+        var request = TestRequests.DelegatedUser([ActorRestrictions.NoSecretReveal]).WithSignIn(TestRequests.StaleSignIn);
+
+        var rights = await request.GetSecretRightsAsync(new RoleAccess(AccountRole.ContributorWithSecrets), new FixedKeyValuePolicies(), Org, Project);
+
+        rights.IsReadWithheldByActor.ShouldBeTrue();
+        rights.IsReadWithheldByStepUp.ShouldBeFalse();
+        rights.IsWriteWithheldByStepUp.ShouldBeTrue();
+        rights.ReadWithheldReason.ShouldBe(SecretRights.WithheldByActor);
+        Should.Throw<AccessDeniedException>(() => KeyValueAuthorization.EnsureSecretReadRights(rights)).ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        Should.Throw<StepUpRequiredException>(() => KeyValueAuthorization.EnsureSecretWriteRights(rights));
+    }
+
+    // Machines never need a step-up: a stray judgement does not change their rights.
+    [Fact]
+    public async Task Machine_WithAStaleJudgement_KeepsItsRights()
+    {
+        var request = TestRequests.Machine([MachineScope.ConfigurationRead, MachineScope.SecretsRead, MachineScope.SecretsWrite], mtls: true);
+        request.FunctionContext.Items[FunctionContextItemKeys.SignInRecency] = TestRequests.StaleSignIn;
+
+        var rights = await request.GetSecretRightsAsync(new RoleAccess(AccountRole.None), new FixedKeyValuePolicies(requireMtls: true), Org, Project);
+
+        rights.CanReadSecrets.ShouldBeTrue();
+        rights.CanWriteSecrets.ShouldBeTrue();
+        rights.IsReadWithheldByStepUp.ShouldBeFalse();
+        rights.IsWriteWithheldByStepUp.ShouldBeFalse();
+        request.HasRecentSignIn().ShouldBeTrue();
+    }
+
+    // Restore and purge answer per item: the items refused only for the step-up say so, with the step-up message.
+    [Fact]
+    public void BulkItems_RefusedForTheStepUp_NameIt()
+    {
+        var result = new KeyValueBulkResult
+        {
+            Items =
+            [
+                new KeyValueBulkItemResult { Key = "db.password", Outcome = KeyValueBulkOutcome.Forbidden, ErrorCode = ErrorCodes.AccessDenied },
+                new KeyValueBulkItemResult { Key = "db.host", Outcome = KeyValueBulkOutcome.Done },
+                new KeyValueBulkItemResult { Key = "gone", Outcome = KeyValueBulkOutcome.NotFound },
+            ],
+        };
+        var stale = Rights(writeWithheldByStepUp: true);
+
+        var marked = KeyValueAuthorization.WithStepUpOutcomes(stale, result);
+
+        marked.Items[0].ErrorCode.ShouldBe(ErrorCodes.StepUpRequired);
+        marked.Items[0].Message.ShouldBe(new StepUpRequiredException(StepUpOptions.DefaultMaxAge).Message);
+        marked.Items[0].Outcome.ShouldBe(KeyValueBulkOutcome.Forbidden);
+        marked.Items[1].ShouldBe(result.Items[1]);
+        marked.Items[2].ShouldBe(result.Items[2]);
+        KeyValueAuthorization.WithStepUpOutcomes(Rights(writeWithheldByStepUp: false), result).ShouldBeSameAs(result);
+    }
+
     // An actor that allows secrets (AllowSecrets: no NoSecretReveal in the token) leaves the user the rights of the role.
     [Fact]
     public async Task DelegatedUser_ThroughAnActorThatAllowsSecrets_KeepsBothRights()
@@ -149,7 +260,7 @@ public class SecretRightsTests
 
         var read = Should.Throw<AccessDeniedException>(() => KeyValueAuthorization.EnsureSecretReadRights(rights));
         var readByTheService = await Should.ThrowAsync<AccessDeniedException>(() => KeyValueAuthorization.UnderSecretReadRuleAsync<bool>(rights, RefusedByTheService));
-        var writeByTheService = await Should.ThrowAsync<AccessDeniedException>(() => KeyValueAuthorization.UnderMtlsWriteRuleAsync<bool>(rights, RefusedByTheService));
+        var writeByTheService = await Should.ThrowAsync<AccessDeniedException>(() => KeyValueAuthorization.UnderSecretWriteRuleAsync<bool>(rights, RefusedByTheService));
 
         read.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
         read.Message.ShouldBe(KeyValueErrors.ActorRestricted().Message);
@@ -251,7 +362,7 @@ public class SecretRightsTests
         var read = Should.Throw<AccessDeniedException>(() => KeyValueAuthorization.EnsureSecretReadRights(rights));
         var write = Should.Throw<AccessDeniedException>(() => KeyValueAuthorization.EnsureSecretWriteRights(rights));
         var readByTheService = await Should.ThrowAsync<AccessDeniedException>(() => KeyValueAuthorization.UnderSecretReadRuleAsync<bool>(rights, RefusedByTheService));
-        var writeByTheService = await Should.ThrowAsync<AccessDeniedException>(() => KeyValueAuthorization.UnderMtlsWriteRuleAsync<bool>(rights, RefusedByTheService));
+        var writeByTheService = await Should.ThrowAsync<AccessDeniedException>(() => KeyValueAuthorization.UnderSecretWriteRuleAsync<bool>(rights, RefusedByTheService));
 
         read.ErrorCode.ShouldBe(readError);
         readByTheService.ErrorCode.ShouldBe(readError);
@@ -303,6 +414,14 @@ public class SecretRightsTests
 
         rights.CanReadSecrets.ShouldBeFalse();
         rights.CanWriteSecrets.ShouldBeFalse();
+    }
+
+    private static SecretRights Rights(bool writeWithheldByStepUp)
+    {
+        return new SecretRights(new KeyValueCaller(AuditActor.Account(TestRequests.UserId), false, !writeWithheldByStepUp), false, false)
+        {
+            IsWriteWithheldByStepUp = writeWithheldByStepUp,
+        };
     }
 
     // The service refuses a secret the way the key/value service does.

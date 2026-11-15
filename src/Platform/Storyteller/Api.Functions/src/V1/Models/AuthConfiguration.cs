@@ -24,4 +24,7 @@ public record class AuthConfiguration
 
     // The user token exchange, for every provider.
     public required TokenExchangeConfiguration TokenExchange { get; init; }
+
+    // The step-up of users (Auth:StepUp), for every provider.
+    public required StepUpConfiguration StepUp { get; init; }
 }

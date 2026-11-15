@@ -37,22 +37,43 @@ internal static class KeyValueAuthorization
         throw Refused(rights, isRead: false);
     }
 
-    // A read the service may refuse for a secret it would reveal (the diff of a secret's text): under the actor's
-    // NoSecretReveal and under the mTLS rule.
+    // A read the service may refuse for a secret it would reveal (a reveal, the diff of a secret's text): under the
+    // actor's NoSecretReveal, the step-up and the mTLS rule.
     public static Task<T> UnderSecretReadRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
     {
         return UnderSecretRuleAsync(rights, isRead: true, action);
     }
 
-    // A write the service may refuse for a secret key or item (set, delete, import): under the mTLS rule only, because
-    // an actor never withholds writes.
-    public static Task<T> UnderMtlsWriteRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
+    // A write the service may refuse for a secret key or item (set, delete, import): under the step-up and the mTLS
+    // rule; an actor never withholds writes.
+    public static Task<T> UnderSecretWriteRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
     {
         return UnderSecretRuleAsync(rights, isRead: false, action);
     }
 
-    // The service refuses a secret with AccessDenied; when the only reason is the actor or the missing mTLS, the client
-    // learns that. Only the right of the direction counts: a machine without it would not get it over mTLS either.
+    // A bulk operation (restore, purge) answers a secret it refused per item, Forbidden with AccessDenied. When the write
+    // right was withheld only by the step-up, those items say so (StepUpRequired), so the client knows a new sign-in helps.
+    public static KeyValueBulkResult WithStepUpOutcomes(SecretRights rights, KeyValueBulkResult result)
+    {
+        if (!rights.IsWriteWithheldByStepUp)
+        {
+            return result;
+        }
+
+        var refusal = new StepUpRequiredException(rights.StepUpMaxAge);
+        return result with
+        {
+            Items = result.Items
+                .Select(item => item is { Outcome: KeyValueBulkOutcome.Forbidden, ErrorCode: ErrorCodes.AccessDenied }
+                    ? item with { ErrorCode = refusal.ErrorCode, Message = refusal.Message }
+                    : item)
+                .ToList(),
+        };
+    }
+
+    // The service refuses a secret with AccessDenied; when the only reason is the actor, the step-up or the missing mTLS,
+    // the client learns that. Only the right of the direction counts: a machine without it would not get it over mTLS
+    // either.
     private static async Task<T> UnderSecretRuleAsync<T>(SecretRights rights, bool isRead, Func<Task<T>> action)
     {
         try
@@ -65,21 +86,28 @@ internal static class KeyValueAuthorization
         }
     }
 
-    // Whether the right of the direction was withheld from a caller that has it: by the actor (reads only) or for the
-    // missing mTLS.
+    // Whether the right of the direction was withheld from a caller that has it: by the actor (reads only), by the
+    // step-up or for the missing mTLS.
     private static bool IsWithheld(SecretRights rights, bool isRead)
     {
         return isRead
-            ? rights.IsReadWithheldByActor || rights.IsReadWithheldByMtls
-            : rights.IsWriteWithheldByMtls;
+            ? rights.IsReadWithheldByActor || rights.IsReadWithheldByStepUp || rights.IsReadWithheldByMtls
+            : rights.IsWriteWithheldByStepUp || rights.IsWriteWithheldByMtls;
     }
 
-    // When the right was withheld only by the actor or for the missing mTLS, the client learns that, the actor first.
-    private static AccessDeniedException Refused(SecretRights rights, bool isRead)
+    // When the right was withheld only by the actor, the step-up or for the missing mTLS, the client learns that: the
+    // actor first (a new sign-in does not lift it), then the step-up (401, a new sign-in helps). A user is never withheld
+    // for mTLS and a machine never by the actor or the step-up.
+    private static StorytellerException Refused(SecretRights rights, bool isRead)
     {
         if (isRead && rights.IsReadWithheldByActor)
         {
             return KeyValueErrors.ActorRestricted();
+        }
+
+        if (isRead ? rights.IsReadWithheldByStepUp : rights.IsWriteWithheldByStepUp)
+        {
+            return new StepUpRequiredException(rights.StepUpMaxAge);
         }
 
         return (isRead ? rights.IsReadWithheldByMtls : rights.IsWriteWithheldByMtls)

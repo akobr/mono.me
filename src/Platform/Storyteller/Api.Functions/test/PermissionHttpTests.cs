@@ -163,6 +163,53 @@ public class PermissionHttpTests
         access.Calls.ShouldBeEmpty();
     }
 
+    // Granting and revoking change roles: a sign-in that is not recent (Auth:StepUp) gets 401 in every build, before the
+    // service is asked; a recent one passes (424-264).
+    [Theory]
+    [InlineData(AccountRole.Reader)]
+    [InlineData(AccountRole.Owner)]
+    public async Task GrantAndRevoke_WithAStaleSignIn_RequireAStepUp(AccountRole role)
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var body = FunctionTestDoubles.ToJsonBody(Permission(role));
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.PostGrantPermission(UserRequest(body).WithSignIn(TestRequests.StaleSignIn)));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.PostRevokePermission(UserRequest(body).WithSignIn(TestRequests.StaleSignIn)));
+
+        access.Calls.ShouldBeEmpty();
+    }
+
+    // Without the judgement of the bearer middleware a Release build finds no recent sign-in; a Debug build (DEV_AUTH,
+    // requests without an identity) needs none.
+    [Fact]
+    public async Task Grant_WithoutAJudgedSignIn_RequiresAStepUpInReleaseBuildsOnly()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var request = UserRequest(FunctionTestDoubles.ToJsonBody(Permission(AccountRole.Reader))).WithSignIn(null);
+
+        if (HttpRequestDataExtensions.IsDevelopmentAuthentication)
+        {
+            (await http.PostGrantPermission(request)).ShouldBeOfType<OkObjectResult>();
+            return;
+        }
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.PostGrantPermission(request));
+        access.Calls.ShouldBeEmpty();
+    }
+
+    // The actor wins: a new sign-in would not lift NoSecretReveal.
+    [Fact]
+    public async Task Grant_ARoleThatReadsSecrets_ThroughARestrictedActorWithAStaleSignIn_IsActorRestricted()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var request = UserRequest(FunctionTestDoubles.ToJsonBody(Permission(AccountRole.Owner)), restricted: true).WithSignIn(TestRequests.StaleSignIn);
+
+        (await Should.ThrowAsync<AccessDeniedException>(() => http.PostGrantPermission(request))).ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+    }
+
     [Theory]
     [InlineData(AccountRole.Reader)]
     [InlineData(AccountRole.Contributor)]
@@ -214,6 +261,7 @@ public class PermissionHttpTests
             new("sub", "user-1"),
             new("scp", Scopes.User.Impersonation),
         };
+        context.Items[FunctionContextItemKeys.SignInRecency] = TestRequests.RecentSignIn;
 
         if (restricted || restrictions is not null)
         {
