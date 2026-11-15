@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Output;
-using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Cli.Services;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using Newtonsoft.Json.Linq;
 
