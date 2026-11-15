@@ -103,12 +103,51 @@ public class SecretToolsTests
     [Fact]
     public async Task GetResolvedConfiguration_ReadsTheResolvedDocument()
     {
-        _configurations.Setup(api => api.GetResolvedConfigurationAsync("house", "main", "default", "sbt.northwind", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Sdk.Configuration { AnnotationKey = "sbt.northwind", Version = 2, Content = new JObject { ["host"] = "sql.internal" } });
+        SetupResolved(new Sdk.Configuration { AnnotationKey = "sbt.northwind", Version = 2, Content = new JObject { ["host"] = "sql.internal" } });
 
         var result = await Tools().GetResolvedConfiguration("house", "main", "sbt.northwind");
 
+        result.Text().ShouldStartWith("{");
         result.Text().ShouldContain("\"host\":\"sql.internal\"");
+        result.StructuredContent!.Value.TryGetProperty(SecretsWithheldNotice.ReasonProperty, out _).ShouldBeFalse();
+    }
+
+    // 424-264: a stale sign-in leaves the secret bindings as stored (X-2S-Secrets-Withheld: step-up-required); the
+    // result says so first, and what the person does about it.
+    [Fact]
+    public async Task GetResolvedConfiguration_WithSecretsWithheldForAStaleSignIn_SaysTheBindingsStayedUnresolvedAndWhy()
+    {
+        SetupResolved(new Sdk.Configuration { AnnotationKey = "sbt.northwind", Version = 2, Content = new JObject { ["password"] = "@secret(db.password)" } }, "step-up-required");
+
+        var result = await Tools().GetResolvedConfiguration("house", "main", "sbt.northwind");
+
+        var notice = SecretsWithheldNotice.For("step-up-required");
+        result.IsError.ShouldNotBe(true);
+        result.Text().ShouldStartWith(notice + "\n{");
+        notice.ShouldStartWith("The API left the secret bindings unresolved (step-up-required): their values are the expressions as stored");
+        notice.ShouldContain("signed in longer ago");
+        notice.ShouldContain("sign out at the identity provider first (for AuthKit, Sign out in the admin UI)");
+        notice.ShouldContain("reconnect the MCP server");
+        notice.ShouldContain("The assistant cannot do this itself.");
+        var content = result.StructuredContent!.Value;
+        content.EnumerateObject().Select(property => property.Name).Take(2).ShouldBe([SecretsWithheldNotice.ReasonProperty, SecretsWithheldNotice.PropertyName]);
+        content.GetProperty(SecretsWithheldNotice.ReasonProperty).GetString().ShouldBe("step-up-required");
+        content.GetProperty("Content").GetProperty("password").GetString().ShouldBe("@secret(db.password)");
+    }
+
+    [Theory]
+    [InlineData("actor-restricted", "NoSecretReveal")]
+    [InlineData("mtls-required", "mTLS")]
+    [InlineData("something-new", "their values are the expressions as stored.")]
+    public async Task GetResolvedConfiguration_WithOtherReasons_NamesThem(string reason, string expected)
+    {
+        SetupResolved(new Sdk.Configuration { AnnotationKey = "sbt.northwind", Content = new JObject() }, reason);
+
+        var result = await Tools().GetResolvedConfiguration("house", "main", "sbt.northwind");
+
+        result.Text().ShouldStartWith($"The API left the secret bindings unresolved ({reason})");
+        result.Text().ShouldContain(expected);
+        result.StructuredContent!.Value.GetProperty(SecretsWithheldNotice.ReasonProperty).GetString().ShouldBe(reason);
     }
 
     [Theory]
@@ -156,6 +195,20 @@ public class SecretToolsTests
     {
         _keyValues.Setup(api => api.GetKeyValueAsync("house", "main", "default", "db.password", false, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.KeyValue { Key = "db.password", Protection = Sdk.KeyValueProtection.Standard, IsSecret = true, Version = version, IsDeleted = deleted });
+    }
+
+    // The conditional read keeps the headers; X-2S-Secrets-Withheld when withheld is given.
+    private void SetupResolved(Sdk.Configuration configuration, string? withheld = null)
+    {
+        var headers = new Dictionary<string, IEnumerable<string>>();
+
+        if (withheld is not null)
+        {
+            headers["X-2S-Secrets-Withheld"] = [withheld];
+        }
+
+        _configurations.Setup(api => api.GetResolvedConfigurationConditionalAsync("house", "main", "default", "sbt.northwind", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.ConditionalResponse<Sdk.Configuration>(200, configuration, headers));
     }
 
     private SecretTools Tools() => new(_keyValues.Object, _configurations.Object);

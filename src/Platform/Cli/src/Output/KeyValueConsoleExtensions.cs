@@ -116,6 +116,13 @@ public static class KeyValueConsoleExtensions
         }
 
         @this.WriteImportant($"{done} of {items.Count} keys {past}; the others were not found, not allowed or failed.");
+
+        // The API refuses the secrets of a restore or a purge per key when the sign-in is not recent (StepUpRequired).
+        if (items.Any(item => string.Equals(item.ErrorCode, StepUpRefusal.ErrorCode, StringComparison.Ordinal)))
+        {
+            @this.WriteLine(StepUpRefusal.Hint);
+        }
+
         return ExitCodes.WARNING_PARTIAL_RESULT;
     }
 
@@ -230,9 +237,18 @@ public static class KeyValueConsoleExtensions
         }
     }
 
-    // The message and the code of an API error, and the exit code of the command.
+    // The message and the code of an API error, and the exit code of the command. The step-up names the window and how
+    // to sign in again.
     public static int WriteApiError(this IExtendedConsole @this, ApiException exception)
     {
+        if (exception.IsStepUpRequired(out var maxAge))
+        {
+            @this.WriteImportant(StepUpRefusal.MessageOf(maxAge, ReadError(exception).Message));
+            @this.WriteLine($"Error code: {StepUpRefusal.ErrorCode}".ThemedLowlight(@this.Theme));
+            @this.WriteLine(StepUpRefusal.Hint);
+            return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
+        }
+
         var (message, errorCode) = ReadError(exception);
         var status = (HttpStatusCode)exception.StatusCode;
 

@@ -1,4 +1,10 @@
-import { isStorytellerError, StorytellerError, type AccountRoleName } from '@42for.net/2splatform.sdk'
+import {
+  isStepUpRequired,
+  isStorytellerError,
+  stepUpMaxAge,
+  StorytellerError,
+  type AccountRoleName,
+} from '@42for.net/2splatform.sdk'
 
 export interface ErrorDescription {
   title: string
@@ -14,6 +20,11 @@ export interface ErrorDescription {
  * exception details (ErrorResponse.Error can contain stack traces).
  */
 export function describeError(error: unknown, fallbackTitle = 'Something went wrong'): ErrorDescription {
+  // A recent sign-in helps, unlike any other 401 or 403 (424-264).
+  if (isStepUpRequired(error)) {
+    return { title: stepUpTitle, message: stepUpText(stepUpMaxAge(error)), status: error.status }
+  }
+
   if (isStorytellerError(error)) {
     const title = error.timedOut
       ? 'The API did not answer in time'
@@ -37,6 +48,26 @@ export function describeError(error: unknown, fallbackTitle = 'Something went wr
   }
 
   return { title: fallbackTitle, message: error instanceof Error ? error.message : String(error ?? 'Unknown error') }
+}
+
+/** The title of an operation that needs a recent sign-in (401 StepUpRequired). */
+export const stepUpTitle = 'Sign in again to continue'
+
+/** The text of an operation that needs a recent sign-in, with the window of the API when it is known. */
+export function stepUpText(maxAge?: number): string {
+  const window = maxAge === undefined ? '' : ` A sign-in counts for ${formatWindow(maxAge)}.`
+  return `For your security, this needs a recent sign-in. Sign in again, then repeat it.${window}`
+}
+
+/** A window in seconds written out as the API writes it: "10 minutes", "1 hour", "90 seconds". */
+export function formatWindow(seconds: number): string {
+  const [amount, unit] =
+    seconds > 0 && seconds % 3600 === 0
+      ? [seconds / 3600, 'hour']
+      : seconds > 0 && seconds % 60 === 0
+        ? [seconds / 60, 'minute']
+        : [seconds, 'second']
+  return `${amount} ${unit}${amount === 1 ? '' : 's'}`
 }
 
 /**

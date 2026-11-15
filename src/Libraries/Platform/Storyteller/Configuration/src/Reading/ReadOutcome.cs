@@ -42,7 +42,8 @@ internal abstract record ReadOutcome
         }
     }
 
-    // X-2S-Secrets-Withheld on a resolved read: the machine may read secrets but presented no certificate.
+    // X-2S-Secrets-Withheld on a resolved read: the caller may read secrets, but the platform withheld them (a machine
+    // without its certificate, a user through an actor that may not reveal them, or a user whose sign-in is not recent).
     public sealed record Withheld : Failure
     {
         public Withheld(string reason, int statusCode, string message)
@@ -51,7 +52,7 @@ internal abstract record ReadOutcome
             Reason = reason;
         }
 
-        // The header's value, mtls-required.
+        // The header's value: mtls-required, actor-restricted or step-up-required (SecretsWithheldReasons).
         public string Reason { get; }
     }
 

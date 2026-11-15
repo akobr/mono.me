@@ -8,6 +8,7 @@ import {
   type KeyValueBulkItemResult,
   type KeyValueProtection,
 } from '@42for.net/2splatform.sdk'
+import { hasStepUpItems, useStepUpStore } from '@/composables/useStepUp'
 import { useContextStore } from '@/stores/context'
 import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import { levelMeta, serverSideLevels } from '@/utils/key-values'
@@ -16,6 +17,7 @@ import { levelMeta, serverSideLevels } from '@/utils/key-values'
  * Actions for the selected keys (spec 29.2): Delete and Change protection in the Active state, Restore and Purge
  * in the Deleted state. One bulk call each; the outcome is reported per key and the failed keys stay selected. A
  * selection of active and deleted keys (the All state of the list) has no actions, as a bulk call takes one state.
+ * Keys refused for a stale sign-in (StepUpRequired) ask the person to confirm it is them (424-264).
  */
 const props = defineProps<{ keys: string[]; state: 'Active' | 'Deleted' | 'Mixed'; allowedLevels: KeyValueProtection[]; retentionDays?: number }>()
 const emit = defineEmits<{ done: [failed: string[]] }>()
@@ -23,6 +25,7 @@ const emit = defineEmits<{ done: [failed: string[]] }>()
 const context = useContextStore()
 const toast = useToast()
 const confirm = useConfirm()
+const stepUp = useStepUpStore()
 const canSecrets = useCan('secrets')
 const canAdmin = useCan('manageAccess')
 
@@ -43,6 +46,9 @@ function report(title: string, items: KeyValueBulkItemResult[] | undefined): str
         .join('; '),
       color: 'warning',
     })
+  }
+  if (hasStepUpItems(items)) {
+    void stepUp.ask()
   }
   return failed.map((item) => item.Key ?? '').filter(Boolean)
 }

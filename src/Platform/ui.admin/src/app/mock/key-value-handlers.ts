@@ -37,6 +37,7 @@ import {
   type ScopeRef,
   type StoredKeyValue,
 } from './key-values'
+import { isStaleSignIn, requireRecentSignIn, stepUpItem, stepUpResponse } from './step-up'
 
 // The key/value API of the mock (spec 29.8): the same rules as the service for roles, levels, versions and plans.
 
@@ -55,6 +56,12 @@ const referencePattern =
 const notFound = (view: string, key: string) => errorResponse(404, `The key '${key}' does not exist in view '${view}'.`, 'KeyValueNotFound')
 
 const hasSecretRights = (db: MockDb, projectKey: string) => !requireRole(db, projectKey, 'ContributorWithSecrets')
+
+/**
+ * Like the API: a caller whose role gives the secret rights, but whose sign-in is stale, has them withheld by the
+ * step-up (424-264); a caller without them is refused for the role, as before.
+ */
+const stepUpWithheld = (db: MockDb, projectKey: string) => hasSecretRights(db, projectKey) && isStaleSignIn()
 
 function listPairs(db: MockDb, scope: ScopeRef, state: string | null, prefix: string | null, levels: string[] | null): StoredKeyValue[] {
   const store = storeOf(db, scope)
@@ -87,6 +94,9 @@ function validateWrite(
   }
   if (isSecret(protection) && !hasSecretRights(db, projectKey)) {
     return { error: errorResponse(403, `The key '${key}' is a secret; the caller has no rights to secrets.`, 'AccessDenied') }
+  }
+  if (isSecret(protection) && stepUpWithheld(db, projectKey)) {
+    return { error: stepUpResponse() }
   }
   if (new TextEncoder().encode(value).length > (protection === 'Hyok' ? 49_152 : 24_576)) {
     return { error: errorResponse(400, `The value of '${key}' is too large.`, 'ValueTooLarge') }
@@ -347,7 +357,12 @@ const projectHandlers: HttpHandler[] = [
       } else {
         return errorResponse(400, 'The public key is neither PEM nor a JWK object.', 'RecipientInvalid')
       }
-      const recipient: ClientEncryptionRecipient = { Id: id, Name: body.Name, PublicKey: publicKey, IsEnabled: true, Created: stamp(db) }
+      // A recipient's private key reads every value encrypted for it afterwards: after the body, a recent sign-in.
+      const stale = requireRecentSignIn()
+      if (stale) {
+        return stale
+      }
+      const recipient: ClientEncryptionRecipient ={ Id: id, Name: body.Name, PublicKey: publicKey, IsEnabled: true, Created: stamp(db) }
       recipients.push(recipient)
       policy.Version = (policy.Version ?? 0) + 1
       recordAudit(db, projectKey, { Operation: 'RecipientAdded', Detail: id })
@@ -374,6 +389,10 @@ const projectHandlers: HttpHandler[] = [
         if (others.length === 0) {
           return errorResponse(409, 'The last enabled recipient cannot be disabled while Hyok is allowed.', 'ProtectionInUse')
         }
+      }
+      const stale = requireRecentSignIn()
+      if (stale) {
+        return stale
       }
       if (body.Name) {
         recipient.Name = body.Name
@@ -500,6 +519,9 @@ const viewHandlers: HttpHandler[] = [
         if (!hasSecretRights(db, projectKey)) {
           return errorResponse(403, `The key '${stored.Key}' is a secret; the caller has no rights to secrets.`, 'AccessDenied')
         }
+        if (stepUpWithheld(db, projectKey)) {
+          return stepUpResponse()
+        }
         recordAudit(db, projectKey, { Operation: 'Reveal', View: params.view, Key: stored.Key, Version: current.Version, Protection: current.Protection })
       }
       return HttpResponse.json(toKeyValue(stored, current, reveal))
@@ -533,6 +555,9 @@ const viewHandlers: HttpHandler[] = [
       if (active && isSecret(active.Versions.at(-1)?.Protection) !== isSecret(protection) && !hasSecretRights(db, projectKey)) {
         return errorResponse(403, `The key '${params.key}' changes between public and secret; the caller has no rights to secrets.`, 'AccessDenied')
       }
+      if ((isSecret(protection) || isSecret(active?.Versions.at(-1)?.Protection)) && stepUpWithheld(db, projectKey)) {
+        return stepUpResponse()
+      }
       const checked = validateWrite(db, scope, params.key, protection, write.Value ?? '', write.ContentType ?? undefined)
       if (checked.error) {
         return checked.error
@@ -562,6 +587,9 @@ const viewHandlers: HttpHandler[] = [
       const current = latest(stored)
       if (isSecret(current.Protection) && !hasSecretRights(db, projectKey)) {
         return errorResponse(403, `The key '${stored.Key}' is a secret; the caller has no rights to secrets.`, 'AccessDenied')
+      }
+      if (isSecret(current.Protection) && stepUpWithheld(db, projectKey)) {
+        return stepUpResponse()
       }
       const expected = url.searchParams.get('expectedVersion')
       if (expected && Number(expected) !== current.Version) {
@@ -597,6 +625,9 @@ const viewHandlers: HttpHandler[] = [
         if (isSecret(latest(stored).Protection) && !hasSecretRights(db, projectKey)) {
           return { Key: key, Outcome: 'Forbidden', ErrorCode: 'AccessDenied', Message: 'A secret; no secret rights.' }
         }
+        if (isSecret(latest(stored).Protection) && stepUpWithheld(db, projectKey)) {
+          return stepUpItem(stored.Key)
+        }
         restore(stored)
         if (isSecret(latest(stored).Protection)) {
           recordAudit(db, projectKey, { Operation: 'Restore', View: params.view, Key: stored.Key, Version: latest(stored).Version, Protection: latest(stored).Protection })
@@ -623,6 +654,9 @@ const viewHandlers: HttpHandler[] = [
         if (!stored?.Deleted) {
           return { Key: key, Outcome: 'NotFound', Message: stored ? 'Not deleted.' : undefined }
         }
+        if (isSecret(latest(stored).Protection) && stepUpWithheld(db, projectKey)) {
+          return stepUpItem(stored.Key)
+        }
         delete store.pairs[id]
         if (isSecret(latest(stored).Protection)) {
           recordAudit(db, projectKey, { Operation: 'Purge', View: params.view, Key: stored.Key, Protection: latest(stored).Protection })
@@ -640,6 +674,9 @@ const viewHandlers: HttpHandler[] = [
       const denied = requireRole(db, projectKey, 'Contributor')
       if (denied) {
         return denied
+      }
+      if (stepUpWithheld(db, projectKey)) {
+        return stepUpResponse()
       }
       const body = (await request.json()) as KeyValueBulkRequest
       const target = body.Protection as KeyValueProtection | undefined
@@ -704,6 +741,9 @@ const viewHandlers: HttpHandler[] = [
         if (!hasSecretRights(db, projectKey)) {
           return errorResponse(403, `The key '${stored.Key}' is a secret; the caller has no rights to secrets.`, 'AccessDenied')
         }
+        if (stepUpWithheld(db, projectKey)) {
+          return stepUpResponse()
+        }
         recordAudit(db, projectKey, { Operation: 'Reveal', View: params.view, Key: stored.Key, Version: version.Version, Protection: version.Protection, Detail: `version ${version.Version}` })
       }
       return HttpResponse.json(toKeyValue(stored, version, reveal))
@@ -735,6 +775,9 @@ const viewHandlers: HttpHandler[] = [
         if (isSecret(entry.Protection) && !hasSecretRights(db, projectKey)) {
           throw new Error('forbidden')
         }
+        if (isSecret(entry.Protection) && stepUpWithheld(db, projectKey)) {
+          throw new Error('step-up')
+        }
         return entry.Value
       }
       try {
@@ -753,9 +796,12 @@ const viewHandlers: HttpHandler[] = [
         }
         return HttpResponse.json(diffTexts(before, after))
       } catch (error) {
-        return (error as Error).message === 'hyok'
+        const reason = (error as Error).message
+        return reason === 'hyok'
           ? errorResponse(400, 'A client-encrypted value cannot be compared on the server.', 'NotSupportedForProtection')
-          : errorResponse(403, `The key '${params.key}' is a secret; the caller has no rights to secrets.`, 'AccessDenied')
+          : reason === 'step-up'
+            ? stepUpResponse()
+            : errorResponse(403, `The key '${params.key}' is a secret; the caller has no rights to secrets.`, 'AccessDenied')
       }
     }),
   ),
@@ -772,6 +818,9 @@ const viewHandlers: HttpHandler[] = [
       const body = (text ? JSON.parse(text) : {}) as KeyValueExportRequest
       if (body.IncludeSecrets && !hasSecretRights(db, projectKey)) {
         return errorResponse(403, 'Secret values need secret rights.', 'AccessDenied')
+      }
+      if (body.IncludeSecrets && stepUpWithheld(db, projectKey)) {
+        return stepUpResponse()
       }
       const pairs = listPairs(db, scopeOf(params), 'Active', body.KeyPrefix ?? null, (body.Protections as string[] | undefined) ?? null)
       const document: KeyValueDocument = {
@@ -808,6 +857,15 @@ const viewHandlers: HttpHandler[] = [
       const secretsNeeded = items.some((item) => isSecret(item.Protection) && item.Value != null) && !hasSecretRights(db, projectKey)
       if (secretsNeeded) {
         return errorResponse(403, 'The document carries secret values; the caller has no rights to secrets.', 'AccessDenied')
+      }
+      // A secret value to write, or (Replace) a secret to delete: a write of secrets.
+      const secretDeletes =
+        mode === 'Replace' &&
+        Object.values(store.pairs).some(
+          (stored) => !stored.Deleted && stored.Key.toLowerCase().startsWith(prefix) && isSecret(latest(stored).Protection) && !items.some((item) => normalizeKey(item.Key ?? '') === normalizeKey(stored.Key)),
+        )
+      if ((items.some((item) => isSecret(item.Protection) && item.Value != null) || secretDeletes) && stepUpWithheld(db, projectKey)) {
+        return stepUpResponse()
       }
 
       const seen = new Set<string>()

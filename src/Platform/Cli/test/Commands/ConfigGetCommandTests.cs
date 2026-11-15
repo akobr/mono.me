@@ -430,7 +430,23 @@ public class ConfigGetCommandTests
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
         _out.ToString().ShouldBe("DB__HOST=db.local\n");
-        _error.ToString().ShouldBe("Warning: the API withheld the secrets of the configuration (mtls-required): the values of secret bindings are their expressions.\n");
+        _error.ToString().ShouldBe("Warning: the API withheld the secrets of the configuration (mtls-required): the values of secret bindings are their expressions. A machine receives secrets over mTLS with its certificate, or from a project that does not require mTLS for secret delivery.\n");
+    }
+
+    // 424-264: each reason names its own remedy; a reason this sform does not know names none.
+    [Theory]
+    [InlineData("actor-restricted", " The sign-in acts through an actor that may not reveal secrets (NoSecretReveal), and a new sign-in does not change that: read it with a sign-in of your own.")]
+    [InlineData("step-up-required", " Secrets need a recent sign-in: sign out in the browser first (the admin UI's Sign out ends the browser's session) or approve the code in a private window, then run 'sform account logout' and 'sform account', and repeat the command.")]
+    [InlineData("something-new", "")]
+    public async Task WithheldSecrets_NameTheRemedyOfTheReason(string reason, string hint)
+    {
+        SetupResolved(Envelope("""{ "db": { "host": "db.local" } }"""), withheld: reason);
+
+        var exitCode = await Execute(Key, "-r", "-f", "env", "--content-only");
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _out.ToString().ShouldBe("DB__HOST=db.local\n");
+        _error.ToString().ShouldBe($"Warning: the API withheld the secrets of the configuration ({reason}): the values of secret bindings are their expressions.{hint}\n");
     }
 
     [Fact]

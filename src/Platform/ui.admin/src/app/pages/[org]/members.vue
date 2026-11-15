@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useStepUpStore } from '@/composables/useStepUp'
 import { useContextStore } from '@/stores/context'
 
 const context = useContextStore()
 // Invite is the page's main action, in the top bar (424-41); it needs Administrator on the organization itself.
 const canInvite = useCan('manageAccess', 'org')
 const inviting = ref(false)
+const stepUp = useStepUpStore()
+
+// An invitation is a deferred grant: it needs a recent sign-in (424-264), asked for before the dialog is filled in.
+async function invite() {
+  if (await stepUp.ensureRecentSignIn()) {
+    inviting.value = true
+  }
+}
 </script>
 
 <template>
@@ -21,7 +30,7 @@ const inviting = ref(false)
             aria-label="Invite"
             icon="i-lucide-user-plus"
             :ui="{ label: 'hidden sm:inline' }"
-            @click="inviting = true"
+            @click="invite()"
           />
         </template>
       </AppNavbar>

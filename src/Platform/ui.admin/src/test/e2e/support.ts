@@ -13,6 +13,8 @@ declare global {
       addMachine: (projectKey: string, machine: MachineAccess) => void
       /** null turns the exhibition off; onboarding asks for it once per page load, so a test opens the page again. */
       setExhibition: (value: { Organization: string; Project: string } | null) => void
+      /** Makes the sign-in stale (false: recent): the guarded operations answer the step-up 401 until the step-up. */
+      staleSignIn: (stale?: boolean) => void
     }
   }
 }

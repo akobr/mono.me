@@ -92,7 +92,8 @@ public class ConfigGetCommand : BaseContextCommand
 
         if (secretsWithheld is not null)
         {
-            Console.WriteErrorLine($"Warning: the API withheld the secrets of the configuration ({secretsWithheld}): the values of secret bindings are their expressions.");
+            var hint = ConfigurationReads.WithheldHint(secretsWithheld);
+            Console.WriteErrorLine($"Warning: the API withheld the secrets of the configuration ({secretsWithheld}): the values of secret bindings are their expressions.{(hint is null ? string.Empty : " " + hint)}");
         }
 
         return await WriteAsync(options, configuration);

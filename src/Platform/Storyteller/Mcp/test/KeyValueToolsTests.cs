@@ -244,6 +244,52 @@ public class KeyValueToolsTests
         _keyValues.VerifyNoOtherCalls();
     }
 
+    // 424-264: the API refuses a secret of a restore or a purge per item for a stale sign-in; the items keep its code and
+    // text, and the notice of what helps comes first.
+    [Fact]
+    public async Task RestoreKeyValues_ItemsRefusedForAStaleSignIn_KeepTheirTextAndGetTheNotice()
+    {
+        const string message = "This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.";
+        _keyValues.Setup(api => api.RestoreKeyValuesAsync("house", "main", "default", It.IsAny<Sdk.KeyValueBulkRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.KeyValueBulkResult
+            {
+                Items =
+                [
+                    new Sdk.KeyValueBulkItemResult { Key = "db.host", Outcome = Sdk.KeyValueBulkItemResultOutcome.Done, Version = 2 },
+                    new Sdk.KeyValueBulkItemResult { Key = "db.password", Outcome = Sdk.KeyValueBulkItemResultOutcome.Forbidden, ErrorCode = "StepUpRequired", Message = message },
+                ],
+            });
+
+        var result = await Tools().RestoreKeyValues("house", "main", keys: ["db.host", "db.password"]);
+
+        result.IsError.ShouldNotBe(true);
+        result.Text().ShouldStartWith(ApiErrors.StepUpItemsNotice + "\n{");
+        ApiErrors.StepUpItemsNotice.ShouldContain("StepUpRequired");
+        ApiErrors.StepUpItemsNotice.ShouldEndWith(ApiErrors.StepUpRemedy);
+        var content = result.StructuredContent!.Value;
+        content.EnumerateObject().First().Name.ShouldBe(KeyValueTools.StepUpNoticeProperty);
+        var refused = content.GetProperty("Items")[1];
+        refused.GetProperty("Outcome").GetString().ShouldBe("Forbidden");
+        refused.GetProperty("ErrorCode").GetString().ShouldBe("StepUpRequired");
+        refused.GetProperty("Message").GetString().ShouldBe(message);
+    }
+
+    [Fact]
+    public async Task PurgeKeyValues_OtherRefusals_HaveNoNotice()
+    {
+        _keyValues.Setup(api => api.PurgeKeyValuesAsync("house", "main", "default", It.IsAny<Sdk.KeyValueBulkRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.KeyValueBulkResult
+            {
+                Items = [new Sdk.KeyValueBulkItemResult { Key = "db.password", Outcome = Sdk.KeyValueBulkItemResultOutcome.Forbidden, ErrorCode = "AccessDenied" }],
+            });
+
+        var result = await Tools().PurgeKeyValues("house", "main", keys: ["db.password"]);
+
+        result.Text().ShouldStartWith("{");
+        result.StructuredContent!.Value.TryGetProperty(KeyValueTools.StepUpNoticeProperty, out _).ShouldBeFalse();
+        result.StructuredContent.Value.GetProperty("Items")[0].GetProperty("ErrorCode").GetString().ShouldBe("AccessDenied");
+    }
+
     [Fact]
     public async Task PurgeKeyValues_EmptyPrefix_IsEveryDeletedKey()
     {

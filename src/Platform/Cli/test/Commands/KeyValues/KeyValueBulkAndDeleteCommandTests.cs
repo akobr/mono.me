@@ -2,6 +2,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.KeyValues;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using Moq;
 using Shouldly;
@@ -29,6 +30,58 @@ public class KeyValueBulkAndDeleteCommandTests
         sent.KeyPrefix.ShouldBeNull();
         sent.Protection.ShouldBeNull();
         _console.Lines.ShouldContain(line => line.Contains("1 of 2 keys restored"));
+    }
+
+    // 424-264: a secret refused for a stale sign-in shows the API's text in its row, and the way to a new sign-in follows.
+    [Fact]
+    public async Task Restore_OfASecretWithAStaleSignIn_ShowsTheItemTextAndANewSignIn()
+    {
+        const string message = "This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.";
+        _api.Setup(api => api.RestoreKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueBulkRequest>()))
+            .ReturnsAsync(new KeyValueBulkResult
+            {
+                Items =
+                [
+                    new KeyValueBulkItemResult { Key = "a", Outcome = KeyValueBulkItemResultOutcome.Done, Version = 2 },
+                    new KeyValueBulkItemResult { Key = "db.password", Outcome = KeyValueBulkItemResultOutcome.Forbidden, ErrorCode = "StepUpRequired", Message = message },
+                ],
+            });
+
+        var exitCode = await new KeyValueRestoreCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Keys = ["a", "db.password"] }.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_PARTIAL_RESULT);
+        _console.Tables.ShouldHaveSingleItem().Rows[1].ShouldBe(["db.password", "Forbidden", string.Empty, message]);
+        _console.Lines.ShouldContain(line => line.Contains("1 of 2 keys restored"));
+        _console.Lines.ShouldContain(StepUpRefusal.Hint);
+    }
+
+    // Another refusal of an item says nothing of a sign-in.
+    [Fact]
+    public async Task Purge_ForbiddenItem_HasNoSignInHint()
+    {
+        _api.Setup(api => api.PurgeKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueBulkRequest>()))
+            .ReturnsAsync(new KeyValueBulkResult
+            {
+                Items = [new KeyValueBulkItemResult { Key = "db.password", Outcome = KeyValueBulkItemResultOutcome.Forbidden, ErrorCode = "AccessDenied" }],
+            });
+
+        var exitCode = await new KeyValuePurgeCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Keys = ["db.password"], Yes = true }.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_PARTIAL_RESULT);
+        _console.Tables.ShouldHaveSingleItem().Rows[0].ShouldBe(["db.password", "Forbidden", string.Empty, "AccessDenied"]);
+        _console.Lines.ShouldNotContain(StepUpRefusal.Hint);
+    }
+
+    // Left to Program.Main, which names the step-up (ApiRefusal).
+    [Fact]
+    public async Task Protect_WithAStaleSignIn_IsLeftToProgramMain()
+    {
+        _api.Setup(api => api.ProtectKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueBulkRequest>()))
+            .ThrowsAsync(AnnotationCommandFixture.StepUpRequired());
+
+        var exception = await Should.ThrowAsync<ApiException>(new KeyValueProtectCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Keys = ["db.password"], Protection = "hsm" }.OnExecuteAsync());
+
+        exception.StatusCode.ShouldBe(401);
     }
 
     [Fact]

@@ -90,6 +90,33 @@ public class ApiRefusalExitCodeTests
         exitCode.ShouldBe(expected);
     }
 
+    // 424-264: a step-up that no command caught is a refusal of the caller, 44, like any other 401.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RunAsync_OfAStepUpNoCommandCaught_IsUnauthorized(bool typed)
+    {
+        var exitCode = await Program.RunAsync(() => throw AnnotationCommandFixture.StepUpRequired(typed), []);
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+    }
+
+    // The plain lines of --content-only and the GitHub Action: the same three lines on the error output.
+    [Fact]
+    public void WriteApiErrorLine_OfAStepUp_NamesTheWindowAndANewSignIn()
+    {
+        var console = new RecordingConsole().UseInnerConsole(redirectedInput: false);
+
+        var exitCode = console.Object.WriteApiErrorLine(AnnotationCommandFixture.StepUpRequired(typed: false, challenge: false));
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        console.ErrorLines.ShouldBe([
+            "This needs a recent sign-in: a sign-in counts for 10 minutes.",
+            "Error code: StepUpRequired",
+            StepUpRefusal.Hint,
+        ]);
+    }
+
     // D1 (CFG-SET-12): a Reader, or a machine without Configuration.Write.
     [Fact]
     public async Task ConfigSet_Forbidden_IsUnauthorizedWithTheServerMessage()

@@ -31,10 +31,13 @@ import {
   tooManyIssuersMessage,
 } from './federation'
 import { errorResponse, requireRole, roleOf, withDb } from './handlers'
+import { requireRecentSignIn } from './step-up'
 
 // Members, invitations, the exhibition (424-267), machines, shared certificates, the machine policy, the trusted
 // issuers and federation rules (424-46) and the CA of the mock API, with the rules of companion spec E2/E3 (last
 // owner, elevated roles, self changes, pending invitations).
+// Role changes, invitations, new machine credentials, federation rules, a replaced issuer and a shared certificate
+// need a recent sign-in (424-264): requireRecentSignIn after the refusals that signing in again cannot fix.
 
 const api = '*/api/v1'
 const random = (length: number) =>
@@ -308,6 +311,10 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (current === 'Owner' && Role !== 'Owner' && ownerCount(db, params.key) <= 1) {
         return errorResponse(409, 'The last Owner cannot be demoted.', 'LastOwner')
       }
+      const stale = requireRecentSignIn()
+      if (stale) {
+        return stale
+      }
       point.AccessMap = { ...point.AccessMap, [params.accountId]: Role! }
       syncAccount(db)
       return HttpResponse.json(members(db, params.key).find((member) => member.AccountId === params.accountId))
@@ -328,6 +335,11 @@ export const accessManagementHandlers: HttpHandler[] = [
       }
       if (current === 'Owner' && ownerCount(db, params.key) <= 1) {
         return errorResponse(409, 'The last Owner cannot be removed.', 'LastOwner')
+      }
+      // Leaving gives nothing out: only removing another member needs a recent sign-in.
+      const stale = params.accountId === db.user.id ? undefined : requireRecentSignIn()
+      if (stale) {
+        return stale
       }
       const { [params.accountId]: _removed, ...rest } = point.AccessMap ?? {}
       point.AccessMap = rest
@@ -355,6 +367,10 @@ export const accessManagementHandlers: HttpHandler[] = [
       const body = (await request.json()) as InvitationCreate
       if (body.Role === 'Owner' && roleOf(db, params.key) !== 'Owner') {
         return errorResponse(403, 'Only Owners can invite Owners.', 'ElevatedRole')
+      }
+      const stale = requireRecentSignIn()
+      if (stale) {
+        return stale
       }
       const email = (body.Email ?? '').trim().toLowerCase()
       if (
@@ -576,6 +592,10 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (invalidRules) {
         return errorResponse(400, invalidRules, 'InvalidFederation')
       }
+      const stale = requireRecentSignIn()
+      if (stale) {
+        return stale
+      }
       const id = `mach-${random(6).toLowerCase()}`
       const machine = withCredentials(
         {
@@ -634,6 +654,10 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (kind === 'Certificate') {
         return errorResponse(400, certificateResetNotSupportedMessage, machineAccessNotSupported)
       }
+      const stale = requireRecentSignIn()
+      if (stale) {
+        return stale
+      }
       // A CertificateAndApiKey machine gets only a new API key: its certificate, its own or a shared one, keeps working
       // and the stored record keeps its thumbprint, lifetime, expiry and renewal (424-82).
       const machine =
@@ -680,6 +704,10 @@ export const accessManagementHandlers: HttpHandler[] = [
       }
       if (machine.CredentialKind !== 'Federated') {
         return errorResponse(400, rulesOnOtherKindMessage, 'MachineNotFederated')
+      }
+      const stale = requireRecentSignIn()
+      if (stale) {
+        return stale
       }
       machine.FederationRules = rules!
       return HttpResponse.json(withTokenEndpoint(stripSecrets(machine), request, params.org, params.project))
@@ -745,6 +773,11 @@ export const accessManagementHandlers: HttpHandler[] = [
           return errorResponse(400, tooManyIssuersMessage, 'InvalidFederation')
         }
       }
+      // Only a replaced issuer changes whose tokens the machines trust today.
+      const stale = existing ? requireRecentSignIn() : undefined
+      if (stale) {
+        return stale
+      }
       const stored: FederatedIssuer = {
         Name: requested.Name,
         Issuer: requested.Issuer,
@@ -807,6 +840,10 @@ export const accessManagementHandlers: HttpHandler[] = [
         )
       }
       const body = (await request.json()) as SharedCertificateCreate
+      const stale = requireRecentSignIn()
+      if (stale) {
+        return stale
+      }
       const certificate: SharedCertificate = {
         Thumbprint: random(40),
         Label: body.Label,

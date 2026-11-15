@@ -190,6 +190,109 @@ public class ApiErrorsTests
         result.Text().ShouldNotContain(Marker);
     }
 
+    // 424-264: the step-up has its own fixed text, with the window written out; the API's message and Details are not copied.
+    [Fact]
+    public void StepUp_HasTheFixedTextWithTheWindow()
+    {
+        var response = new Sdk.ErrorResponse
+        {
+            Message = $"This operation needs a recent sign-in: sign in again, then repeat it. {Marker}",
+            Hint = Marker,
+            ErrorCode = "StepUpRequired",
+            Details = Marker,
+        };
+        var exception = new Sdk.ApiException<Sdk.ErrorResponse>("Unauthorized", 401, string.Empty, Challenge(600), response, null);
+
+        var result = ApiErrors.ToResult(exception);
+
+        result.IsError.ShouldBe(true);
+        result.Text().ShouldBe($"Storyteller API answered 401 StepUpRequired: {ApiErrors.StepUpRequiredMessage(TimeSpan.FromMinutes(10))}");
+        result.Text().ShouldBe(
+            "Storyteller API answered 401 StepUpRequired: The Storyteller API needs a recent sign-in of the person for this (within the last "
+            + "10 minutes): reading or writing secret values, creating or resetting machine credentials, changing federation rules. A "
+            + "reconnect that reuses the person's browser session keeps the old sign-in: ask the person to sign out at the identity "
+            + "provider first (for AuthKit, Sign out in the admin UI), then reconnect the MCP server in the client and retry, or to make "
+            + "the change in the admin UI. The assistant cannot do this itself.");
+        var content = result.StructuredContent!.Value;
+        content.GetProperty("Status").GetInt32().ShouldBe(401);
+        content.GetProperty("ErrorCode").GetString().ShouldBe(ApiErrors.StepUpRequiredCode);
+        content.GetProperty("MaxAge").GetInt64().ShouldBe(600);
+        content.GetRawText().ShouldNotContain(Marker);
+    }
+
+    // A route that does not declare the body leaves it as text: the code and the window come from the JSON.
+    [Fact]
+    public void StepUp_OfAPlainException_ReadsTheCodeAndTheWindowOfItsJson()
+    {
+        var exception = new Sdk.ApiException(
+            "Unauthorized",
+            401,
+            """{"Message":"This operation needs a recent sign-in.","ErrorCode":"StepUpRequired","Details":{"MaxAge":3600}}""",
+            NoHeaders,
+            null);
+
+        var result = ApiErrors.ToResult(exception);
+
+        result.Text().ShouldStartWith("Storyteller API answered 401 StepUpRequired: The Storyteller API needs a recent sign-in of the person for this (within the last 1 hour):");
+        ApiErrors.GetErrorCode(exception).ShouldBe("StepUpRequired");
+    }
+
+    [Fact]
+    public void StepUp_WithoutAWindow_LeavesItOut()
+    {
+        var exception = new Sdk.ApiException(
+            "Unauthorized",
+            401,
+            string.Empty,
+            new Dictionary<string, IEnumerable<string>> { ["WWW-Authenticate"] = ["Bearer error=\"insufficient_user_authentication\""] },
+            null);
+
+        var result = ApiErrors.ToResult(exception);
+
+        result.Text().ShouldStartWith("Storyteller API answered 401 StepUpRequired: The Storyteller API needs a recent sign-in of the person for this: reading");
+        result.StructuredContent!.Value.TryGetProperty("MaxAge", out _).ShouldBeFalse();
+    }
+
+    // The same code on a 403 is no step-up.
+    [Fact]
+    public void StepUpCode_OnAForbidden_KeepsTheApiMessage()
+    {
+        var result = ApiErrors.ToResult(Error(403, new Sdk.ErrorResponse { Message = "Refused.", ErrorCode = "StepUpRequired" }));
+
+        result.Text().ShouldBe("Storyteller API answered 403 StepUpRequired: Refused.");
+    }
+
+    // Nothing else of a body left as text is read: its code reaches neither the result nor a log.
+    [Fact]
+    public void PlainException_OtherThanTheStepUp_KeepsNothingOfItsText()
+    {
+        var exception = new Sdk.ApiException("Forbidden", 403, $$"""{"Message":"{{Marker}}","ErrorCode":"{{Marker}}"}""", NoHeaders, null);
+
+        ApiErrors.GetErrorCode(exception).ShouldBeNull();
+        var result = ApiErrors.ToResult(exception);
+        result.StructuredContent!.Value.GetRawText().ShouldNotContain(Marker);
+        result.Text().ShouldNotContain(Marker);
+    }
+
+    [Theory]
+    [InlineData(600, "10 minutes")]
+    [InlineData(60, "1 minute")]
+    [InlineData(3600, "1 hour")]
+    [InlineData(7200, "2 hours")]
+    [InlineData(90, "90 seconds")]
+    public void StepUpWindow_IsWrittenOutAsTheApiWritesIt(int seconds, string expected)
+    {
+        ApiErrors.DescribeWindow(TimeSpan.FromSeconds(seconds)).ShouldBe(expected);
+    }
+
+    private static Dictionary<string, IEnumerable<string>> Challenge(int seconds)
+    {
+        return new Dictionary<string, IEnumerable<string>>
+        {
+            ["WWW-Authenticate"] = [$"Bearer error=\"insufficient_user_authentication\", error_description=\"A recent sign-in is required\", max_age=\"{seconds}\""],
+        };
+    }
+
     private static Sdk.ApiException<Sdk.ErrorResponse> Error(int status, Sdk.ErrorResponse response)
     {
         return new Sdk.ApiException<Sdk.ErrorResponse>($"Status {status} {Marker}", status, Marker, NoHeaders, response, null);
