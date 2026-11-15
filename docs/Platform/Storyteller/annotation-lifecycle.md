@@ -73,7 +73,7 @@ Every stored annotation also carries the server-owned [audit stamps](audit-stamp
 
 1. One query per partition of the tree loads the annotations, their configurations and audits.
 2. Each annotation gets `Deletion` and `ttl`, its configuration `AnnotationDeletionId` and `ttl` (and the version snapshot), and its audit a `Deleted` entry. The writes run in transactional batches with ETags, the deepest descendants first and the requested annotation last, so a failure leaves a valid state.
-3. Active parents outside the deleted tree drop the names of their deleted children from their arrays (for example the context of a deleted usage's execution).
+3. Active parents outside the deleted tree drop the names of their deleted children from their arrays (for example the context of a deleted usage's execution). The delete reads all of these parents in one read of many items and replaces each changed one under the ETag of that read; a deleted or missing parent is left as it is.
 
 A second delete of the same key returns the existing deletion. A delete that did not finish is completed with the same `DeletionId`.
 
@@ -85,7 +85,7 @@ A second delete of the same key returns the existing deletion. A delete that did
 2. The key itself is restored; with descendants (the default), also every descendant with the same `DeletionId` (cause `Cascade`). Descendants deleted by an earlier, separate delete stay deleted.
 3. A restored item loses `Deletion` and `ttl`; its configuration loses the stamp and `ttl`, its cached calculation is cleared, and the version snapshot is removed.
 4. An annotation restored alone keeps its deleted children deleted: they leave its arrays and become roots.
-5. Active parents get the names of the restored children back.
+5. Active parents get the names of the restored children back. The parents outside the restored tree are read in one read of many items, and each changed one is replaced under the ETag of that read; a deleted or missing parent is left as it is.
 
 ## Re-create
 

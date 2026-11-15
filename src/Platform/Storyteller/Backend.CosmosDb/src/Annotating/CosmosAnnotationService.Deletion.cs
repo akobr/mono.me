@@ -285,9 +285,14 @@ public partial class CosmosAnnotationService
         var relations = new Dictionary<string, AnnotationNode>(StringComparer.Ordinal);
         var updates = new Dictionary<string, AnnotationEntity>(StringComparer.Ordinal);
 
+        // every parent in one read of many items (a missing one is Missing), written with the ETag of this read
+        var parents = await store.ReadNodesAsync(
+            removals.Select(group => FullKey.Create(group.First().Parent, fullKey)),
+            withAudit: false);
+
         foreach (var group in removals)
         {
-            var parent = await store.LoadAsync(FullKey.Create(group.First().Parent, fullKey), withConfiguration: false, withAudit: false);
+            var parent = parents[group.Key];
 
             if (parent.State != AnnotationItemState.Active)
             {
@@ -429,9 +434,12 @@ public partial class CosmosAnnotationService
             .DistinctBy(parent => parent.ToString(), StringComparer.Ordinal)
             .ToList();
 
-        foreach (var parent in outsideParents)
+        // in one read of many items; a missing parent is known as Missing, so AddToParents skips it like a deleted one
+        var outside = await store.ReadNodesAsync(outsideParents.Select(parent => FullKey.Create(parent, fullKey)), withAudit: false);
+
+        foreach (var (keyText, node) in outside)
         {
-            known[parent.ToString()] = await store.LoadAsync(FullKey.Create(parent, fullKey), withConfiguration: false, withAudit: false);
+            known[keyText] = node;
         }
 
         AddToParents(writes, keyText => known.GetValueOrDefault(keyText), relations, updates);
