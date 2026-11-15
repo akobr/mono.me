@@ -24,6 +24,7 @@ const screens: [string, string][] = [
   ['secrets settings', '/acme/billing/settings#secrets'],
   ['monitor usage', '/acme/billing/monitor'],
   ['monitor audit', '/acme/billing/monitor?tab=audit'],
+  ['organization audit', '/acme/audit'],
   ['account', '/account'],
 ]
 

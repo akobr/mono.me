@@ -19,6 +19,7 @@ import type {
 } from '@42for.net/2splatform.sdk'
 import { roleRank } from '@42for.net/2splatform.sdk'
 import { fallbackFunctions } from '@/utils/binding-language'
+import { accountTarget, recordAccessAudit } from './access-audit'
 import { stamp } from './audit'
 import { loadDb, saveDb, type MockDb } from './db'
 
@@ -84,6 +85,16 @@ async function readAccessPointUpdate(request: Request): Promise<AccessPointUpdat
   return isUpdate ? (body as AccessPointUpdate) : undefined
 }
 
+/** The access audit record of a new organization or project, whose Owner is the signed-in user (424-263). */
+function recordCreated(db: MockDb, key: string) {
+  recordAccessAudit(db, key, {
+    Action: 'AccessPointCreated',
+    Target: accountTarget(db.user.id, db.user.name),
+    NewValue: 'Owner',
+    Detail: db.accessPoints[key]?.Description,
+  })
+}
+
 export const accessHandlers: HttpHandler[] = [
   http.get(`${api}/auth/configuration`, () =>
     HttpResponse.json({ Provider: 'AuthKit', ClientId: 'client_mock', Scopes: [] }),
@@ -126,6 +137,8 @@ export const accessHandlers: HttpHandler[] = [
         AccessMap: { [db.user.id]: 'Owner' },
         Description: normalizeDescription(body.ProjectDescription),
       }
+      recordCreated(db, body.Organization!)
+      recordCreated(db, projectKey)
       return HttpResponse.json(db.account, { status: 201 })
     }),
   ),
@@ -158,13 +171,18 @@ export const accessHandlers: HttpHandler[] = [
         return errorResponse(409, `The organization ${org} already exists.`, 'AccessPointExists')
       }
 
-      db.accessPoints[org] ??= { Key: org, AccessMap: { [db.user.id]: 'Owner' } }
+      // The first project of a new organization creates two access points, and records two.
+      if (!db.accessPoints[org]) {
+        db.accessPoints[org] = { Key: org, AccessMap: { [db.user.id]: 'Owner' } }
+        recordCreated(db, org)
+      }
       // Only the project gets the description.
       db.accessPoints[projectKey] = {
         Key: projectKey,
         AccessMap: { [db.user.id]: 'Owner' },
         Description: normalizeDescription(body.ProjectDescription),
       }
+      recordCreated(db, projectKey)
       db.account!.AccessMap = {
         ...db.account!.AccessMap,
         [org]: db.account!.AccessMap?.[org] ?? 'Owner',
@@ -204,7 +222,12 @@ export const accessHandlers: HttpHandler[] = [
       if (!point) {
         return errorResponse(404, `The project '${key}' doesn't exist.`, 'NotFound')
       }
+      const before = point.Description
       point.Description = normalizeDescription(body.Description)
+      // The same description saved again records nothing.
+      if (before !== point.Description) {
+        recordAccessAudit(db, key, { Action: 'AccessPointUpdated', OldValue: before, NewValue: point.Description })
+      }
       return HttpResponse.json(point)
     }),
   ),

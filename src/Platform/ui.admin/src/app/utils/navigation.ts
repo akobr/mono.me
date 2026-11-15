@@ -146,6 +146,8 @@ export function buildNavigation(
       entries: [
         { label: 'Overview', icon: 'i-lucide-building-2', to: `/${org}`, exact: true },
         { label: 'Members', icon: 'i-lucide-users', to: `/${org}/members`, minRole: 'Administrator' },
+        // The access audit of the organization and its projects (424-263); `audit` is a reserved project name.
+        { label: 'Audit', icon: 'i-lucide-scroll-text', to: `/${org}/audit`, minRole: 'Administrator' },
       ],
     })
   }

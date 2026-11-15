@@ -1,7 +1,13 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
-import type { GetKeyValueAuditParams, GetKeyValuesParams, GetKeyValueUsageParams } from '@42for.net/2splatform.sdk'
+import type {
+  GetAccessAuditParams,
+  GetKeyValueAuditParams,
+  GetKeyValuesParams,
+  GetKeyValueUsageParams,
+} from '@42for.net/2splatform.sdk'
 import { getKeyValues, type KeyValuesResponse } from '@42for.net/2splatform.sdk'
 import {
+  useGetAccessAudit,
   useGetAnnotation,
   useGetAnnotationHistory,
   useGetDeletedAnnotation,
@@ -138,5 +144,18 @@ export function useKeyValueUsage(params: MaybeRefOrGetter<GetKeyValueUsageParams
   const { org, project } = useAppContext()
   return useGetKeyValueUsage(() => org.value ?? '', () => project.value ?? '', () => toValue(params), {
     query: { enabled: () => !!project.value && toValue(enabled), staleTime: 60_000, meta: { silent: true } },
+  })
+}
+
+// --- access audit (424-263) ---
+
+/**
+ * The first page of the access audit trail of the current organization; asked only when `enabled` (its Owners and
+ * Administrators), so no request is sent below the role.
+ */
+export function useAccessAudit(params: MaybeRefOrGetter<GetAccessAuditParams>, enabled: MaybeRefOrGetter<boolean> = true) {
+  const { org } = useAppContext()
+  return useGetAccessAudit(() => org.value ?? '', () => toValue(params), {
+    query: { enabled: () => !!org.value && toValue(enabled), staleTime: 15_000, meta: { silent: true } },
   })
 }

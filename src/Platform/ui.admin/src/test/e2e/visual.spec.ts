@@ -53,6 +53,7 @@ const screens: {
   { name: 'settings', path: '/acme/billing/settings#secrets' },
   { name: 'monitor', path: '/acme/billing/monitor' },
   { name: 'monitor-audit', path: '/acme/billing/monitor?tab=audit' },
+  { name: 'organization-audit', path: '/acme/audit' },
   // The steps of the onboarding wizard (424-267) by their addresses; `onboarding` is its first step.
   { name: 'onboarding', path: '/onboarding', scenario: 'new-user' },
   { name: 'onboarding-residency', path: '/onboarding?step=residency', scenario: 'new-user' },
