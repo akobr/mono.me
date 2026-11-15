@@ -51,6 +51,20 @@ The record's `id` is `aca.{yyyyMMddHHmmssfffffff}.{guid}`, so the order of the i
 
 The partitions that hold records also hold what the API lists, so the lists skip them: the machines of a project (`GET …/access/machines` also skips the `mcert.` certificate records and the `scr.` shared certificates) and the trusted issuers, whose count of `FederationValidation.MaxIssuersPerProject` they do not take part in.
 
+## Reading the trail
+
+| Method | Route | Needs | Result |
+| --- | --- | --- | --- |
+| GET | `v1/access/points/{key}/audit` | `Administrator` or `Owner` on the access point, users only | `AccessAuditResponse`: `Items` (`AccessAuditEntry[]`), `ContinuationToken`, `Count` |
+
+- `{key}` is an organization: its whole trail, memberships of the organization and every project's records. `{key}` is `{organization}.{project}`: the project's records only, for the project's Owners and Administrators. The role is the exact role on the key, as for the members: an organization's Owner reads a project's records through the organization key with `?project=`.
+- Filters, all optional: `project` (only that project; the organization's own records are left out; with a project key it must be that project, else `400`), `action` (an `AccessAuditAction`, any case), `target` (an account id, a machine id, an issuer's name or a certificate's thumbprint), `from` and `to` (ISO 8601, both inclusive).
+- Newest first, at most 100 per page. Pass `ContinuationToken` back as `continuationToken` until it is missing. The token names the last record of the page, so the next page is the records just older than it in both partitions together: no record is skipped or repeated, and records written meanwhile appear on a new first page.
+- `400` with `ErrorCode` `InvalidQuery` for a filter that does not parse, a project that is not the key's, and a continuation token that is not one of this trail. `403` (`AccessDenied`) for a machine and for every role below `Administrator`.
+- `IAccessAuditLog.QueryAsync` (`CosmosAccessAuditLog`) runs one query per source, `core` (partition `access`, filtered on `c.Organization`) and `organizations` (the organization as the key prefix, filtered on `c.Organization`), each `TOP` one more than the page and ordered by id, and merges them. There is no update or delete route, nor a service method that changes a record.
+
+The SDKs have it as `GetAccessAuditAsync` (`IAccessApiClient`, NSwag) and `getAccessAudit` / `useGetAccessAudit` (TypeScript). The admin UI shows the trail of an organization on its **Audit** page.
+
 ## Retention
 
 | Setting | Default | Meaning |
