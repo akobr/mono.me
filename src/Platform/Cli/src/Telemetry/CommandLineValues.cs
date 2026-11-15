@@ -162,7 +162,8 @@ internal sealed class CommandLineValues
     // - both sides of the first '=' (the path and the value of -x path=value), whatever their length: a short one is
     //   replaced as a whole word only;
     // - the pieces between = , ; . / \ of four characters or more, without a leading '@' (of a full key), and none that
-    //   ends with ':' (the scheme of a URL, which would hide the shape of every other URL from its rule).
+    //   ends with ':' (the scheme of a URL, which would hide the shape of every other URL from its rule). A file path is
+    //   not cut in pieces: Users or home would go from every message; ErrorReporter adds its full form instead.
     internal static IEnumerable<string> WithParts(string value)
     {
         var parts = new List<string> { value };
@@ -176,25 +177,34 @@ internal sealed class CommandLineValues
         foreach (var line in lines)
         {
             var equals = line.IndexOf('=');
+            string[] sides = equals < 0 ? [line] : [line[..equals].Trim(), line[(equals + 1)..].Trim()];
 
             if (equals >= 0)
             {
-                parts.Add(line[..equals].Trim());
-                parts.Add(line[(equals + 1)..].Trim());
+                parts.AddRange(sides);
             }
 
-            foreach (var piece in line.Split(PartSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            foreach (var side in sides.Where(side => !IsFilePath(side)))
             {
-                var part = piece.TrimStart('@');
-
-                if (part.Length >= MinimumPartLength && !part.EndsWith(':'))
+                foreach (var piece in side.Split(PartSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
-                    parts.Add(part);
+                    var part = piece.TrimStart('@');
+
+                    if (part.Length >= MinimumPartLength && !part.EndsWith(':'))
+                    {
+                        parts.Add(part);
+                    }
                 }
             }
         }
 
         return parts.Where(part => part.Length > 0).Distinct(StringComparer.Ordinal);
+    }
+
+    // A text with a path separator that is not a URL.
+    internal static bool IsFilePath(string text)
+    {
+        return text.IndexOfAny(['/', '\\']) >= 0 && !text.Contains("://", StringComparison.Ordinal);
     }
 
     private static IReadOnlyList<string> Clean(IEnumerable<string?> values)

@@ -88,8 +88,11 @@ public class ReportScrubberTests
     [InlineData("Could not find file '/home/o'brien/.sform/sform.settings.json'.", "Could not find file '***'.")]
     [InlineData("The certificate file C:\\Users\\Alice Smith\\certs\\globex-payroll.pfx in STORYTELLER_CLIENT_CERTIFICATE does not exist.", "The certificate file *** in STORYTELLER_CLIENT_CERTIFICATE does not exist.")]
     [InlineData("The file C:\\Users\\O'Brien\\x.log is locked.", "The file *** is locked.")]
-    [InlineData("The input string 'first-line-secret", "The input string '***")]
-    [InlineData("{\"name\":\"b", "{\"***\":\"***")]
+    [InlineData("The input string 'first-line-secret\nsecond line' was not in a correct format.", "The input string '***")]
+    [InlineData("{\"name\":\"b\nc\"}", "{\"***\":\"***")]
+    [InlineData("C:\\Users\\ada\\OneDrive - Contoso Ltd\\certs\\machine.pfx is denied.", "*** is denied.")]
+    [InlineData("Unterminated string. Expected delimiter: \". Path 'name', line 1, position 15.", "Unterminated string. Expected delimiter: \". Path '***', line 1, position 15.")]
+    [InlineData("Cannot start process 'C:\\tools\\code.cmd' with working directory 'C:\\work'. The system cannot find the file.", "Cannot start process '***' with working directory '***'. The system cannot find the file.")]
     public void ScrubForSentry_RemovesAPathOrAQuoteWhole(string text, string expected)
     {
         ReportScrubber.ScrubForSentry(text, NoValues).ShouldBe(expected);
@@ -112,6 +115,29 @@ public class ReportScrubberTests
     public void ScrubSecrets_APartThatNamesASecret_DoesNotHideItsShape(string text, string secret)
     {
         ReportScrubber.ScrubSecrets(text, ["db.password", "password", "app.token", "token"]).ShouldNotContain(secret);
+    }
+
+    // What a shape left of a value next to its mask goes with it: the head of a secret the token rule cut, the host of a URL.
+    [Fact]
+    public void AValueAShapeCoveredInPart_LeavesNothingOfIt()
+    {
+        const string secret = "kV9#q2Lr8XzT4mWp7NsB3yHd6JfGc1Ae5Ru0";
+
+        ReportScrubber.ScrubSecrets($"The store rejected {secret} for db.password.", [secret, "db.password", "password"])
+            .ShouldBe("The store rejected *** for ***.");
+        ReportScrubber.ScrubForSentry("GET https://10.20.30.40/keys/x failed", ["https://10.20.30.40/keys/x", "keys"])
+            .ShouldBe("GET *** failed");
+        ReportScrubber.ScrubForSentry("Machine build-agent-7c9e6679-7425-40de-944b-e07fc1f90ae7 not found", ["build-agent-7c9e6679-7425-40de-944b-e07fc1f90ae7"])
+            .ShouldBe("Machine *** not found");
+    }
+
+    [Theory]
+    [InlineData("filter=%22x7q%22", "filter=%22***%22")]
+    [InlineData("name: \\nx7q\\n", "name: \\n***\\n")]
+    [InlineData("Key x7qsuffix and x7q.", "Key x7qsuffix and ***.")]
+    public void AShortValue_GoesAsAWord_AlsoNextToAnEscape(string text, string expected)
+    {
+        ReportScrubber.ScrubSecrets(text, ["x7q"]).ShouldBe(expected);
     }
 
     [Fact]
@@ -163,7 +189,18 @@ public class ReportScrubberTests
                     Mechanism = new Mechanism { HelpLink = "https://help.example/s3cr3t", Description = "s3cr3t" },
                 },
             ],
-            DebugImages = [new DebugImage { CodeFile = "C:\\Users\\ada\\.dotnet\\tools\\.store\\42.platform.cli\\42.Platform.Cli.dll" }],
+            DebugImages =
+            [
+                new DebugImage
+                {
+                    CodeFile = "C:\\Users\\ada\\.dotnet\\tools\\.store\\42.platform.cli\\42.Platform.Cli.dll",
+                    DebugFile = "C:\\Users\\ada\\source\\mono.me\\src\\Platform\\Cli\\src\\obj\\Debug\\net10.0\\42.Platform.Cli.pdb",
+                },
+            ],
+        };
+        sentryEvent.SentryExceptions!.Single().Stacktrace = new SentryStackTrace
+        {
+            Frames = { new SentryStackFrame { FileName = "Program.cs", AbsolutePath = "C:\\Users\\ada\\source\\mono.me\\src\\Platform\\Cli\\src\\Program.cs" } },
         };
         sentryEvent.SentryExceptions!.Single().Mechanism!.Data["HResult"] = "0x80070002";
         sentryEvent.SentryExceptions!.Single().Mechanism!.Data["key"] = "s3cr3t";
@@ -182,6 +219,9 @@ public class ReportScrubberTests
         exception.Mechanism.Description.ShouldBe("***");
         exception.Mechanism.Data.Keys.ShouldBe(["HResult"]);
         scrubbed.DebugImages!.Single().CodeFile.ShouldBe("42.Platform.Cli.dll");
+        scrubbed.DebugImages!.Single().DebugFile.ShouldBe("42.Platform.Cli.pdb");
+        exception.Stacktrace!.Frames.Single().AbsolutePath.ShouldBeNull();
+        exception.Stacktrace.Frames.Single().FileName.ShouldBe("Program.cs");
         scrubbed.Tags.Keys.ShouldBe([ReportScrubber.CommandTag]);
         scrubbed.Extra.Values.ShouldAllBe(value => Equals(value, ReportScrubber.Filtered));
         scrubbed.Contexts.Keys.ShouldContain("os");

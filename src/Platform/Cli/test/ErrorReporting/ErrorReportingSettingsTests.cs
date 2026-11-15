@@ -3,6 +3,7 @@ using System.Linq;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.ErrorReporting;
+using _42.Platform.Cli.UnitTests.Authentication;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -21,6 +22,12 @@ public class ErrorReportingSettingsTests
             ["STORYTELLER_CLIENT_CERTIFICATE_PASSWORD"] = "p4ss",
             ["STORYTELLER_KEY"] = "@acme.billing.prod.sbt.app",
             ["SFORM_HOME"] = @"C:\Users\ada\.sform",
+            ["SFORM_general__baseUrl"] = "https://api.contoso.example/api",
+            ["SFORM_TOKEN_STORE"] = "file",
+            ["SFORM_authentication__useDeviceCode"] = "true",
+            ["STORYTELLER_SUBJECT_TOKEN_TYPE"] = "access_token",
+            ["STORYTELLER_API_KEY"] = TestApiKeys.Create("globex", "payroll", "m7"),
+            ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = "github-request-token-value",
             ["PATH"] = @"C:\Windows",
         };
         var machine = MachineSignInSettings.FromEnvironment(name => variables[name] as string);
@@ -32,10 +39,19 @@ public class ErrorReportingSettingsTests
         settings.ContextValues.ShouldContain("acme");
         settings.ContextValues.ShouldContain("billing");
         settings.ContextValues.ShouldContain(@"C:\Users\ada\.sform");
-        settings.ContextValues.ShouldContain("cl1ent-s3cret");
+        settings.ContextValues.ShouldNotContain("cl1ent-s3cret");
         settings.ContextValues.ShouldContain("ada-laptop");
         settings.ContextValues.ShouldNotContain(@"C:\Windows");
-        settings.SecretValues.ShouldBe(["cl1ent-s3cret", "p4ss"], ignoreOrder: true);
+        settings.ContextValues.ShouldContain("https://api.contoso.example/api");
+        settings.ContextValues.ShouldContain("globex");
+        settings.ContextValues.ShouldContain("payroll");
+        settings.ContextValues.ShouldContain("m7");
+
+        // The switches would cut every message: "file", "true", "access_token".
+        settings.ContextValues.ShouldNotContain("file");
+        settings.ContextValues.ShouldNotContain("true");
+        settings.ContextValues.ShouldNotContain("access_token");
+        settings.SecretValues.ShouldBe(["cl1ent-s3cret", "p4ss", variables["STORYTELLER_API_KEY"] as string, "github-request-token-value"], ignoreOrder: true);
         settings.Dsn.ShouldBe("https://public@o1.ingest.de.sentry.io/1");
         settings.Release.ShouldBe("42.Platform.Cli@1.2.3");
     }
@@ -48,8 +64,9 @@ public class ErrorReportingSettingsTests
 
         signIn.Setup(machine => machine.TryGetIdentity())
             .Returns(new MachineIdentity(MachineSignInKind.ApiKey, ["STORYTELLER_API_KEY"], "m1", "globex", "payroll"));
+        signIn.SetupGet(machine => machine.KnownNames).Returns(["initech", "ledger", "m1"]);
 
-        settings.ReportTimeValues.ShouldNotBeNull()().ShouldBe(["globex", "payroll", "m1"]);
+        settings.ReportTimeValues.ShouldNotBeNull()().ShouldBe(["globex", "payroll", "m1", "initech", "ledger", "m1"]);
     }
 
     [Fact]
