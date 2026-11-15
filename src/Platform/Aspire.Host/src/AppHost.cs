@@ -77,6 +77,12 @@ var keyVault = builder.AddContainer("keyvault", "nagyesta/lowkey-vault", "7.3.11
     .WithEnvironment("LOWKEY_ARGS", "--LOWKEY_VAULT_RELAXED_PORTS=true")
     .WithLifetime(ContainerLifetime.Persistent);
 
+// The seed writes the Standard pairs of a set's key-values.json with the vault of the API, so the API decrypts them.
+dbSeed
+    .WithEnvironment("AzureKeyVaults__default", keyVault.GetEndpoint("https"))
+    .WithEnvironment("KeyValues__Protection__Emulator", "true")
+    .WaitFor(keyVault);
+
 var apiFunctions = builder.AddProject<Projects.Api_Functions>("api-functions")
     .WithHttpEndpoint(port: 7071, name: "http", isProxied: false)
     .WithReference(cosmos)

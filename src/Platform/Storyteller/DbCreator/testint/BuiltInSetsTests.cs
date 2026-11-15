@@ -1,13 +1,16 @@
 using System.Diagnostics;
 using System.IO.Abstractions;
+using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using _42.Platform.Storyteller.Transferring;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace _42.Platform.Storyteller.DbCreator.IntegrationTests;
 
-// The sets of the repository seed without failures: core by the build of the database, large, showcase and the
-// playground's folder each into an organization of its own (the given organization wins over their manifests).
+// The sets of the repository seed without failures: core by the build of the database, large, showcase, exhibit and
+// the playground's folder each into an organization of its own (the given organization wins over their manifests);
+// the sets with Standard pairs with the vault (DbCreatorFixture.GetVaultServicesAsync).
 public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
 {
     [Fact]
@@ -37,8 +40,9 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
     public async Task Showcase_SeedsWithoutFailures()
     {
         var organization = NewOrganization();
+        var services = await Fixture.GetVaultServicesAsync(Cancellation);
 
-        var result = await SeedAsync(new DataSetSeedRequest { Sets = ["showcase"], Organization = organization });
+        var result = await SeedAsync(new DataSetSeedRequest { Sets = ["showcase"], Organization = organization }, services);
 
         // every file is created, in the summary of its folder's kind; the counts come from the folder, which the admin
         // UI's test/unit/mock/showcase-set.test.ts writes, so a change of the mock needs none here
@@ -51,6 +55,36 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
             .ToDictionary(summary => ViewArchiveNames.GetFolder(summary.Content!.Value), summary => summary.Created)
             .ShouldBe(files.GroupBy(file => file.Path.Split('/')[0]).ToDictionary(group => group.Key, group => group.Count()), ignoreOrder: true);
         (await Access.GetAccessPointAsync($"{organization}.invoicing-suite"))!.Description.ShouldStartWith("The B2B SaaS of the documentation");
+
+        // the pairs of its key-values.json, the Standard ones too, every one created
+        if (DataSetKeyValues.Read(new FileSystem(), result.Set.Folder) is { } pairs)
+        {
+            result.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = pairs.Items.Count });
+        }
+    }
+
+    [Fact]
+    public async Task Exhibit_SeedsWithoutFailures_AndItsConfigurationsBindItsPairs()
+    {
+        var organization = NewOrganization();
+        var services = await Fixture.GetVaultServicesAsync(Cancellation);
+
+        var result = await SeedAsync(new DataSetSeedRequest { Sets = ["exhibit"], Organization = organization }, services);
+
+        // README.md and project-settings.json are ignored files; the 20 pairs are created, the Standard one with the vault
+        var files = DataSetFolder.GetEntries(new FileSystem(), result.Set.Folder);
+        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = files.Count - 2, IgnoredFiles = 2 });
+        result.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = 20 });
+
+        // a resolved read binds the public pairs, their interpolations and the Standard secret
+        var configurations = services.GetRequiredService<IConfigurationService>();
+        var target = new DataSetTarget(organization, "toons-and-tyrants", "default");
+        var crm = (await configurations.GetResolvedConfigurationWithSecretsAsync(Key(target, "usg.globex.crm"))).ShouldNotBeNull();
+        crm.Content.SelectToken("application.url")!.ToString().ShouldBe("https://lairforce.globex.example");
+        crm.Content.SelectToken("crm.ransom.escrowPin")!.ToString().ShouldBe("0000-NICE-TRY");
+        var globex = (await configurations.GetResolvedConfigurationWithSecretsAsync(Key(target, "sbt.globex"))).ShouldNotBeNull();
+        globex.Content.SelectToken("company.portal")!.ToString().ShouldBe("https://lair.globex.example");
+        globex.Content.SelectToken("perks.hammockVendors")!.ToString().ShouldBe("https://hammocks.cypresscreek.example/vendors");
     }
 
     [Fact]
@@ -67,10 +101,11 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
         result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = 10, Warnings = 5 });
     }
 
-    private async Task<DataSetSeedResult> SeedAsync(DataSetSeedRequest request)
+    private async Task<DataSetSeedResult> SeedAsync(DataSetSeedRequest request, IServiceProvider? services = null)
     {
         var started = Stopwatch.GetTimestamp();
-        var run = await Seeder.SeedAsync(request with { Owner = NewOwner() }, Cancellation);
+        var seeder = (services ?? Services).GetRequiredService<DataSetSeeder>();
+        var run = await seeder.SeedAsync(request with { Owner = NewOwner() }, Cancellation);
         var result = run.Sets.ShouldHaveSingleItem();
         Log($"The set {result.Set.Name} seeded in {Stopwatch.GetElapsedTime(started).TotalSeconds:F1} s on the {Fixture.Emulator.Kind} emulator.");
 
