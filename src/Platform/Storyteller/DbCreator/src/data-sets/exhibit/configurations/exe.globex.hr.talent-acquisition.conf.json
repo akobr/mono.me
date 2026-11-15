@@ -1,0 +1,22 @@
+{
+  "appUsage": {
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "seats": "@annotation(\"/headcount\", \"Context\")",
+    "appVersion": "@annotation(\"/version\", \"Usage\")"
+  },
+  "hr": {
+    "onboarding": {
+      "checklist": [
+        "meet-hank"
+      ],
+      "durationDays": 0.5
+    },
+    "relocation": {
+      "quarterlyTarget": "@annotation(\"/relocationsThisQuarter\", \"Context\")",
+      "welcomeBasket": "@annotation(\"/welcomeBasket\", \"Context\")"
+    }
+  },
+  "features": [
+    "express-relocation"
+  ]
+}

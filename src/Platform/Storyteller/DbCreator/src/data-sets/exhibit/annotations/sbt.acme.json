@@ -1,0 +1,36 @@
+{
+  "Title": "Acme Corp",
+  "Description": "A Company Making Everything. Acme supplies rocket skates, giant magnets, dehydrated boulders and portable holes to a small but extremely loyal customer base of one. Every product is delivered within minutes by rocket mail, works exactly as advertised right up to the worst possible moment, and comes with a warranty that expires on first use.\n\nAcme hired Fourth Wall Software after its in-house IT department was flattened by an anvil it had ordered from itself.",
+  "DocumentationLink": "https://acme.example/catalog",
+  "Labels": [
+    "customer",
+    "key-account",
+    "cartoon-physics",
+    "high-risk"
+  ],
+  "Values": {
+    "code": "ACME",
+    "legalName": "Acme Corporation",
+    "founded": 1949,
+    "headquarters": {
+      "address": "1 Mesa Drive, Mile Marker 42",
+      "city": "Painted Desert",
+      "state": "AZ"
+    },
+    "accountManager": "Penelope Plummet",
+    "primaryCustomer": "A. Coyote, Super Genius",
+    "contractTier": "platinum",
+    "currency": "USD",
+    "brandColor": "#E8412C",
+    "deliveryMethod": "rocket-mail",
+    "deliverySlaMinutes": 4,
+    "annualAnvilQuota": 12000,
+    "insurance": {
+      "carrier": "Mutual of Mesa",
+      "policy": "KABOOM-1949-0001",
+      "coversGravity": false
+    }
+  },
+  "ValidFrom": "2019-04-01T00:00:00-07:00",
+  "TimeZone": "America/Phoenix"
+}

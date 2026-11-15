@@ -1,0 +1,48 @@
+{
+  "toonSafety": {
+    "$binding": "jsone",
+    "$context": {
+      "company": "@annotation(\"$\", \"Subject\")",
+      "department": "@annotation(\"$\", \"Context\")"
+    },
+    "$definition": {
+      "$if": "company.code == 'ACME'",
+      "then": {
+        "policy": "${company.insurance.policy}",
+        "insurer": "${company.insurance.carrier}",
+        "coversGravity": {
+          "$eval": "company.insurance.coversGravity"
+        },
+        "costCenter": "${department.costCenter}",
+        "hazardLevel": "${department.hazardLevel}",
+        "safetyOfficer": "${department.headOfDepartment}",
+        "mandatoryGear": {
+          "$if": "department.hazardLevel == 'extreme'",
+          "then": [
+            "helmet",
+            "umbrella",
+            "parachute",
+            "tiny 'help' sign"
+          ],
+          "else": [
+            "helmet",
+            "umbrella"
+          ]
+        },
+        "reconstitution": {
+          "enabled": true,
+          "maxPerShift": {
+            "$eval": "department.maxReconstitutionsPerShift"
+          },
+          "method": "accordion-shake"
+        },
+        "incidentReporting": {
+          "target": "BoomDesk",
+          "url": "@[https://@acme.boomdesk.host/@acme.boomdesk.apiVersion/incidents]",
+          "hotline": "@public(acme.safety.hotline)"
+        }
+      },
+      "else": {}
+    }
+  }
+}

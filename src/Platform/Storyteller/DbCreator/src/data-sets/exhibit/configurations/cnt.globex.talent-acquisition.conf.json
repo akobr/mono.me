@@ -1,0 +1,22 @@
+{
+  "department": {
+    "name": "Aggressive Talent Acquisition & Relocation",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "head": "@annotation(\"/headOfDepartment\", \"Context\")",
+    "headcount": "@annotation(\"/headcount\", \"Context\")"
+  },
+  "recruiting": {
+    "approach": "@annotation(\"/hiringStyle\", \"Context\")",
+    "offerExpiresInMinutes": 15,
+    "relocationRequired": true,
+    "interviewRounds": 1,
+    "acceptedAnswers": [
+      "yes",
+      "of course",
+      "do I have a choice?"
+    ]
+  },
+  "features": [
+    "candidate-radar"
+  ]
+}

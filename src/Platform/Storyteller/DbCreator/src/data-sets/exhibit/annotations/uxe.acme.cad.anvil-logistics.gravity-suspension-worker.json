@@ -1,0 +1,13 @@
+{
+  "Title": "GravitySuspensionWorker at Anvil Logistics",
+  "Description": "Scans 3D assemblies for heavy objects (such as anvils or pianos) placed over ledges and suppresses downward vector calculations until a \"user_looked_down\" event flag is triggered.",
+  "Labels": [
+    "production",
+    "event-driven",
+    "schema-validated"
+  ],
+  "Values": {
+    "assemblyBatch": "ANV-2026-11-13",
+    "scanIntervalSeconds": 2
+  }
+}

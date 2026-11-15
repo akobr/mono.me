@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "hr"
+  ],
+  "properties": {
+    "hr": {
+      "type": "object",
+      "required": [
+        "onboarding",
+        "leave",
+        "payroll"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "onboarding": {
+          "type": "object",
+          "properties": {
+            "checklist": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "buddyProgram": {
+              "type": "boolean"
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "leave": {
+          "type": "object",
+          "required": [
+            "baseDays",
+            "totalDays"
+          ],
+          "properties": {
+            "baseDays": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 60
+            },
+            "bonusDays": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "totalDays": {
+              "$ref": "#/definitions/binding",
+              "description": "Computed late: base plus bonus of the node being read."
+            },
+            "carryOver": {
+              "type": "boolean"
+            }
+          }
+        },
+        "payroll": {
+          "type": "object",
+          "required": [
+            "cycle",
+            "currency"
+          ],
+          "properties": {
+            "cycle": {
+              "enum": [
+                "weekly",
+                "biweekly",
+                "monthly"
+              ]
+            },
+            "payday": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          }
+        },
+        "reviews": {
+          "type": "object",
+          "properties": {
+            "frequency": {
+              "enum": [
+                "annual",
+                "quarterly",
+                "after-every-incident"
+              ]
+            },
+            "scale": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "offboarding": {
+          "type": "object",
+          "properties": {
+            "exitInterview": {
+              "type": "boolean"
+            },
+            "badgeReturnDays": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "binding": {
+      "type": "string",
+      "pattern": "^@"
+    }
+  }
+}

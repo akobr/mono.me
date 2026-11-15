@@ -1,0 +1,19 @@
+{
+  "Title": "Department of Anvil Logistics & Gravity Compliance",
+  "Description": "Responsible for ensuring heavy objects hang motionless in mid-air until a victim looks down. The department also keeps the official register of every anvil, piano and safe currently suspended above a canyon, and signs the quarterly Gravity Compliance Report (\"gravity: mostly complied\").",
+  "Labels": [
+    "logistics",
+    "heavy-objects",
+    "hazardous"
+  ],
+  "Values": {
+    "costCenter": "AC-ANV-100",
+    "headOfDepartment": "Ivana Dropp",
+    "headcount": 42,
+    "hazardLevel": "extreme",
+    "maxReconstitutionsPerShift": 3,
+    "slackChannel": "#anvils-overhead",
+    "floor": "B3 (reinforced ceiling)",
+    "anvilStockTons": 980
+  }
+}

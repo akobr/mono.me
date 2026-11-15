@@ -1,0 +1,37 @@
+{
+  "Title": "Globex Corporation",
+  "Description": "The friendliest multinational on the planet, and soon the only one. Globex gives every employee a hammock, a monorail pass and a boss who remembers their kids' birthdays, and keeps a cobalt-thorium G doomsday device in the basement in case the United Nations does not answer its demands within 72 hours.\n\nGlobex is headquartered in Cypress Creek, a lovingly planned community where nobody asks what's inside the volcano. It hired Fourth Wall Software because, in the words of its CEO, \"you can't run a global empire on spreadsheets. Well, you can, but you shouldn't.\"",
+  "DocumentationLink": "https://globex.example/careers",
+  "Labels": [
+    "customer",
+    "key-account",
+    "supervillain",
+    "employee-friendly"
+  ],
+  "Values": {
+    "code": "GLOBEX",
+    "legalName": "Globex Corporation",
+    "ceo": "Hank Scorpio",
+    "headquarters": {
+      "address": "1 Volcano Plaza",
+      "city": "Cypress Creek",
+      "lairLevel": -7
+    },
+    "accountManager": "Sunny Ultimatum",
+    "contractTier": "diamond",
+    "currency": "USD",
+    "ransomCurrency": "XAU",
+    "brandColor": "#7A2BD1",
+    "employeeBenefits": [
+      "hammock",
+      "monorail pass",
+      "free cookies",
+      "henchman dental plan"
+    ],
+    "friendlinessIndex": 11,
+    "doomsdayReadiness": "DEFCON 2",
+    "takeoverTarget": "East Coast"
+  },
+  "ValidFrom": "2021-06-01T09:00:00-05:00",
+  "TimeZone": "America/Chicago"
+}

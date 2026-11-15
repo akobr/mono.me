@@ -1,0 +1,33 @@
+{
+  "company": {
+    "code": "@annotation(\"/code\", \"Subject\")",
+    "name": "@annotation(\"/legalName\", \"Subject\")",
+    "accountManager": "@annotation(\"/accountManager\", \"Subject\")",
+    "currency": "@annotation(\"/currency\", \"Subject\")",
+    "locale": "en-US",
+    "timeZone": "America/Phoenix",
+    "portal": "@[https://@acme.portal.host]",
+    "motto": "If it can explode, we already sell it."
+  },
+  "branding": {
+    "primaryColor": "@annotation(\"/brandColor\", \"Subject\")",
+    "logo": "@[https://@acme.portal.host/assets/logo-with-scorch-marks.svg]",
+    "tagline": "Quality products. Questionable outcomes."
+  },
+  "delivery": {
+    "method": "@annotation(\"/deliveryMethod\", \"Subject\")",
+    "dispatchUrl": "@acme.delivery.rocketMail",
+    "slaMinutes": "@annotation(\"/deliverySlaMinutes\", \"Subject\")",
+    "signatureRequired": false
+  },
+  "physics": {
+    "gravity": "optional",
+    "gravityDelayMs": 1500,
+    "momentumConserved": "only when it's funny"
+  },
+  "features": [
+    "sso",
+    "cartoon-physics",
+    "instant-delivery"
+  ]
+}

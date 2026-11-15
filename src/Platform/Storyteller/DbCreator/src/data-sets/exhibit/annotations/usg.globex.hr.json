@@ -1,0 +1,15 @@
+{
+  "Title": "HammockHR",
+  "Description": "Manages Cypress Creek relocation packages, casual dress code policies, and local hammock district vendor perks.",
+  "DocumentationLink": "https://lair.globex.example/hammock/help",
+  "Labels": [
+    "hr",
+    "relocation",
+    "perks"
+  ],
+  "Values": {
+    "version": "4.2.0",
+    "codename": "Siesta",
+    "goLive": "2022-06-01"
+  }
+}

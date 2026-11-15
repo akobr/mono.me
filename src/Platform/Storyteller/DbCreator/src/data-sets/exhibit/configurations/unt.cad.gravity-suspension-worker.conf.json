@@ -1,0 +1,15 @@
+{
+  "job": {
+    "trigger": {
+      "type": "event",
+      "event": "user_looked_down"
+    },
+    "timeoutSeconds": 3,
+    "concurrency": 1,
+    "retries": 0,
+    "onTimeout": "let-go"
+  },
+  "features": [
+    "anvil-scan"
+  ]
+}

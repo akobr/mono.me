@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "An AppUsage of ToonDayHR",
+  "description": "Every Department that uses ToonDayHR declares its risk profile and when to raise the alarm.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appUsage",
+    "hr"
+  ],
+  "properties": {
+    "appUsage": {
+      "type": "object",
+      "required": [
+        "riskProfile",
+        "seats",
+        "costCenter"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "riskProfile": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "extreme"
+          ]
+        },
+        "seats": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "$ref": "#/definitions/binding"
+            }
+          ]
+        },
+        "costCenter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^AC-[A-Z]{3}-[0-9]{3}$"
+            },
+            {
+              "$ref": "#/definitions/binding"
+            }
+          ]
+        },
+        "goLive": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "hr": {
+      "type": "object",
+      "required": [
+        "survivalTracking"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "leave": {
+          "type": "object",
+          "properties": {
+            "bonusDays": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 30
+            }
+          }
+        },
+        "survivalTracking": {
+          "type": "object",
+          "required": [
+            "alertAfterLosses"
+          ],
+          "properties": {
+            "alertAfterLosses": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9
+            },
+            "alertChannel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^#"
+                },
+                {
+                  "$ref": "#/definitions/binding"
+                }
+              ]
+            }
+          }
+        },
+        "reconstitution": {
+          "type": "object",
+          "properties": {
+            "maxPerDay": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          }
+        }
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "definitions": {
+    "binding": {
+      "type": "string",
+      "pattern": "^@"
+    }
+  }
+}

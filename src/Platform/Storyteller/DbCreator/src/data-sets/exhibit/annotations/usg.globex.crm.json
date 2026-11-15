@@ -1,0 +1,14 @@
+{
+  "Title": "LairForce CRM",
+  "Description": "Tracks world leaders, ransom payment statuses, and automated threats of tectonic plate disruption.",
+  "DocumentationLink": "https://lairforce.globex.example/docs",
+  "Labels": [
+    "crm",
+    "world-domination"
+  ],
+  "Values": {
+    "version": "2026.10",
+    "codename": "Tectonic",
+    "goLive": "2023-03-15"
+  }
+}

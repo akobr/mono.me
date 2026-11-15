@@ -1,0 +1,15 @@
+{
+  "Title": "ScorpioSlack",
+  "Description": "An upbeat internal messaging app where team-building GIFs sit right next to East Coast takeover countdowns.",
+  "DocumentationLink": "https://scorpio.globex.example/help",
+  "Labels": [
+    "chat",
+    "schema-validated",
+    "countdown"
+  ],
+  "Values": {
+    "version": "7.0.1",
+    "codename": "Stinger",
+    "goLive": "2024-02-29"
+  }
+}

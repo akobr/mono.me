@@ -1,0 +1,16 @@
+{
+  "Title": "LooneyCAD",
+  "Description": "A 3D modeling suite that ignores basic laws of physics, gravity, and structural integrity during product design.",
+  "DocumentationLink": "https://acme.example/looneycad",
+  "Labels": [
+    "cad",
+    "physics-optional",
+    "desktop"
+  ],
+  "Values": {
+    "version": "11.2",
+    "codename": "Thin Air",
+    "goLive": "2020-01-15",
+    "physicsEngine": "Rubber Band 3D"
+  }
+}

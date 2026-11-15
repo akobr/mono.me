@@ -1,0 +1,51 @@
+{
+  "application": {
+    "name": "LairForce CRM",
+    "version": "@annotation(\"/version\", \"Usage\")",
+    "url": "@[https://@globex.lairforce.host]"
+  },
+  "solution": {
+    "supportTier": "diamond",
+    "sla": {
+      "responseMinutes": 5
+    }
+  },
+  "features": [
+    "ransom-tracking",
+    "threat-scheduler"
+  ],
+  "crm": {
+    "tickets": {
+      "prefix": "DEMAND"
+    },
+    "accounts": {
+      "types": [
+        "world-leader",
+        "rival-supervillain",
+        "useful-scientist"
+      ],
+      "vipRule": "has a nuclear arsenal or a really nice volcano"
+    },
+    "ransom": {
+      "currency": "@annotation(\"/ransomCurrency\", \"Subject\")",
+      "defaultAmount": 100000000000,
+      "escrowPin": "@secret(globex.lairforce.escrowPin)",
+      "statuses": [
+        "demanded",
+        "negotiating",
+        "paid",
+        "tectonic-plates-adjusted"
+      ]
+    },
+    "threats": {
+      "tectonicDisruption": {
+        "enabled": true,
+        "approvedBy": "@annotation(\"/ceo\", \"Subject\")",
+        "cooldownHours": 72
+      }
+    },
+    "notifications": {
+      "digest": "realtime"
+    }
+  }
+}

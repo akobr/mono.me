@@ -1,0 +1,45 @@
+{
+  "appUsage": {
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "seats": "@annotation(\"/headcount\", \"Context\")",
+    "appVersion": "@annotation(\"/version\", \"Usage\")"
+  },
+  "crm": {
+    "ticketCategories": [
+      "failed-to-stop",
+      "ignition-stuck",
+      "reached-orbit"
+    ],
+    "routing": {
+      "defaultQueue": "propulsion-incidents",
+      "escalateTo": "@annotation(\"/headOfDepartment\", \"Context\")",
+      "priority": {
+        "$binding": "jlogic",
+        "$definition": {
+          "if": [
+            {
+              ">": [
+                {
+                  "var": "topSpeedKmh"
+                },
+                1000
+              ]
+            },
+            "critical",
+            "high"
+          ]
+        },
+        "$context": {
+          "topSpeedKmh": "@annotation(\"/topSpeedKmh\", \"Context\")"
+        }
+      }
+    },
+    "autoClose": {
+      "when": "dust-cloud-settles",
+      "afterMinutes": 3
+    }
+  },
+  "features": [
+    "crater-photos"
+  ]
+}

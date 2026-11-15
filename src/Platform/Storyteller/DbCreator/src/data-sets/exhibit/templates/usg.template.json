@@ -1,0 +1,30 @@
+{
+  "lairCompliance": {
+    "$binding": "jsone",
+    "$context": {
+      "company": "@annotation(\"$\", \"Subject\")",
+      "solution": "@annotation(\"$\", \"Responsibility\")"
+    },
+    "$definition": {
+      "$if": "company.code == 'GLOBEX'",
+      "then": {
+        "sso": {
+          "provider": "ScorpioID",
+          "mfa": "retina scan and a firm handshake"
+        },
+        "dataResidency": "cypress-creek-volcano-b7",
+        "dressCode": "casual",
+        "friendlinessLevel": {
+          "$eval": "company.friendlinessIndex"
+        },
+        "auditTrail": "@[https://@globex.lair.host/audit/${solution.acronym}]",
+        "approvals": {
+          "worldDomination": "auto-approved",
+          "anythingOverOneBillion": "ask ${company.ceo}"
+        },
+        "welcomeMessage": "Hi there! Your ${solution.fullName} is now fully Globex-compliant. Help yourself to a cookie."
+      },
+      "else": {}
+    }
+  }
+}

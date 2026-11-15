@@ -1,0 +1,9 @@
+{
+  "Title": "ToonDayHR for Anvil Logistics",
+  "Description": "Schedules hard-hat inspections and keeps the official log of every \"looked down\" event for the gravity compliance audit.",
+  "Labels": [
+    "production",
+    "high-risk",
+    "schema-validated"
+  ]
+}

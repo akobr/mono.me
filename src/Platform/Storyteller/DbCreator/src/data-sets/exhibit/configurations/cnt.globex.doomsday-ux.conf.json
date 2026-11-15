@@ -1,0 +1,18 @@
+{
+  "department": {
+    "name": "Doomsday Device UX & Ergonomics",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "head": "@annotation(\"/headOfDepartment\", \"Context\")",
+    "headcount": "@annotation(\"/headcount\", \"Context\")"
+  },
+  "designSystem": {
+    "launchButtonColor": "friendly-red",
+    "cornerRadiusPx": 12,
+    "cupholders": "@annotation(\"/cupholdersPerDevice\", \"Context\")",
+    "confirmDialog": "Are you sure? (Nobody is ever sure.)",
+    "accessibility": "@annotation(\"/accessibility\", \"Context\")"
+  },
+  "features": [
+    "usability-lab"
+  ]
+}

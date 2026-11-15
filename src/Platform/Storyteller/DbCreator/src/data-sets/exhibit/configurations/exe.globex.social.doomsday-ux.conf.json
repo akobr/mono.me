@@ -1,0 +1,24 @@
+{
+  "appUsage": {
+    "channel": "#doomsday-device-ux",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "members": "@annotation(\"/headcount\", \"Context\")",
+    "teamBuilding": {
+      "gifQuotaPerDay": 10,
+      "icebreaker": "Rate this launch button from 1 to apocalypse."
+    }
+  },
+  "social": {
+    "pinned": [
+      "Every doomsday device needs at least 4 cupholders."
+    ],
+    "polls": {
+      "enabled": true,
+      "question": "Big red button or friendly teal toggle?"
+    }
+  },
+  "features": [
+    "design-reviews",
+    "cupholder-polls"
+  ]
+}

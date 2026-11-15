@@ -1,0 +1,62 @@
+{
+  "solution": {
+    "code": "@annotation(\"/acronym\", \"Responsibility\")",
+    "category": "people",
+    "supportTier": "gold",
+    "sla": {
+      "responseMinutes": 120,
+      "uptimePercent": 99.5
+    },
+    "support": {
+      "email": "@fourthwall.support.email",
+      "hours": "@fourthwall.support.hours"
+    },
+    "statusPage": "@[@fourthwall.status.url/hr]"
+  },
+  "telemetry": {
+    "endpoint": "@public(fourthwall.telemetry.endpoint)",
+    "service": "hr",
+    "sampleRate": 0.1
+  },
+  "features": [
+    "employee-records",
+    "payroll",
+    "leave"
+  ],
+  "hr": {
+    "onboarding": {
+      "checklist": [
+        "contract",
+        "badge",
+        "laptop"
+      ],
+      "buddyProgram": true,
+      "durationDays": 14
+    },
+    "leave": {
+      "baseDays": 20,
+      "bonusDays": 0,
+      "totalDays": "@{@config(\"/hr/leave/baseDays\") + @config(\"/hr/leave/bonusDays\")}",
+      "carryOver": true
+    },
+    "payroll": {
+      "cycle": "monthly",
+      "payday": 25,
+      "currency": "USD"
+    },
+    "reviews": {
+      "frequency": "annual",
+      "scale": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "offboarding": {
+      "exitInterview": true,
+      "badgeReturnDays": 1
+    }
+  }
+}

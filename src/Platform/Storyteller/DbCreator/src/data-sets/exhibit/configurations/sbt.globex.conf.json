@@ -1,0 +1,34 @@
+{
+  "company": {
+    "code": "@annotation(\"/code\", \"Subject\")",
+    "name": "@annotation(\"/legalName\", \"Subject\")",
+    "ceo": "@annotation(\"/ceo\", \"Subject\")",
+    "accountManager": "@annotation(\"/accountManager\", \"Subject\")",
+    "currency": "@annotation(\"/currency\", \"Subject\")",
+    "locale": "en-US",
+    "timeZone": "America/Chicago",
+    "portal": "@[https://@globex.lair.host]",
+    "motto": "Changing the world, one friendly ultimatum at a time."
+  },
+  "branding": {
+    "primaryColor": "@annotation(\"/brandColor\", \"Subject\")",
+    "logo": "@[https://@globex.lair.host/assets/globe-with-a-tiny-volcano.svg]",
+    "tagline": "We're a family. A very well-funded family."
+  },
+  "perks": {
+    "benefits": "@annotation(\"/employeeBenefits\", \"Subject\")",
+    "hammockVendors": "@globex.hammock.vendorsUrl",
+    "snackBudgetPerDayUsd": 25
+  },
+  "ultimatums": {
+    "demandsUrl": "@public(globex.un.demandsUrl)",
+    "responseWindowHours": 72,
+    "target": "@(globex.takeover.target, public)",
+    "tone": "warm and encouraging"
+  },
+  "features": [
+    "sso",
+    "hammock-mode",
+    "world-domination"
+  ]
+}

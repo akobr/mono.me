@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CAD",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "cad"
+  ],
+  "properties": {
+    "cad": {
+      "type": "object",
+      "required": [
+        "units",
+        "simulation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "units": {
+          "enum": [
+            "metric",
+            "imperial",
+            "imperial-ish"
+          ]
+        },
+        "precisionMm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "simulation": {
+          "type": "object",
+          "required": [
+            "gravity"
+          ],
+          "properties": {
+            "gravity": {
+              "type": "number",
+              "minimum": 0,
+              "description": "m/s². Zero is allowed, unfortunately."
+            },
+            "friction": {
+              "type": "boolean"
+            },
+            "structuralIntegrity": {
+              "enum": [
+                "enforced",
+                "suggested",
+                "ignored"
+              ]
+            }
+          }
+        },
+        "rendering": {
+          "type": "object",
+          "properties": {
+            "engine": {
+              "enum": [
+                "raytracer",
+                "rasterizer"
+              ]
+            },
+            "maxSamples": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "outlines": {
+              "type": "boolean"
+            }
+          }
+        },
+        "export": {
+          "type": "object",
+          "properties": {
+            "formats": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "collaboration": {
+          "type": "object",
+          "properties": {
+            "maxEditors": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "lockTimeoutMinutes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

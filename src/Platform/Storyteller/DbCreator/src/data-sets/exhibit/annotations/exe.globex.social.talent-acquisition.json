@@ -1,0 +1,8 @@
+{
+  "Title": "ScorpioSlack for Talent Acquisition",
+  "Description": "Runs #welcome-to-cypress-creek: welcome GIFs, relocation tips and a pinned message reminding newcomers that the exits are decorative.",
+  "Labels": [
+    "production",
+    "schema-validated"
+  ]
+}

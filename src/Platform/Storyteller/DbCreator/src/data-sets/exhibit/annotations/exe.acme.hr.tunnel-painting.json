@@ -1,0 +1,8 @@
+{
+  "Title": "ToonDayHR for Tunnel Painting R&D",
+  "Description": "Tracks the painters' exposure to suddenly solid scenery and accepts \"flattened against a wall\" as a valid reason for sick leave.",
+  "Labels": [
+    "production",
+    "schema-validated"
+  ]
+}

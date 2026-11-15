@@ -1,0 +1,23 @@
+{
+  "appUsage": {
+    "riskProfile": "extreme",
+    "seats": "@{@annotation(\"/headcount\", \"Context\") + 3}",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "goLive": "2024-04-01"
+  },
+  "hr": {
+    "leave": {
+      "bonusDays": 10
+    },
+    "survivalTracking": {
+      "alertAfterLosses": 2,
+      "alertChannel": "@annotation(\"/slackChannel\", \"Context\")"
+    },
+    "reconstitution": {
+      "maxPerDay": 5
+    }
+  },
+  "features": [
+    "launch-log"
+  ]
+}

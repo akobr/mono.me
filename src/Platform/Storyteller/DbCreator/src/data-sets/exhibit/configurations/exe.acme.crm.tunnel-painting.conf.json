@@ -1,0 +1,21 @@
+{
+  "appUsage": {
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "seats": "@annotation(\"/headcount\", \"Context\")",
+    "appVersion": "@annotation(\"/version\", \"Usage\")"
+  },
+  "crm": {
+    "ticketCategories": [
+      "ran-into-painted-tunnel",
+      "train-came-out-of-painting",
+      "paint-still-wet"
+    ],
+    "routing": {
+      "defaultQueue": "illusion-incidents",
+      "escalateTo": "@annotation(\"/headOfDepartment\", \"Context\")"
+    }
+  },
+  "features": [
+    "paint-sample-attachments"
+  ]
+}

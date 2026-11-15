@@ -1,0 +1,14 @@
+{
+  "Title": "BoomDesk",
+  "Description": "Automatically generates soot-stained incident reports and processes one-star reviews from a single recurring coyote customer.",
+  "DocumentationLink": "https://boomdesk.acme.example/docs",
+  "Labels": [
+    "helpdesk",
+    "incident-management"
+  ],
+  "Values": {
+    "version": "3.14.0",
+    "codename": "Smoldering Crater",
+    "goLive": "2021-04-01"
+  }
+}

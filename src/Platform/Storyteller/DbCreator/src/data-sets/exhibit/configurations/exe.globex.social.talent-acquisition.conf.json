@@ -1,0 +1,20 @@
+{
+  "appUsage": {
+    "channel": "#welcome-to-cypress-creek",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "members": "@annotation(\"/headcount\", \"Context\")",
+    "teamBuilding": {
+      "gifQuotaPerDay": 50,
+      "icebreaker": "Two truths and a doomsday device."
+    }
+  },
+  "social": {
+    "pinned": [
+      "Welcome! The exits are decorative.",
+      "The hammock sign-up sheet is in #hammock-reservations."
+    ]
+  },
+  "features": [
+    "new-hire-onboarding"
+  ]
+}

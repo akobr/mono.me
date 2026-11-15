@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Solution",
+  "description": "What every Solution of Fourth Wall Software declares: what it is, how it is supported, and where it sends telemetry.",
+  "type": "object",
+  "required": [
+    "solution",
+    "telemetry"
+  ],
+  "properties": {
+    "solution": {
+      "type": "object",
+      "required": [
+        "code",
+        "category",
+        "supportTier",
+        "sla"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "description": "The acronym of the Solution, usually bound to its value `acronym`.",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{2,8}$"
+            },
+            {
+              "$ref": "#/definitions/binding"
+            }
+          ]
+        },
+        "category": {
+          "enum": [
+            "sales",
+            "people",
+            "engineering",
+            "collaboration"
+          ]
+        },
+        "supportTier": {
+          "enum": [
+            "bronze",
+            "silver",
+            "gold",
+            "platinum",
+            "diamond"
+          ]
+        },
+        "sla": {
+          "type": "object",
+          "required": [
+            "responseMinutes"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "responseMinutes": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "How fast Fourth Wall answers a ticket."
+            },
+            "uptimePercent": {
+              "type": "number",
+              "minimum": 90,
+              "maximum": 100
+            }
+          }
+        },
+        "support": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "$ref": "#/definitions/binding"
+            },
+            "hours": {
+              "$ref": "#/definitions/binding"
+            }
+          }
+        },
+        "statusPage": {
+          "$ref": "#/definitions/binding"
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "required": [
+        "endpoint",
+        "service"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "$ref": "#/definitions/binding"
+        },
+        "service": {
+          "type": "string",
+          "pattern": "^[a-z]+$"
+        },
+        "sampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "features": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$"
+      }
+    }
+  },
+  "definitions": {
+    "binding": {
+      "type": "string",
+      "pattern": "^@",
+      "description": "A Storyteller data binding, evaluated on the resolved read."
+    }
+  }
+}

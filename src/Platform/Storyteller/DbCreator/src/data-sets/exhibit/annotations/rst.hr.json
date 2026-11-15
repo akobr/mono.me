@@ -1,0 +1,14 @@
+{
+  "Title": "HR",
+  "Description": "**Human Resources Management System.** Software that runs the employee lifecycle (hiring, onboarding, payroll, leave, performance reviews and offboarding) and keeps the employee records that go with it.",
+  "DocumentationLink": "https://en.wikipedia.org/wiki/Human_resource_management_system",
+  "Labels": [
+    "solution",
+    "people"
+  ],
+  "Values": {
+    "acronym": "HR",
+    "fullName": "Human Resources Management System",
+    "productOwner": "Iris Onboard"
+  }
+}
