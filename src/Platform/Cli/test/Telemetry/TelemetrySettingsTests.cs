@@ -67,7 +67,6 @@ public class TelemetrySettingsTests
 
         settings.IsEnabled.ShouldBeFalse();
         settings.ProjectToken.ShouldBeNull();
-        settings.IsOptedOut.ShouldBeTrue();
         TelemetrySettings.IsOptedOutBy(name => name == variable ? value : null).ShouldBeTrue();
     }
 
@@ -89,18 +88,7 @@ public class TelemetrySettingsTests
             });
 
         settings.IsEnabled.ShouldBeTrue();
-        settings.IsOptedOut.ShouldBeFalse();
         TelemetrySettings.IsOptedOutBy(_ => value).ShouldBeFalse();
-    }
-
-    // The opt-out is the user's choice, whatever the configuration: it stops the error reports even without a token.
-    [Fact]
-    public void TheOptOut_IsKnownWithoutAToken()
-    {
-        var settings = Resolve(new TelemetryOptions(), new Dictionary<string, string> { [TelemetrySettings.DO_NOT_TRACK] = "1" });
-
-        settings.IsEnabled.ShouldBeFalse();
-        settings.IsOptedOut.ShouldBeTrue();
     }
 
     [Theory]

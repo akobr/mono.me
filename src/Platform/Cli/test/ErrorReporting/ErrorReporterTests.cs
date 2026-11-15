@@ -137,6 +137,62 @@ public class ErrorReporterTests
     }
 
     [Fact]
+    public async Task AFileGivenByARelativePath_IsHiddenInItsFullForm()
+    {
+        var logger = new RecordingLogger();
+        var reporter = ErrorReporter.Create(logger, Settings(isOptedOut: true));
+        var full = Path.GetFullPath("../nx/ada/db.zip");
+
+        await reporter.ReportAsync(LogLevel.Error, "Unhandled exception", Run("story", "export", "-o", "../nx/ada/db.zip"), Thrown(() => new DirectoryNotFoundException($"Could not find a part of the path '{full}'.")));
+
+        logger.Entries.Single().Exception.ShouldNotBeNull().ToString().ShouldContain("Could not find a part of the path '***'.");
+    }
+
+    [Fact]
+    public async Task ASecretOfTheEnvironment_ReachesNeitherSentryNorTheLog()
+    {
+        var transport = new RecordingTransport();
+        var logger = new RecordingLogger();
+        var reporter = ErrorReporter.Create(logger, Settings(secretValues: ["cl1ent-s3cret-value"]), options => options.Transport = transport);
+
+        await reporter.ReportAsync(LogLevel.Warning, "Sign-in failed (Configuration)", Run("story"), Thrown(() => new InvalidOperationException("The token endpoint rejected cl1ent-s3cret-value.")));
+
+        transport.AllText.ShouldNotContain("cl1ent-s3cret-value");
+        logger.AllText.ShouldNotContain("cl1ent-s3cret-value");
+        logger.AllText.ShouldContain("The token endpoint rejected ***.");
+    }
+
+    // The organization and project of a machine's credential are known only once it was loaded, during the run.
+    [Fact]
+    public async Task TheValuesKnownAtTheReport_ReachNotSentry()
+    {
+        var transport = new RecordingTransport();
+        var settings = Settings() with { ReportTimeValues = () => ["globex", "payroll", "m1"] };
+        var reporter = ErrorReporter.Create(null, settings, options => options.Transport = transport);
+        var exception = Thrown(() => new InvalidOperationException("The machine credentials in STORYTELLER_API_KEY belong to globex.payroll, not acme.billing."));
+
+        await reporter.ReportAsync(LogLevel.Warning, "Sign-in failed (Configuration)", Run("story", "kv", "get", "db.password", "-p", "acme.billing"), exception);
+
+        transport.Events.Single().GetProperty("exception").GetProperty("values")[0].GetProperty("value").GetString()
+            .ShouldBe("The machine credentials in STORYTELLER_API_KEY belong to ***.***, not ***.");
+    }
+
+    [Fact]
+    public async Task AScrubbingRuleThatTimesOut_LeavesEveryMessageOut_AndKeepsTheTypesAndTheStack()
+    {
+        var logger = new RecordingLogger();
+        var reporter = ErrorReporter.Create(logger, Settings(isOptedOut: true));
+        var exception = Thrown(() => new InvalidOperationException("outer", Thrown(() => new FormatException(string.Concat(Enumerable.Repeat("eyJ", 200_000))))));
+
+        await reporter.ReportAsync(LogLevel.Error, "Unhandled exception", Run("story"), exception);
+
+        var logged = logger.Entries.Single().Exception.ShouldNotBeNull().ToString();
+        logged.ShouldStartWith("System.InvalidOperationException: (the message is left out) ---> System.FormatException: (the message is left out)");
+        logged.ShouldContain(nameof(Thrown));
+        logged.ShouldNotContain("eyJeyJ");
+    }
+
+    [Fact]
     public void TheEvent_IsBuiltFromTheUsage()
     {
         var sentryEvent = ErrorReporter.CreateEvent(LogLevel.Error, "Unhandled exception", new CommandUsage("sform storyteller kv set", ["--secret"]), null);
@@ -146,9 +202,18 @@ public class ErrorReporterTests
         sentryEvent.Tags[ReportScrubber.CommandTag].ShouldBe("sform storyteller kv set");
     }
 
-    internal static ErrorReportingSettings Settings(string? dsn = Dsn, bool isOptedOut = false, string?[]? contextValues = null)
+    internal static ErrorReportingSettings Settings(string? dsn = Dsn, bool isOptedOut = false, string?[]? contextValues = null, string?[]? secretValues = null)
     {
-        return new ErrorReportingSettings(dsn, isOptedOut, InstallationId, "production", "42.Platform.Cli@1.2.3", contextValues ?? []);
+        return new ErrorReportingSettings
+        {
+            Dsn = dsn,
+            IsOptedOut = isOptedOut,
+            InstallationId = InstallationId,
+            Environment = "production",
+            Release = "42.Platform.Cli@1.2.3",
+            ContextValues = contextValues ?? [],
+            SecretValues = secretValues ?? [],
+        };
     }
 
     internal static CommandRun Run(params string[] args)

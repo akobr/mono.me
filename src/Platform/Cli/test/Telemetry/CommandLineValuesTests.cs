@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using _42.Platform.Cli.Telemetry;
 using McMaster.Extensions.CommandLineUtils;
@@ -145,6 +144,26 @@ public class CommandLineValuesTests
         run.RecordFailedParsing(exception.Command);
 
         run.Values.Hidden.ShouldBe(["sett", "key"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void BothSidesOfAnInlineProperty_AreValues_WhateverTheirLength()
+    {
+        var values = Record("story", "config", "set", "exe.northwind.invoicing.prod", "-x", "db.password=x9/k2;Qz", "-x", "db.port=543");
+
+        values.Hidden.ShouldContain("x9/k2;Qz");
+        values.Hidden.ShouldContain("db.password");
+        values.Hidden.ShouldContain("543");
+        values.Hidden.ShouldContain("db.port");
+    }
+
+    [Fact]
+    public void WithParts_GivesTheLines_NoSchemeOfAUrl_AndTheNamesOfAFullKey()
+    {
+        CommandLineValues.WithParts("first-line-secret\nsecond line").ShouldBe(["first-line-secret\nsecond line", "first-line-secret", "second line"], ignoreOrder: true);
+        CommandLineValues.WithParts("https://keys.example.org/jwks").ShouldNotContain("https:");
+        CommandLineValues.WithParts("@acme.billing.prod.sbt.app").ShouldContain("acme");
+        CommandLineValues.WithParts("@acme.billing.prod.sbt.app").ShouldContain("billing");
     }
 
     [Fact]
