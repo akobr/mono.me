@@ -61,6 +61,7 @@ public static class Definitions
 
                 public const string CertificateAuthority = "v1/access/certificate-authority";
                 public const string MachineAuthentication = $"v1/access/points/{{{Parameters.Key}}}/machine-authentication";
+                public const string AccessAudit = $"v1/access/points/{{{Parameters.Key}}}/audit";
 
                 public const string MachineCertificateRenew = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}/certificate/renew";
                 public const string MachineFederationRules = $"{Machine}/federation-rules";
@@ -239,7 +240,8 @@ public static class Definitions
                 public const string Rotate = $"{Policy}/rotate";
                 public const string Recipients = $"{ProjectKeyValues}/recipients";
                 public const string Recipient = $"{Recipients}/{{{Parameters.Id}}}";
-                public const string Audit = $"{ProjectKeyValues}/audit";
+                // "access" is no organization: v1/access/points/key-values/audit is the access audit of an access point.
+                public const string Audit = $"v1/{{{Parameters.Organization}{Constraints.Organization}}}/{{{Parameters.Project}}}/key-values/audit";
                 public const string Usage = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/usage/key-values";
             }
         }
@@ -279,6 +281,7 @@ public static class Definitions
             public const string GetMembers = nameof(GetMembers);
             public const string SetMemberRole = nameof(SetMemberRole);
             public const string RemoveMember = nameof(RemoveMember);
+            public const string GetAccessAudit = nameof(GetAccessAudit);
 
             public const string GetInvitations = nameof(GetInvitations);
             public const string CreateInvitation = nameof(CreateInvitation);
@@ -504,6 +507,8 @@ public static class Definitions
         public const string Mode = "mode";
         public const string DryRun = "dryRun";
         public const string Operation = "operation";
+        public const string Action = "action";
+        public const string Target = "target";
         public const string From = "from";
         public const string To = "to";
         public const string IncludeInactive = "includeInactive";
