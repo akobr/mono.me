@@ -5,13 +5,13 @@ The package `42.Platform.Storyteller.Hosting` adds the catalog to the [configura
 | Service | Does |
 | --- | --- |
 | `IExecutionContext` | Who am I: the annotation of `STORYTELLER_KEY` and its ancestors, each as the snapshot of its type |
-| `IStorytellerCatalog` | Any annotation by its key, and the descendants of any annotation by a target: as a list, or as a stream of changes |
+| `IStorytellerCatalog` | Any annotation by its key, alone or with its ancestors, and the descendants of any annotation by a target: as a list, as a list with their ancestors, or as a stream of changes |
 | `ISubscriptionCatalog` | One execution by its key, and the informer: the subscriptions of a responsibility in a context, as a stream of changes |
 | `IStorytellerSubscriptions` | A hosted informer that keeps the document of every subscription in memory, with `IOptionsMonitor<T>.Get(subject)` over them |
 
 The code is in `src/Libraries/Platform/Storyteller/Hosting/src/`: the public types at its root, the registration (`Container/` and the extension classes), who am I (`Executions/`), the catalogs (`Catalog/`), the reads (`Reading/`), the polling informers (`Informer/`), and the subscriptions with their named options (`Subscriptions/`).
 
-The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md). The typed snapshots and `IStorytellerCatalog` are in [their own spec](../../Libraries/Platform/Storyteller/specs/2026-11-08%20Hosting%20-%20who%20am%20I%20for%20any%20annotation,%20and%20a%20catalog%20and%20informer%20for%20any%20descendants.md), and the time zone and the chain of a key in [a third one](../../Libraries/Platform/Storyteller/specs/2026-11-12%20Hosting%20-%20time%20zone,%20chain%20status%20and%20managed%20identity%20federation.md). An Aspire AppHost passes the variables with [the Aspire integration](aspire.md). `DotNet.SimpleExecutor` of [the playground](playground.md) runs who am I and both catalogs.
+The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md). The typed snapshots and `IStorytellerCatalog` are in [their own spec](../../Libraries/Platform/Storyteller/specs/2026-11-08%20Hosting%20-%20who%20am%20I%20for%20any%20annotation,%20and%20a%20catalog%20and%20informer%20for%20any%20descendants.md), and the time zone, the chain of a key and the status over it in [a third one](../../Libraries/Platform/Storyteller/specs/2026-11-12%20Hosting%20-%20time%20zone,%20chain%20status%20and%20managed%20identity%20federation.md). An Aspire AppHost passes the variables with [the Aspire integration](aspire.md). `DotNet.SimpleExecutor` of [the playground](playground.md) runs who am I and both catalogs.
 
 ## Package
 
@@ -228,7 +228,9 @@ Any other key works the same way, `unt`, `sbt`, `usg` and `cnt` included. Each a
 | `Find<T>()` | The annotation of the snapshot type `T`, the key's own or an ancestor: `context.Find<StorytellerUnit>()?.UnitType`, `context.Find<StorytellerResponsibility>()?.UnitNames`. `null` when it was not read, or when it is not a `T`, as a test double's base snapshot. `Find<StorytellerAnnotation>()` throws `ArgumentException` |
 | `Chain` | The key's annotation and its ancestors that were read, nearest first; see [The chain](#the-chain) |
 | `GetEffectiveTimeZone()` | The time zone that applies to the key: the first `TimeZone` that is set along `Chain`, `null` when none is; see [The time zone](#the-time-zone) |
-| `GetSubscriptionStatus(now)` | Whether the subscription is in effect; see below |
+| `GetSubscriptionStatus(now)` | Whether the subscription is in effect; see [The status of the subscription](#the-status-of-the-subscription) |
+| `GetSubscriptionStatus(now, scope)` | The same in a `StorytellerStatusScope`: `Subscription`, or `Chain`, which counts every ancestor; see [The scope of a status](#the-scope-of-a-status) |
+| `FindInactiveAnnotation(now, scope)` | The annotation that decides a status other than `Active` and `Unknown`; `null` otherwise |
 
 ### Reads
 
@@ -311,9 +313,57 @@ var zone = TimeZoneInfo.TryFindSystemTimeZoneById(context.GetEffectiveTimeZone()
 | All that were read are active, but the usage, or the execution of a `uxe` key, was unreadable | `Unknown` |
 | Otherwise | `Active` |
 
-- **Per annotation.** The status of an annotation is its own: `Disabled` wins, then a `ValidFrom` after `now` is `Scheduled`, then an `ExpiresAt` at or before `now` is `Expired`. Only the key's annotation, its execution and its usage count: an execution stays active when its subject is disabled.
+- **Per annotation.** The status of an annotation is its own: `Disabled` wins, then a `ValidFrom` after `now` is `Scheduled`, then an `ExpiresAt` at or before `now` is `Expired`. Only the key's annotation, its execution and its usage count: an execution stays active when its subject is disabled. [The `Chain` scope](#the-scope-of-a-status) counts the subject, the context and the responsibility too.
 - **The clock.** The status changes without a write when `ValidFrom` or `ExpiresAt` passes, so it is evaluated against a time.
 - **A restricted machine.** A machine restricted to its execution cannot read its usage, so its status is `Unknown` while its execution is active. `context.Annotation.GetStatus(now)` gives the status of the execution alone.
+
+### The scope of a status
+
+`GetSubscriptionStatus(now, scope)` takes a `StorytellerStatusScope`, which says which annotations count:
+
+| Scope | Counts | An execution under a disabled subject, context or responsibility |
+| --- | --- | --- |
+| `Subscription` | The key's annotation, its execution and its usage: the rule above. `GetSubscriptionStatus(now)` means this scope | Stays `Active` |
+| `Chain` | The key's annotation and every ancestor of [its chain](#the-chain) | Is `Disabled` |
+
+With `Chain`:
+
+| Case | Status |
+| --- | --- |
+| The key's annotation or its execution is deleted, or gone | `Deleted` |
+| The first annotation of `Chain` that is not active | `Disabled`, `Scheduled` or `Expired` |
+| All that were read are active, but an ancestor is in `Unreadable` | `Unknown` |
+| Otherwise | `Active` |
+
+- **Every key type counts its ancestors.** With `Subscription`, a key of another type than `exe` and `uxe` has the status of its own annotation. With `Chain`, a usage under a disabled subject is `Disabled`, and so is a unit under a disabled responsibility.
+- **The nearest one decides.** The annotations are asked in [the chain order](#the-chain): an expired usage comes before a disabled subject, so the status is `Expired`.
+- **A deleted ancestor** deletes its descendants, the key included, so only the key's annotation and its execution are asked for a deletion. An ancestor that answered `404` is in neither `Ancestors` nor `Unreadable`, and does not count.
+- **A restricted machine.** A machine restricted to its execution reads none of its ancestors, so its status is `Unknown` in both scopes while its execution is active.
+- **Test doubles.** A context that a test built has its status in both scopes. With `Chain`, an entry of `Unreadable` counts when it is a full key of a type that the context holds no annotation of. An annotation key, a text that is no key, or the full key of a type that is the key's own or in `Ancestors` does not make the status `Unknown`.
+- **It reads nothing.** Both scopes tell the status from the snapshot, at the time they are given.
+- **A scope that is not defined** throws `ArgumentOutOfRangeException`.
+
+`FindInactiveAnnotation(now, scope)` gives the annotation that decides the status, so a log can name it:
+
+```csharp
+var context = await self.GetAsync(cancellationToken);
+var now = DateTimeOffset.UtcNow;
+
+if (context.FindInactiveAnnotation(now, StorytellerStatusScope.Chain) is { } inactive)
+{
+    // exe.northwind.invoicing.production is not run: sbt.northwind is Disabled
+    logger.LogInformation(
+        "{Key} is not run: {Inactive} is {Status}",
+        context.Annotation.AnnotationKey,
+        inactive.AnnotationKey,
+        context.GetSubscriptionStatus(now, StorytellerStatusScope.Chain));
+}
+```
+
+- **The first one that is not active**, in the order of the scope: the key's annotation, its execution and its usage with `Subscription`, the chain with `Chain`.
+- **For `Deleted`** it is the deleted annotation: the key's own when it is deleted, otherwise its execution.
+- **`null`** for `Active` and `Unknown`: no annotation that was read decides those.
+- **One rule.** The status and the annotation come from the same evaluation, so they always agree.
 
 ### Entitlements
 
@@ -353,7 +403,7 @@ Who am I and the catalogs hand out immutable snapshots of what the API answered:
 - **Point reads only.** Snapshots come from reads of one annotation, never from the items of a list, whose `Values` lose array items, the trailing zeros of decimals and the offsets of date-like strings.
 - **Copies.** A snapshot is shared by every caller, so what a caller could change (`Values`, `Created`, `Modified`) is a copy per access.
 - **`ToString()`** prints the key and the type, never values.
-- **Test doubles.** `StorytellerAnnotation`, its subtypes and `StorytellerExecutionContext` have public constructors and `init` members, so a test can build them for a fake `IStorytellerCatalog`, `ISubscriptionCatalog` or `IExecutionContext`, a usage with its `Labels` and `Values` included. What an initializer sets is copied (`Labels`, `Values`, `Created`, `Modified`, the relation names, `Ancestors`, `Unreadable`), so a later change of the objects it was given does not reach the snapshot. A test double may put a base `StorytellerAnnotation` in who am I: `Usage` and the other members give it back, `Find<T>()` does not. A `StorytellerSubscription` has no public constructor: its document belongs to the subscriptions, and `StorytellerDocument` has none either.
+- **Test doubles.** `StorytellerAnnotation`, its subtypes and `StorytellerExecutionContext` have public constructors and `init` members, so a test can build them for a fake `IStorytellerCatalog`, `ISubscriptionCatalog` or `IExecutionContext`, a usage with its `Labels` and `Values` included. What an initializer sets is copied (`Labels`, `Values`, `Created`, `Modified`, the relation names, `Ancestors`, `Unreadable`), so a later change of the objects it was given does not reach the snapshot. A test double may put a base `StorytellerAnnotation` in who am I: `Usage` and the other members give it back, `Find<T>()` does not. A `StorytellerSubscription` has no public constructor: its document belongs to the subscriptions, and `StorytellerDocument` has none either. A fake `IStorytellerCatalog` gets `GetWithAncestorsAsync` and `ListWithAncestorsAsync` from the interface; see [Test doubles of the catalog](#test-doubles-of-the-catalog).
 
 ## Any annotation and its descendants
 
@@ -371,13 +421,23 @@ await foreach (var change in catalog.WatchAsync(StorytellerTarget.ExecutionsOf("
 
 // One annotation, typed.
 StorytellerUnit? daily = await catalog.GetAsync<StorytellerUnit>("unt.invoicing.daily", cancellationToken);
+
+// Any key with its ancestors, as who am I reads its own.
+StorytellerExecutionContext? northwind = await catalog.GetWithAncestorsAsync("exe.northwind.invoicing.production", cancellationToken);
+
+// The executions of a responsibility that are under active ancestors, each with its chain.
+IReadOnlyList<StorytellerExecutionContext> executions = await catalog.ListWithAncestorsAsync(
+    StorytellerTarget.ExecutionsOf("rst.invoicing").RequiringActiveAncestors(),
+    cancellationToken);
 ```
 
 | Member | Does |
 | --- | --- |
 | `GetAsync(key)` | One annotation, in any status, as the snapshot of its type; `null` when it does not exist or is deleted |
 | `GetAsync<T>(key)` | The same, typed. A key of another type than `T`'s throws `ArgumentException` before any read. `StorytellerAnnotation` takes any key; a type of the application that derives from it names no type, and throws `ArgumentException` |
+| `GetWithAncestorsAsync(key)` | Who am I for any key: the annotation and its ancestors, read on every call; `null` when the key does not exist or is deleted |
 | `ListAsync(target)` | The descendants of the target, by key, ordinally |
+| `ListWithAncestorsAsync(target)` | `ListAsync`, and a `StorytellerExecutionContext` of each descendant with its ancestors, by key, ordinally |
 | `WatchAsync(target, pollInterval)` | The informer of the target: `Added`, `Changed` and `Removed` |
 
 - **Keys.** A key, and the key of a target, is a full key, or an annotation key in the organization, project and view of the options' `Key`. An annotation key without that `Key` throws `StorytellerConfigurationException` naming `STORYTELLER_KEY`, at the call.
@@ -399,7 +459,8 @@ StorytellerUnit? daily = await catalog.GetAsync<StorytellerUnit>("unt.invoicing.
 - **Filters.** `WithSubject`, `WithResponsibility`, `WithContext` and `WithUnit` keep the descendants whose key has that name, compared ordinally. A filter is one key segment; an empty one, or one with a `.`, throws `ArgumentException`. So does a filter of a name the descendants' keys do not have (`WithContext` on units), or one the ancestor names already (`WithResponsibility` on the executions of `rst.invoicing`).
 - **Filters run in the process.** The API has no filter of descendants, so a filter narrows what was listed, and the list costs the same.
 - **Status.** A target takes active descendants. `IncludingInactive()` adds disabled, scheduled and expired ones. Deleted ones are never listed.
-- **Immutable.** Each `With…` and `IncludingInactive()` returns a new target. `Of`, `Type`, the filters and `IncludeInactive` read it back; `ToString()` describes it: "the executions of sbt.northwind in the context production".
+- **Active ancestors.** `RequiringActiveAncestors()` keeps, in the lists, the descendants whose ancestors are all active. `IncludingInactive()` decides about the descendant's own status, and this about its ancestors; the two combine. See [Requiring active ancestors](#requiring-active-ancestors).
+- **Immutable.** Each `With…`, `IncludingInactive()` and `RequiringActiveAncestors()` returns a new target. `Of`, `Type`, the filters, `IncludeInactive` and `RequireActiveAncestors` read it back; `ToString()` describes it: "the executions of sbt.northwind in the context production", with ", under active ancestors" at its end for a target that requires them.
 
 ### Lists
 
@@ -409,7 +470,55 @@ StorytellerUnit? daily = await catalog.GetAsync<StorytellerUnit>("unt.invoicing.
 2. reads every page of `…/annotations/{ancestor}/{descendants}`, with `includeInactive` for a target that includes them, following the continuation tokens as [the informer](#one-poll) does;
 3. keeps the descendants that pass the filters, and point-reads each of them, at most 4 at once;
 4. leaves out one that is gone since the list (`404`), deleted, or inactive when the target takes active ones only, by the process's clock;
-5. returns the snapshots by key. Any other failure of a read throws, once every read ended.
+5. for a target that [requires active ancestors](#requiring-active-ancestors), reads each distinct ancestor of the descendants it kept, and leaves out those that are not under active ancestors;
+6. returns the snapshots by key. Any other failure of a read throws, once every read ended.
+
+### With the ancestors
+
+`GetWithAncestorsAsync(key)` is who am I for any key, read on every call. It returns a [`StorytellerExecutionContext`](#the-snapshot), so `Chain`, `GetEffectiveTimeZone()`, `GetSubscriptionStatus` and `FindInactiveAnnotation` work on it as on who am I's.
+
+- **Keys and failures** are those of `GetAsync`. A key that does not exist or is deleted gives `null`, and no ancestor is read.
+- **The ancestors** are read at once, with `includeInactive`, as [who am I reads its own](#reads). One the machine may not read (`403` `AnnotationRestricted`) goes to `Unreadable`, a missing one (`404`) is left out, and any other failure throws.
+- **`ReadAt`** is when the read started, on the options' `TimeProvider`.
+- **Nothing is cached.** Every call reads the key and each of its ancestors.
+
+`ListWithAncestorsAsync(target)` returns a `StorytellerExecutionContext` of each descendant, by key:
+
+1. it lists and reads the descendants as [`ListAsync`](#lists) does;
+2. it reads each distinct ancestor of the descendants it kept once, at most 4 reads at once. The target's own ancestor is an ancestor of every descendant, and the read of step 1 of the list serves for it;
+3. it builds the context of each descendant from those reads. A restricted ancestor is in `Unreadable` of each context that has it, and a missing one is left out, as in who am I.
+
+- **One call** gives every descendant with [the status of its chain](#the-scope-of-a-status) and [its time zone](#the-time-zone): `context.GetSubscriptionStatus(now, StorytellerStatusScope.Chain)` and `context.GetEffectiveTimeZone()`.
+- **Shared snapshots.** Descendants that share an ancestor get the same snapshot of it.
+- **`ReadAt`** is when the call started, the same in every context.
+- **Any other failure** of an ancestor's read throws, once every read ended.
+
+### Requiring active ancestors
+
+A target with `RequiringActiveAncestors()` takes the descendants whose ancestors are all active:
+
+```csharp
+// The executions of the responsibility, without those of a disabled subject, of an expired usage or of a context
+// that is not valid yet.
+var executions = await catalog.ListAsync(StorytellerTarget.ExecutionsOf("rst.invoicing").RequiringActiveAncestors(), cancellationToken);
+```
+
+- **In `ListAsync` and `ListWithAncestorsAsync`**, a descendant is kept when every ancestor of its chain is active, at the time that the descendants' own status is told by. The ancestors are read as `ListWithAncestorsAsync` reads them: each distinct one once.
+- **The target's own ancestor counts.** A disabled responsibility has no executions under active ancestors.
+- **A missing ancestor** leaves its descendants out: they were deleted with it.
+- **A restricted ancestor** fails the call with a definitive `StorytellerConfigurationException`, with status `403`, `AnnotationRestricted` and the ancestor's key: whether it is active cannot be told. See [Scopes and restricted machines](#scopes-and-restricted-machines).
+- **With `IncludingInactive()`** the inactive descendants under active ancestors are kept too.
+- **Without `RequiringActiveAncestors()`**, `ListAsync` reads no ancestor but the target's own, and `ListWithAncestorsAsync` returns every descendant of the list with its chain: the caller decides by `GetSubscriptionStatus(now, StorytellerStatusScope.Chain)`.
+
+### Test doubles of the catalog
+
+`GetWithAncestorsAsync` and `ListWithAncestorsAsync` have default implementations. A test double of `IStorytellerCatalog` that implements `GetAsync`, `GetAsync<T>`, `ListAsync` and `WatchAsync` compiles unchanged, and gets both. They are members of the interface, not of the double: call them through `IStorytellerCatalog`, not through a variable of the double's own type.
+
+- **`GetWithAncestorsAsync`** reads the key with the double's `GetAsync`, then each ancestor with `GetAsync`, by its full key. The full keys come from the `Key` of the snapshot that `GetAsync` returned, so a key given as an annotation key works too. A snapshot whose `Key` is not a full key throws `InvalidOperationException`.
+- **`ListWithAncestorsAsync`** builds on the double's `ListAsync` and `GetAsync`. It asks for each distinct ancestor once, orders the contexts by key, and for a target that requires active ancestors keeps the descendants under them itself.
+- **They know no restrictions.** `GetAsync` throws on a `403`, so nothing lands in `Unreadable`: an ancestor that `GetAsync` returns `null` for is left out, and one it throws for fails the call. A test of a restricted machine implements the two members itself, and builds its contexts with `Unreadable`.
+- **Their times** are the system clock's, `DateTimeOffset.UtcNow`: the interface has no `TimeProvider`.
+- **One call at a time.** They wait for each `GetAsync` before the next one.
 
 ### Watching a target
 
@@ -687,7 +796,7 @@ The subscriptions' documents are not served by `IStorytellerDocuments`. Its `Get
 | Service | Scopes of the machine | Restricted machine |
 | --- | --- | --- |
 | Who am I | `Annotation.Read` | Restricted to its key: reads the key; its ancestors are `Unreadable` |
-| `IStorytellerCatalog` | `Annotation.Read` | Targets the annotation it is restricted to, and any annotation under it; gets those annotations |
+| `IStorytellerCatalog` | `Annotation.Read` | Targets the annotation it is restricted to, and any annotation under it; gets those annotations; their ancestors that are not under it are `Unreadable` |
 | `GetExecutionAsync` | `Annotation.Read` | Reads the executions at or under the key it is restricted to |
 | The informer | `Annotation.Read` | Restricted to `rst.{responsibility}`, or unrestricted |
 | The subscriptions | `Annotation.Read` and `Configuration.Read`; `Secrets.Read` for secrets | Restricted to `rst.{responsibility}`, or unrestricted |
@@ -695,6 +804,8 @@ The subscriptions' documents are not served by `IStorytellerDocuments`. Its `Get
 - **A runtime reader** of `sform account machine create` has `Annotation.Read` and `Configuration.Read`, so it runs who am I and the provider. A machine without `Annotation.Read` runs the provider, but who am I fails with `403` `AccessDenied`.
 - **A worker's machine.** `sform account machine create -a rst.invoicing` restricts a machine to the responsibility. It lists and reads the executions and usages of `rst.invoicing`, and their configurations. Add `--scope secrets-read` when the documents need their secrets.
 - **What a restricted machine can target.** A machine restricted to an annotation reads that annotation and its descendants. Its targets are that annotation and the annotations under it: one restricted to `rst.invoicing` lists the units and executions of `rst.invoicing`, and the units of execution of `exe.northwind.invoicing.production`. It cannot target an ancestor of its annotation, nor the other descendants of that ancestor: a machine restricted to `usg.northwind.invoicing` cannot list the executions of `sbt.northwind`. The read answers `403 AnnotationRestricted`, which throws a `StorytellerConfigurationException` saying that listing needs a machine restricted to the ancestor or to an annotation above it, or an unrestricted one.
+- **The ancestors a restricted machine may not read.** `GetWithAncestorsAsync` and `ListWithAncestorsAsync` put them in `Unreadable`, as who am I does. A machine restricted to `rst.invoicing` gets the executions of `rst.invoicing` with the responsibility and their usages, which it may read, and without their subjects and contexts, which are not under `rst.invoicing`. Their status in the `Chain` scope is then `Unknown` while everything that was read is active.
+- **Requiring active ancestors needs a machine that may read them.** A list of a target with `RequiringActiveAncestors()` fails when the machine may not read an ancestor of a descendant: a definitive `StorytellerConfigurationException` with status `403` and `AnnotationRestricted`, whose `Key` is the ancestor's, and whose message says so. The executions of a responsibility need an unrestricted machine, as their subjects and contexts are not under the responsibility. A restricted machine can require active ancestors where every ancestor is the annotation it is restricted to, or under it: one restricted to `rst.invoicing` for the units of `rst.invoicing`, but not for its usages or executions.
 - **A machine restricted to its execution** gets who am I without ancestors and the status `Unknown`, and cannot run the informer. The informer's first read, of `rst.{responsibility}`, answers `403` `AnnotationRestricted`, so every poll fails with "The machine may not read …" before any list is requested. The failure is definitive: `WaitUntilReadyAsync`, and a start with `WaitUntilReadyOnStart`, throw it.
 
 See [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines) and [Scopes of machines](authentication.md#scopes-of-machines).
@@ -724,6 +835,8 @@ See [Annotation restriction of machines](authentication.md#annotation-restrictio
 **Cost of `IStorytellerCatalog`:**
 
 - `ListAsync`: one read of the ancestor, one request per page of its descendants of the type, and one point read per descendant that passes the filters, 4 at a time. The filters run in the process, so the pages list every descendant of the type, and `ListAsync(StorytellerTarget.ExecutionsOf("rst.…"))` of a responsibility with thousands of executions makes thousands of reads. Target the narrowest ancestor that holds what you need (`usg.{S}.{R}` rather than `rst.{R}` with a subject filter), and prefer `WatchAsync`, which reads again only what changed;
+- `GetWithAncestorsAsync`: one read of the key and one of each ancestor, on every call: 5 for an execution, 7 for a unit of execution, 1 for a responsibility or a subject;
+- `ListWithAncestorsAsync`, and `ListAsync` of a target that requires active ancestors: the cost of `ListAsync`, and one point read of each distinct ancestor of the descendants it kept, 4 at a time. The executions of `rst.R` of 10 subjects in 20 contexts cost the pages of the list, 20 point reads of the executions, and 1 + 10 + 10 + 20 reads of the responsibility, the subjects, the usages and the contexts. The read of the responsibility is the one that `ListAsync` makes anyway, so the ancestors add 40 reads. Nothing is cached between two calls;
 - a poll of `WatchAsync`: one request per page, one read of the ancestor until a poll has completed, and point reads for changes only: one per added, changed or removed annotation.
 
 **Limits:**

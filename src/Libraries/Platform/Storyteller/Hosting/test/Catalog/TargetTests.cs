@@ -1,3 +1,5 @@
+using _42.Platform.Storyteller.Sdk.Hosting.Informer;
+
 namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Catalog;
 
 public sealed class TargetTests
@@ -174,6 +176,70 @@ public sealed class TargetTests
         StorytellerTarget.UnitsOfExecutionOf("@acme.billing.default.rst.invoicing").WithSubject("northwind").WithContext("prod").WithUnit("daily").IncludingInactive().ToString()
             .ShouldBe("the units of execution of @acme.billing.default.rst.invoicing of the subject northwind in the context prod of the unit daily, inactive ones included");
         StorytellerTarget.ExecutionsOf("sbt.northwind").WithResponsibility("invoicing").ToString().ShouldBe("the executions of sbt.northwind of the responsibility invoicing");
+    }
+
+    [Fact]
+    public void RequiringActiveAncestors_SetsIt_OnANewTarget()
+    {
+        var target = StorytellerTarget.ExecutionsOf("rst.invoicing").WithContext("prod");
+
+        var required = target.RequiringActiveAncestors();
+
+        required.ShouldNotBeSameAs(target);
+        required.RequireActiveAncestors.ShouldBeTrue();
+        required.Of.ShouldBe("rst.invoicing");
+        required.Type.ShouldBe(AnnotationType.Execution);
+        required.Context.ShouldBe("prod");
+        required.IncludeInactive.ShouldBeFalse();
+        target.RequireActiveAncestors.ShouldBeFalse();
+        StorytellerTarget.UnitsOf("rst.invoicing").RequireActiveAncestors.ShouldBeFalse();
+        required.RequiringActiveAncestors().RequireActiveAncestors.ShouldBeTrue();
+    }
+
+    // IncludingInactive() decides about the descendant's own status, RequiringActiveAncestors() about its ancestors.
+    [Fact]
+    public void RequiringActiveAncestors_CombinesWithIncludingInactive_AndTheFilters_InAnyOrder()
+    {
+        var target = StorytellerTarget.ExecutionsOf("rst.invoicing");
+
+        var first = target.RequiringActiveAncestors().IncludingInactive().WithSubject("northwind");
+        var last = target.WithSubject("northwind").IncludingInactive().RequiringActiveAncestors();
+
+        foreach (var combined in new[] { first, last })
+        {
+            combined.RequireActiveAncestors.ShouldBeTrue();
+            combined.IncludeInactive.ShouldBeTrue();
+            combined.Subject.ShouldBe("northwind");
+        }
+
+        target.IncludingInactive().RequireActiveAncestors.ShouldBeFalse();
+        target.RequiringActiveAncestors().IncludeInactive.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ToString_OfATargetThatRequiresActiveAncestors_SaysSoAtTheEnd()
+    {
+        StorytellerTarget.ExecutionsOf("rst.invoicing").RequiringActiveAncestors().ToString().ShouldBe("the executions of rst.invoicing, under active ancestors");
+        StorytellerTarget.ExecutionsOf("sbt.northwind").RequiringActiveAncestors().WithContext("prod").ToString()
+            .ShouldBe("the executions of sbt.northwind in the context prod, under active ancestors");
+        StorytellerTarget.UnitsOfExecutionOf("@acme.billing.default.rst.invoicing").RequiringActiveAncestors().WithUnit("daily").IncludingInactive().ToString()
+            .ShouldBe("the units of execution of @acme.billing.default.rst.invoicing of the unit daily, inactive ones included, under active ancestors");
+    }
+
+    // What the lists and the informer read by carries the requirement, and names it in their messages.
+    [Fact]
+    public void TheScopeOfATarget_CarriesTheRequirement()
+    {
+        var view = FullKey.Parse("@acme.billing.default.rst.invoicing");
+        var target = StorytellerTarget.ExecutionsOf("sbt.northwind");
+
+        var required = DescendantScope.Create(target.RequiringActiveAncestors(), view);
+
+        required.RequireActiveAncestors.ShouldBeTrue();
+        required.IncludeInactive.ShouldBeFalse();
+        required.ToString().ShouldBe("the executions of @acme.billing.default.sbt.northwind, under active ancestors");
+        DescendantScope.Create(target, view).RequireActiveAncestors.ShouldBeFalse();
+        DescendantScope.Create(target.IncludingInactive(), view).RequireActiveAncestors.ShouldBeFalse();
     }
 
     [Theory]
