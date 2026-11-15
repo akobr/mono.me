@@ -4,7 +4,7 @@ Organizations and projects are **access points**. An organization has the key `{
 
 Every change of members, access points, machines, the policies of a project, trusted issuers and shared certificates is recorded in the [access audit](access-audit.md), in the same transaction as the change.
 
-An organization role does not grant access to the organization's projects. Each project has its own members, and can have a [description](#projects).
+An organization role does not grant access to the organization's projects. Each project has its own members, and can have a [description](#projects) and [settings](#project-settings).
 
 ## Names
 
@@ -47,18 +47,118 @@ A project can have a description, like a view. An organization has none.
 | GET | `v1/access/exhibition` | A user, also without an account | `Exhibition`: the names and the description of the deployment's [exhibition](#exhibition) project; `404` when it is not offered |
 | GET | `v1/access/points/{key}/audit` | Administrator, users only | `AccessAuditResponse`: the [access audit](access-audit.md#reading-the-trail) of the organization or project, newest first |
 
-Every route needs the scope `User.Impersonation`. An `AccessPoint` has `Key`, `AccessMap` (the members and their roles), `MachineAuthentication` and `Description`. POST creates the project, and the organization when it does not exist yet; the caller becomes the `Owner` of what it creates. In an existing organization it needs `Owner` of the organization (`403`), and an existing project answers `409 AccessPointExists`. The access points, the owner's account and their access audit records are written in one transactional batch, so a failure leaves nothing half created; a project or organization created concurrently answers `409` (`AccessPointExists`, or `Conflict` after one retry).
+Every route needs the scope `User.Impersonation`. An `AccessPoint` has `Key`, `AccessMap` (the members and their roles), `MachineAuthentication` and `Description`, and a project also its [`Settings`](#project-settings). POST creates the project, and the organization when it does not exist yet; the caller becomes the `Owner` of what it creates. In an existing organization it needs `Owner` of the organization (`403`), and an existing project answers `409 AccessPointExists`. The access points, the owner's account and their access audit records are written in one transactional batch, so a failure leaves nothing half created; a project or organization created concurrently answers `409` (`AccessPointExists`, or `Conflict` after one retry).
 
-An access point carries the members and the machine authentication policy, so reading one needs `Administrator`, and `GET v1/access/points` lists only the access points the caller administers. Every member reads the descriptions of their projects with `GET v1/access/projects` instead, as every member reads the descriptions of views. A `ProjectSummary` has `Key` (`{organization}.{project}`), `Role` (the caller's role) and `Description`, and nothing of the members or the policies. The list holds every project where the account has a role above `None`; organizations are not listed, and a key whose project does not exist is left out. Without an account, `GET v1/access/points` and `GET v1/access/projects` answer `404`.
+An access point carries the members and the machine authentication policy, so reading one needs `Administrator`, and `GET v1/access/points` lists only the access points the caller administers. Every member reads the descriptions of their projects with `GET v1/access/projects` instead, as every member reads the descriptions of views. A `ProjectSummary` has `Key` (`{organization}.{project}`), `Role` (the caller's role), `Description` and `Settings` (the [project settings](#project-settings), the defaults at `Version` 0 when none were set), and nothing of the members or the policies. The list holds every project where the account has a role above `None`; organizations are not listed, and a key whose project does not exist is left out. Without an account, `GET v1/access/points` and `GET v1/access/projects` answer `404`.
 
 **The description.** It is trimmed, and a blank one is none: nothing is stored, and the project is returned without `Description`. The server has no length rule; the body limit of 8 KiB bounds it, and the admin UI takes 500 characters.
 
 * `ProjectDescription` of `POST v1/access/points` and [`POST v1/access/account`](#accounts) describes the new project. An organization created with it gets none.
 * PUT replaces the description of a project. A missing body (empty or `null`), `{}` or a blank `Description` clears it, as for views. The `Administrator` check comes first, so a key the caller does not administer answers `403`, also when the project does not exist. After it, an organization key answers `400` (`Access point key must be in organization.project format.`) and a body that is not a project update `400`. Debug builds (`DEV_AUTH`) skip the role check of users and answer `404` for a project that does not exist.
 * PUT and `GET v1/access/projects` are for users: machine credentials get `403`.
-* PUT changes only the description and keeps the members and the policies. It replaces the document guarded by its ETag, in a batch with its access audit record when the description changes; a concurrent change of the project (a member, a policy) makes it read the project again and retry once, and a second failure answers `409 Conflict`.
+* PUT changes only the description and keeps the members, the policies and the settings. It replaces the document guarded by its ETag, in a batch with its access audit record when the description changes; a concurrent change of the project (a member, a policy) makes it read the project again and retry once, and a second failure answers `409 Conflict`.
 
-The description is stored on the project's access point document (`apt.{organization}.{project}` in the `access` partition of `core`). `GET v1/access/projects` reads only the keys and the descriptions of the caller's projects, in one query.
+The description is stored on the project's access point document (`apt.{organization}.{project}` in the `access` partition of `core`). `GET v1/access/projects` reads only the keys, the descriptions and the settings of the caller's projects, in one query.
+
+## Project settings
+
+The settings of a project say how every client shows it: the names, colors and icons of its seven annotation types, the time zone that new annotations start in, and the date format. They belong to the project, so every member sees the same in every browser, and every client can read them from the API.
+
+| Method | Route | Needs | Result |
+| --- | --- | --- | --- |
+| GET | `v1/{organization}/{project}/settings` | Reader; machines `Annotation.Read` or `Configuration.Read`, also one restricted to an annotation | `ProjectSettings` with its `ETag`; `304` for a matching `If-None-Match` |
+| PUT | `v1/{organization}/{project}/settings` | Administrator, users only | `ProjectSettings` → the stored `ProjectSettings` with its `ETag` |
+| PATCH | `v1/{organization}/{project}/settings` | Administrator, users only | A JSON Merge Patch → the stored `ProjectSettings` with its `ETag` |
+
+Every machine of the project reads them, also one restricted to an annotation, because they hold no annotation data; without either read scope it gets `403 AccessDenied` ("This operation needs one of the scopes Annotation.Read or Configuration.Read, which the machine was not created with."). `GET v1/access/projects` returns the settings of every project of the caller in its `ProjectSummary` items, so a client gets all of them in one request, and `GET v1/access/points/{key}` returns those of a project in its `AccessPoint` (see [Projects](#projects)). The operations are in the tag `Access` of the OpenAPI document (`GetProjectSettings`, `SetProjectSettings`, `PatchProjectSettings`).
+
+**The document.**
+
+| Member | Content |
+| --- | --- |
+| `Types` | The appearance of each type the project changed, keyed by its lower-case type code (`rst`, `unt`, `sbt`, `usg`, `cnt`, `exe`, `uxe`). A type left out has its built-in appearance. An appearance (`ProjectTypeAppearance`) has `Label` (the singular name, such as `Company`), `Plural` (only with a `Label`; clients derive it from the label when it is absent), `Color` and `Icon`, each optional. |
+| `DefaultTimeZone` | The IANA time zone id that new annotations start in, such as `Europe/Prague`. Absent for `UTC`. |
+| `DateFormat` | How clients show dates: `yyyy-mm-dd`, `dd.mm.yyyy`, `dd/mm/yyyy`, `mm/dd/yyyy` or `d mmm yyyy` (`mmm` is the English abbreviation of the month). Absent for `yyyy-mm-dd`. |
+| `Version` | Raised by every change, `0` before the first. Read-only. |
+| `Modified` | The [audit stamp](audit-stamps.md) of the last change, absent before the first. Read-only. |
+
+```json
+GET v1/acme/billing/settings
+
+200 OK
+ETag: "3"
+Cache-Control: private, no-cache
+
+{
+  "Types": {
+    "sbt": { "Label": "Company", "Plural": "Companies", "Color": "pink", "Icon": "i-lucide-building-2" },
+    "rst": { "Label": "Solution", "Color": "green" }
+  },
+  "DefaultTimeZone": "Europe/Prague",
+  "DateFormat": "dd.mm.yyyy",
+  "Version": 3,
+  "Modified": { "At": "2026-11-15T10:00:00+00:00", "By": { "Kind": "Account", "Id": "user-1", "Name": "Ada" } }
+}
+```
+
+The allowed values are the **catalog of project settings**, `src/Platform/Storyteller/conformance/project-settings.json`: the type codes, the built-in appearance of each type, 18 colors (the admin UI's palette, such as `pink`), 65 icons (Lucide names, such as `i-lucide-building-2`), the five date formats, the defaults, the length limits and the time zone ids of the tz database. The API embeds it (`ProjectSettingsCatalog` in `Abstractions.Annotations`), the TypeScript SDK exports it as constants and types, and its vectors pin the rules below for every client (see [Conformance](conformance.md#project-settings)).
+
+**Defaults.** A project whose settings were never set answers `{ "Types": {}, "Version": 0 }`, never `404`: every type built-in, the time zone `UTC` and the date format `yyyy-mm-dd`. `UTC` and `yyyy-mm-dd` given explicitly are stored as given. Once written, the settings are never removed: a write that clears everything stores empty settings with a higher `Version`, so a tag never repeats.
+
+**The time zone is a default of the clients.** The API never applies it: an annotation created without a `TimeZone` is stored without one. Clients start new annotations in it.
+
+**Rules.** Every write is checked against the catalog (`ProjectSettingsJson.Read` and `ProjectSettingsRules`), and nothing is dropped silently:
+
+| Rule | Refuses |
+| --- | --- |
+| `type-code` | A key of `Types` that is not a type code, or two keys that differ only in case |
+| `label`, `plural` | A `Label` or a `Plural` longer than 40 UTF-16 code units after trimming |
+| `plural-without-label` | A `Plural` without a `Label` |
+| `color`, `icon`, `time-zone`, `date-format` | A value that is not in the catalog, such as the Windows zone `Central Europe Standard Time` |
+| `unknown-member` | A member the document does not have, such as `Theme` |
+| `case-collision` | Two members that differ only in case |
+| `type` | A value of the wrong JSON type: a body, `Types` or a type that is not an object, another member that is not a string or `null` |
+| `format` | A `Format` that is not `2s.project-settings.v1` |
+
+- Member names, type codes, colors, icons, date formats and time zones match in any ASCII case and are stored in the catalog's spelling: `europe/prague` is stored as `Europe/Prague`, `SBT` as `sbt`.
+- Labels and plurals are trimmed. A blank label, plural, time zone or date format means none, and so does `null`. An appearance without any value is removed.
+- `Version` and `Modified` are ignored, and `Format` may be the marker `2s.project-settings.v1` (the file shape of data sets), so a read or a settings file can be sent back as it is.
+- A problem has `Path` (a JSON path in the canonical spelling, such as `$.Types.sbt.Color`), `Rule` and `Message`.
+
+**ETag and conditions.** The tag is strong: the `Version` in quotes, such as `"7"`, and `"0"` before the first write. A browser on another origin cannot read `ETag` (see [CORS for browser clients](authentication.md#cors-for-browser-clients)), so it builds `If-Match` from the `Version` of the body it read: `If-Match: "7"`.
+
+- GET answers with the `ETag` and `Cache-Control: private, no-cache`. `If-None-Match` compares weakly (`W/"7"` and `*` match too), and a match answers `304` without a body. A header that is not a list of entity tags is ignored, and the read answers `200`.
+- PUT and PATCH take an optional `If-Match`: `*` (any version, as the settings always exist) or a list of tags. The comparison is strong: a weak tag, or a tag that is not a version in its plain spelling (`"07"`), never matches. A mismatch answers `412` with `ErrorCode` `SettingsPreconditionFailed`, "The project settings changed meanwhile; they are at version 7." and `Details: { "Version": 7 }`.
+- A malformed `If-Match` (not `*` or a list of tags, `*` together with tags, or an empty value) answers `400 InvalidPrecondition`, and so does an `If-None-Match` on a write ("The project settings always exist; a write takes If-Match.").
+- Without `If-Match`, the last write wins.
+
+**PUT** replaces the settings: a type left out goes back to its built-in appearance, a missing `DefaultTimeZone` or `DateFormat` to its default. A body that is empty, not JSON, or holds a member twice answers `400 InvalidSettings` with one problem at `$`.
+
+**PATCH** merges a JSON Merge Patch (RFC 7396) into the stored settings and checks the result as PUT does:
+
+- A member left out keeps its value, and `null` removes it: a type goes back to its built-in appearance, `DefaultTimeZone` to `UTC`, `DateFormat` to `yyyy-mm-dd`, and `"Types": null` resets every type.
+- `Types` merge type by type, and the members of a type one by one. Member names and type codes match in any case.
+- The body is `application/merge-patch+json` (as documented), `application/json`, or has no `Content-Type`. Another media type answers `415 InvalidContentType` with `Accept-Patch: application/merge-patch+json`. A body that is empty, not JSON, or not a JSON object answers `400 PatchInvalid`.
+
+```json
+PATCH v1/acme/billing/settings
+Content-Type: application/merge-patch+json
+If-Match: "3"
+
+{ "Types": { "sbt": { "Color": "rose" }, "rst": null }, "DateFormat": null }
+```
+
+**Answers of a write.**
+
+- `200` with the stored settings and their `ETag`, also for a write that changes nothing: then the `Version` stays, nothing is written and no audit event is recorded.
+- `400 InvalidSettings` lists every problem in `Details`, and its `Message` names the first one and their count, for example "The project settings have 2 problems; the first is $.Types.sbt.Color: …".
+- A machine is refused first, before any other check: `403 AccessDenied` with "Changing the project settings needs a user with the Administrator role.". Then the role decides (`Administrator`), so a project the caller does not administer answers `403`, also when it does not exist; Debug builds (`DEV_AUTH`) skip the role check and answer `404` for a project that does not exist.
+- A body above 16 KiB answers `413 BodyTooLarge`, before any JSON is parsed.
+- `409 Conflict` when the project changed concurrently twice in a row; repeat the request.
+
+**Storage.** The settings are the member `Settings` of the project's access point (`apt.{organization}.{project}` in the `access` partition of `core`), next to its `Description`. A project without them reads the defaults; nothing is migrated. A write reads the document with its ETag, checks the condition against the stored `Version`, and replaces the document under that ETag with only `Settings` changed. A concurrent change of the project (a member, the description, a policy) makes it read again and retry once (a patch then merges into the fresh state), and a second failure answers `409 Conflict`. The other writers of the access point (the members, the description, the key/value policy and the machine authentication policy) replace it under its ETag too and keep the settings.
+
+**Audit.** Every change appends a `ProjectSettingsChange` event to the project's audit trail, the one of the key/values (see [Audit trail](key-values.md#audit-trail)): the caller's actor and channel, no view or key, and a `Detail` with the versions and the names of the changed parts, never their values, such as `v7→v8: Types.sbt, DefaultTimeZone`. Administrators read the events with `GET v1/{organization}/{project}/key-values/audit?operation=ProjectSettingsChange`. The event is written after the change; a failed append is logged as a warning and does not fail the write.
 
 ## Roles
 
@@ -80,6 +180,8 @@ Scopes describe machines, roles describe people. A user is authorized by the rol
 | Write key/value secrets: set, delete, restore, protect, import with secrets | `ContributorWithSecrets` on the project; machines `Secrets.Write`, under the mTLS rule of the project. A restore answers no `403` for a secret: it reports the key as `Forbidden` |
 | Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project, users only: machine credentials get `403` |
 | Set the [description of a project](#projects) | `Administrator` on the project, users only: machine credentials get `403` |
+| Read the [settings of a project](#project-settings) | `Reader` on the project; machines `Annotation.Read` or `Configuration.Read`, also a machine restricted to an annotation |
+| Change the settings of a project (`PUT` and `PATCH`) | `Administrator` on the project, users only: machine credentials get `403` before any other check |
 | List the machines of a project and read one | `Contributor` on the project, whatever the scopes of the machines, users only: machine credentials get `403` |
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
@@ -290,15 +392,18 @@ The account id comes from the caller's token under the deployment's provider: th
 
 All errors use `ErrorResponse` without exception details, and the errors below carry a stable `ErrorCode`. See also [401 and 403](authentication.md#401-and-403).
 
-A route that takes a JSON body does not require a `Content-Type`, and answers `400` for an empty body, `null` or JSON that does not fit the documented type, unless it documents a default for a missing body. On the routes of this page, these `400`s name the problem in `Message` and have no `ErrorCode`. Each such route reads a limited number of bytes of its body, and answers `413` with `ErrorCode` `BodyTooLarge` for a larger body or a larger declared `Content-Length`, before it parses any JSON.
+A route that takes a JSON body does not require a `Content-Type`, and answers `400` for an empty body, `null` or JSON that does not fit the documented type, unless it documents a default for a missing body. On the routes of this page, these `400`s name the problem in `Message` and have no `ErrorCode`, except those of the [project settings](#project-settings), which carry `InvalidSettings` (`PatchInvalid` for a merge patch). Each such route reads a limited number of bytes of its body, and answers `413` with `ErrorCode` `BodyTooLarge` for a larger body or a larger declared `Content-Length`, before it parses any JSON.
 
 The `404` of the two [exhibition](#exhibition) routes has no body, and so no `ErrorCode`: the deployment has no exhibition, or does not offer it.
 
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
 | `400` | `InvalidName` | A new organization, project, or view name breaks the [name rules](#names). |
+| `400` | `InvalidSettings` | [Project settings](#project-settings) that break a rule of the catalog, or a settings body that is empty or not JSON. `Details` list every problem with its `Path`, `Rule` and `Message`. |
+| `400` | `InvalidPrecondition` | A settings write with a malformed `If-Match`, or with an `If-None-Match`. |
+| `400` | `PatchInvalid` | A merge patch of the project settings that is empty, not JSON, or not a JSON object. |
 | `401` | `StepUpRequired` | The operation needs a [recent sign-in](authentication.md#recent-sign-in-step-up) and the user's is older than `Auth:StepUp:MaxAge`: a grant, a revoke, a role change, the removal of another member, a new invitation, machine credentials, secret values. `Details.MaxAge` and the `WWW-Authenticate` header name the window in seconds; sign in again and repeat the request. |
-| `403` | `AccessDenied` | The caller's role on the access point is too low, a machine lacks a scope of the operation, or a machine calls an operation for users only (such as registering, describing or discovering views, a permanent delete, setting the description of a project, listing projects, or reading or joining the exhibition). |
+| `403` | `AccessDenied` | The caller's role on the access point is too low, a machine lacks a scope of the operation, or a machine calls an operation for users only (such as registering, describing or discovering views, a permanent delete, setting the description of a project, changing its settings, listing projects, or reading or joining the exhibition). |
 | `403` | `ActorRestricted` | The token acts for the person through an [actor](#actors) whose restrictions forbid the operation (under `NoSecretReveal`: reading secret values, or giving out what reads them). |
 | `403` | `EmailMismatch`, `EmailNotVerified` | Accepting or declining with another or an unverified email, or through an actor. |
 | `404` | `NotFound` | The access point, account, or invitation does not exist. |
@@ -307,6 +412,8 @@ The `404` of the two [exhibition](#exhibition) routes has no body, and so no `Er
 | `409` | `InvitationExists`, `InvitationNotPending`, `InvitationExpired` | Invitation rules above. |
 | `409` | `ViewExists` | The view is already registered, or is `default`. |
 | `409` | `AccessPointExists` | The project already exists. |
-| `409` | `Conflict` | The membership, the invitation, or the project whose description is set changed concurrently twice; repeat the request. The join of the [exhibition](#exhibition) answers it only after it tried again three times. |
+| `409` | `Conflict` | The membership, the invitation, or the project whose description or settings are set changed concurrently twice; repeat the request. The join of the [exhibition](#exhibition) answers it only after it tried again three times. |
+| `412` | `SettingsPreconditionFailed` | The `If-Match` of a settings write names another version; `Details.Version` is the current one. |
 | `503` | `AccessAuditUnavailable` | The identity provider replaced the client secret of a machine, but the [access audit](access-audit.md) record of the reset could not be stored; the new secret is withheld, reset the machine again. |
-| `413` | `BodyTooLarge` | The body is larger than its route reads: 64 KiB for a view, 8 KiB for an account, a new project, a project update, a member role or an invitation. |
+| `413` | `BodyTooLarge` | The body is larger than its route reads: 64 KiB for a view, 16 KiB for the project settings, 8 KiB for an account, a new project, a project update, a member role or an invitation. |
+| `415` | `InvalidContentType` | A `PATCH` of the project settings that is neither `application/merge-patch+json` nor `application/json`; `Accept-Patch` names the patch format. |

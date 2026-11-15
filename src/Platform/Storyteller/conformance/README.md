@@ -10,7 +10,7 @@ Language-neutral JSON vectors that every Storyteller configuration provider and 
 | `refresh.json` | `refresh` | Keys, notifications, sent tags and failures across refresh runs |
 | `project-settings.json` | `project-settings` | The catalog of project settings (type codes, built-in appearances, colors, icons, date formats, defaults, limits, time zones) and the normalized settings or the problems of a settings document |
 
-`project-settings.json` is also the catalog of the platform itself: `Abstractions.Annotations` embeds it (`ProjectSettingsCatalog`, with the rules in `ProjectSettingsRules` and `ProjectSettingsJson`). Its `timeZones` are the ids of the tz database (now release 2026f, from NodaTime 3.3.7), printed by `tools/time-zones.cs`, a file-based app: run `dotnet run src/Platform/Storyteller/conformance/tools/time-zones.cs` and paste its lines into the catalog after a NodaTime update that brings a new tz database release.
+`project-settings.json` is also the catalog of the platform itself: `Abstractions.Annotations` embeds it (`ProjectSettingsCatalog`, with the rules in `ProjectSettingsRules` and `ProjectSettingsJson`), so the API checks every settings write against it, and the TypeScript SDK writes `generated/catalog/project-settings.ts` from it (`npm run generate`; commit the module with every change of the catalog). Its `timeZones` are the ids of the tz database (now release 2026f, from NodaTime 3.3.7), printed by `tools/time-zones.cs`, a file-based app: run `dotnet run src/Platform/Storyteller/conformance/tools/time-zones.cs` and paste its lines into the catalog after a NodaTime update that brings a new tz database release.
 
 Run it:
 
