@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useNow } from '@vueuse/core'
 import { issueSharedCertificate, revokeSharedCertificate, type SharedCertificate } from '@42for.net/2splatform.sdk'
 import { useGetMachineAuthentication, useGetSharedCertificates } from '@42for.net/2splatform.sdk/vue-query'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { formatDate } from '@/utils/dates'
@@ -38,6 +39,9 @@ const lifetime = ref(365)
 const busy = ref(false)
 const revoking = ref<SharedCertificate>()
 const secret = ref<OneTimeSecret>()
+
+// The typed label of the next certificate, which the step-up's confirmation says its sign-in loses (424-264).
+useDirtySource(() => issuing.value && label.value.trim().length > 0)
 
 const daysLeft = (certificate: SharedCertificate) =>
   certificate.NotAfter ? Math.floor((Date.parse(certificate.NotAfter) - now.value.getTime()) / 86_400_000) : undefined

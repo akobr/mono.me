@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { importKeyValues, restoreKeyValues, type KeyValueImportResult, type KeyValueProtection } from '@42for.net/2splatform.sdk'
 import { encryptForRecipients, getHyokPlace } from '@42for.net/2splatform.sdk/hyok'
 import { hasStepUpItems, useStepUpStore } from '@/composables/useStepUp'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { useKeyValuePolicy, useRecipients } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
@@ -22,7 +23,9 @@ import {
 /**
  * Import in three steps (spec 29.5): the source (a file or pasted text, format detected), the review (a level per
  * row, "mark matching", Merge or Replace, Check for the server's plan) and the result (Retry failed, Undo deletes).
- * HYOK rows are encrypted in the browser before they leave.
+ * HYOK rows are encrypted in the browser before they leave. Secret rows need a recent sign-in (424-264): Check and
+ * Import ask the person to confirm it is them first when the sign-in is about to be too old, and the step-up's
+ * confirmation warns that the document is lost.
  */
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ imported: [] }>()
@@ -65,6 +68,13 @@ watch(open, (isOpen) => {
     prefix.value = ''
   }
 })
+
+// The pasted or read document, in every step: Retry failed and Undo deletes need it too.
+useDirtySource(() => open.value && text.value.trim().length > 0)
+
+/** Rows with a secret level go only with a sign-in recent enough to write them, asked for before they are sent. */
+const recentEnoughFor = async (rows: ImportItem[]) =>
+  !rows.some((item) => isSecretLevel(item.protection)) || (await stepUp.ensureRecentSignIn())
 
 const allowedLevels = computed(() => (policy.data.value?.AllowedProtections ?? ['Public', 'Standard']) as KeyValueProtection[])
 const levelItems = computed(() =>
@@ -126,7 +136,7 @@ async function prepared(): Promise<ImportItem[]> {
 }
 
 async function check() {
-  if (!context.scope) {
+  if (!context.scope || !(await recentEnoughFor(items.value))) {
     return
   }
   busy.value = true
@@ -154,10 +164,10 @@ function apply() {
 }
 
 async function run(subset: ImportItem[]) {
-  if (!context.scope) {
+  confirmReplace.value = false
+  if (!context.scope || !(await recentEnoughFor(subset))) {
     return
   }
-  confirmReplace.value = false
   busy.value = true
   failure.value = undefined
   try {

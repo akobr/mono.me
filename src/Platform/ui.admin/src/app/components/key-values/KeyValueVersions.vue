@@ -58,14 +58,17 @@ async function view(entry: KeyValueVersion) {
   }
 }
 
-// Back from the step-up that a View of a secret asked for, the View runs once more.
+// Back from the step-up that a View of a secret asked for, that View runs once more. The pending View is taken once the
+// versions are there, also when none of them is it.
 watch(
-  () => (canSecrets.value ? rows.value : []),
+  () => (versions.data.value ? rows.value : undefined),
   (entries) => {
-    const pending = entries.find((entry) => {
-      const target = entry.Version === undefined || !isSecretLevel(entry.Protection) ? undefined : revealTarget(entry.Version)
-      return target !== undefined && stepUp.takePendingReveal(target)
-    })
+    if (!entries) {
+      return
+    }
+    const secrets = canSecrets.value ? entries.filter((entry) => entry.Version !== undefined && isSecretLevel(entry.Protection)) : []
+    const taken = stepUp.takePendingReveal(secrets.flatMap((entry) => revealTarget(entry.Version!) ?? []))
+    const pending = taken && secrets.find((entry) => entry.Version === taken.version)
     if (pending) {
       void view(pending)
     }

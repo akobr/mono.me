@@ -4,9 +4,20 @@ import { useEventListener } from '@vueuse/core'
 
 const dirtySources = new Set<() => boolean>()
 
-/** True when any mounted editor has unsaved changes (for the tab title dot). */
+/** True when any mounted editor or dialog has unsaved changes (the step-up's warning, 424-264). */
 export function hasUnsavedChanges(): boolean {
   return [...dirtySources].some((isDirty) => isDirty())
+}
+
+/**
+ * Counts what a dialog holds (typed or pasted input) as unsaved changes while `dirty` is true, so the step-up's
+ * confirmation warns that its sign-in loses them (424-264). Unlike useUnsavedChanges, no route guard and no browser
+ * prompt: closing the dialog discards its input, as its Cancel does.
+ */
+export function useDirtySource(dirty: MaybeRefOrGetter<boolean>): void {
+  const isDirty = () => toValue(dirty)
+  dirtySources.add(isDirty)
+  onBeforeUnmount(() => dirtySources.delete(isDirty))
 }
 
 let leaving = false
@@ -29,8 +40,7 @@ export function useUnsavedChanges(
 ) {
   const confirm = useConfirm()
   const isDirty = () => toValue(dirty)
-  dirtySources.add(isDirty)
-  onBeforeUnmount(() => dirtySources.delete(isDirty))
+  useDirtySource(isDirty)
 
   // The navigations the user chose Discard for: the location first asked for, which is `to.redirectedFrom` behind a
   // route-record redirect (the plain Modeling URL) and `to` itself otherwise. A redirect, such as the page memory's,

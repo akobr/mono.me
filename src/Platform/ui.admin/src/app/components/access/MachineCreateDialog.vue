@@ -8,6 +8,7 @@ import {
   type MachineScope,
 } from '@42for.net/2splatform.sdk'
 import { useGetFederatedIssuers } from '@42for.net/2splatform.sdk/vue-query'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
@@ -97,6 +98,16 @@ watch(open, (value) => {
     }
   }
 })
+
+// What was typed (the annotation, the subjects and claims of the rules), which the step-up's confirmation says its
+// sign-in loses (424-264).
+const typed = (text: string) => text.trim().length > 0
+useDirtySource(
+  () =>
+    open.value &&
+    (typed(annotationKey.value) ||
+      rules.value.some((rule) => typed(rule.subject) || rule.claims.some((row) => typed(row.claim) || typed(row.value)))),
+)
 
 /** With a single trusted issuer, a rule that names none takes it. */
 function preselectIssuer() {

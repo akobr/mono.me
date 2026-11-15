@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { addRecipient, removeRecipient, updateRecipient, type ClientEncryptionRecipient } from '@42for.net/2splatform.sdk'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { invalidateKeyValuePolicy } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { formatDateTime } from '@/utils/dates'
@@ -25,7 +26,10 @@ const publicKey = ref('')
 const busy = ref<string>()
 const failure = ref<string>()
 
-const bits = (recipient: ClientEncryptionRecipient) => {
+// The recipient being added (a pasted public key), which the step-up's confirmation says its sign-in loses (424-264).
+useDirtySource(() => adding.value && [name, id, publicKey].some((field) => field.value.trim().length > 0))
+
+const bits =(recipient: ClientEncryptionRecipient) => {
   const n = recipient.PublicKey?.N
   if (!n) {
     return '?'

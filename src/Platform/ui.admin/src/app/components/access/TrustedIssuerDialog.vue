@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { setFederatedIssuer, type FederatedIssuer, type FederatedIssuerKeySource } from '@42for.net/2splatform.sdk'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
@@ -86,6 +87,23 @@ function applyTemplate(value: FederationPlatform) {
   requiredClaims.value = next.requiredClaims.map((row) => ({ ...row }))
 }
 
+// What the dialog opened with (the stored issuer or the template), to tell the edits, which the step-up's confirmation
+// says its sign-in loses (424-264).
+let opened = ''
+const fields = () =>
+  JSON.stringify([
+    platform.value,
+    name.value,
+    issuerUrl.value,
+    keySource.value,
+    jwksUri.value,
+    jwks.value,
+    lifetime.value,
+    requiredClaims.value,
+    description.value,
+  ])
+useDirtySource(() => open.value && fields() !== opened)
+
 watch(open, (value) => {
   if (!value) {
     return
@@ -107,6 +125,7 @@ watch(open, (value) => {
     description.value = ''
     applyTemplate('github')
   }
+  opened = fields()
 })
 
 const nameError = computed(() => {
