@@ -51,11 +51,9 @@ public sealed class DataSetProvisioner
 
         // an existing project is seeded only for someone who may import into it (Administrator or Owner, as the API's
         // import requires), so a typo in the target never writes into a project of someone else
-        if (projectPoint is not null
-            && (!projectPoint.AccessMap.TryGetValue(owner.Id, out var projectRole) || projectRole < AccountRole.Administrator))
+        if (projectPoint is not null)
         {
-            throw new DataSetException(
-                $"The project '{target.ProjectKey}' exists, and the owner '{owner.Id}' is not its Administrator or Owner, so nothing is seeded there: give an Administrator or Owner of the project as the owner, or another project.");
+            EnsureAdministers(projectPoint, target, owner);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -93,8 +91,14 @@ public sealed class DataSetProvisioner
             }
             catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.AccessPointExists)
             {
-                // created by someone else in the meantime: used as it is
+                // created by someone else in the meantime: used as it is, when the owner administers it
                 isProjectCreated = false;
+                var createdPoint = await _access.GetAccessPointAsync(target.ProjectKey);
+
+                if (createdPoint is not null)
+                {
+                    EnsureAdministers(createdPoint, target, owner);
+                }
             }
             catch (AccessDeniedException exception)
             {
@@ -141,5 +145,14 @@ public sealed class DataSetProvisioner
             isProjectCreated && organizationPoint is null,
             isProjectCreated,
             isViewRegistered);
+    }
+
+    private static void EnsureAdministers(AccessPoint project, DataSetTarget target, DataSetOwner owner)
+    {
+        if (!project.AccessMap.TryGetValue(owner.Id, out var role) || role < AccountRole.Administrator)
+        {
+            throw new DataSetException(
+                $"The project '{target.ProjectKey}' exists, and the owner '{owner.Id}' is not its Administrator or Owner, so nothing is seeded there: give an Administrator or Owner of the project as the owner, or another project.");
+        }
     }
 }
