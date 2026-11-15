@@ -75,6 +75,8 @@ $secret = "<a random string>"
 
 The **hash** goes to the API, the **secret itself** to the MCP server. Giving the MCP server the hash makes every tool call answer *"The Storyteller API does not accept the MCP server as an actor of its token exchange…"*.
 
+**Step-up**: a Debug build of the API leaves the [step-up](Storyteller/authentication.md#recent-sign-in-step-up) off, so secrets, roles and machines need no recent sign-in locally. To try it against AuthKit staging, set `Auth:StepUp:Enabled` to `true` (and `Auth:StepUp:MaxAge` to a short window such as `00:01:00`) as user secrets of the API.
+
 **Sentry**: `local.settings.json` sets `Sentry:Dsn` to the project `2s-api`, so local runs and Aspire report their errors under the environment `development`; a user secret `Sentry:Dsn` set to an empty value turns it off; [error reporting](Storyteller/error-reporting.md) describes what an event carries.
 
 ## 5. MCP server settings
@@ -133,7 +135,7 @@ dotnet run --project src/Platform/Aspire.Host/src --launch-profile https-local-c
 Checks:
 
 ```sh
-curl http://localhost:7071/api/v1/auth/configuration                       # "TokenExchange": { "Enabled": true }
+curl http://localhost:7071/api/v1/auth/configuration                       # "TokenExchange": { "Enabled": true }, "StepUp": { "Enabled": false, … } in a Debug build
 curl -k https://localhost:7180/.well-known/oauth-protected-resource/mcp     # the AuthKit domain as authorization server
 ```
 

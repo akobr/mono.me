@@ -334,6 +334,8 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | `Sentry__Dsn` | the API reports its errors to the Sentry project `2s-api` (step 14), next to Application Insights; without it, nothing is sent ([error reporting](../Storyteller/error-reporting.md)) |
 | `Exhibition__Organization`, `__Project`, `__Owner` | not set at first, so the deployment has no exhibition; added together after the seed of the exhibition (below) |
 
+The [step-up](../Storyteller/authentication.md#recent-sign-in-step-up) needs no setting: under AuthKit, secrets, role changes and machine credentials need a sign-in of the last 10 minutes. `Auth__StepUp__MaxAge` (a `TimeSpan`, e.g. `00:15:00`) changes the window, and `Auth__StepUp__Enabled=false` turns it off when a client cannot satisfy it; the templates set them through `stepUpMaxAge` and `stepUpEnabled` ([decisions](decisions.md#can-change-any-time-no-need-to-decide-now)).
+
 Invitation emails need the WorkOS management key. When you want them, store it and add the setting:
 
 ```sh
@@ -495,6 +497,7 @@ In the WorkOS dashboard, environment **Production**:
 6. **Invitation link**: `https://app.2s.42for.net/invitations/accept` (and the management key of step 8.3 for the emails).
 7. **Your own account**: sign up once in production. Its user id (`user_01…`) is `baseAccount__id` of DbCreator (step 16) and becomes the owner of the platform's first organization (decision 11).
 8. **User impersonation off** (**Authentication → Features**, the default) and **one or two named dashboard members** with the least role and MFA, or SSO with MFA ([decisions](decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary)).
+9. **Multi-factor authentication: Required.** The [MFA policy](../Storyteller/authentication.md#mfa-policy) requires MFA in production for every sign-in without SSO, which is Magic Auth today: every user enrols a factor (TOTP) and gives it at sign-in, and SSO users get their MFA from their own identity provider. It is Required since 2026-11-17. The API cannot check MFA: its [step-up](../Storyteller/authentication.md#recent-sign-in-step-up) only needs a recent sign-in, which MFA then protects.
 
 The checklist of the admin UI ([README](../../../src/Platform/ui.admin/README.md#workos-dashboard-checklist)) has the same items in more detail.
 
@@ -535,6 +538,8 @@ The workflows (`platform-infrastructure.yml`, `platform-deploy.yml`, spec sectio
 ## 16. First deployment (after the blockers are merged)
 
 Run from a clean checkout of `main`, with 424-230 and the setting of the certificate kinds merged.
+
+Deploy the admin UI (16.3) together with the API (16.1), or first, whenever the API brings the [step-up](../Storyteller/authentication.md#rollout-of-the-step-up) for the first time: an admin UI from before it answers the step-up with a plain sign-in redirect, which keeps the old sign-in, and nobody gets through to secrets, roles or machines.
 
 ### 16.1 The API
 
@@ -585,13 +590,15 @@ The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with
 
 | Check | How | Expected |
 | --- | --- | --- |
-| Discovery | `curl -s https://api.2s.42for.net/api/v1/auth/configuration` | `200`, `"Provider":"AuthKit"`, `"AuthKitDomain":"https://auth.42for.net"` |
+| Discovery | `curl -s https://api.2s.42for.net/api/v1/auth/configuration` | `200`, `"Provider":"AuthKit"`, `"AuthKitDomain":"https://auth.42for.net"`, `"StepUp":{"Enabled":true,"MaxAge":600}` |
 | HTTPS only | `curl -sI http://api.2s.42for.net/api/v1/auth/configuration` | a redirect to HTTPS |
 | CORS | `curl -sI -X OPTIONS -H "Origin: https://app.2s.42for.net" -H "Access-Control-Request-Method: GET" https://api.2s.42for.net/api/v1/auth/configuration` | `Access-Control-Allow-Origin: https://app.2s.42for.net` |
 | Sign-in | open `https://app.2s.42for.net`, sign in with your production account | the organization `42dotnet` is listed |
 | Containers | `az cosmosdb sql container list -g "$RG" -a "$COSMOS" -d 42.Platform.2S --query "[].name" -o tsv` | exactly `core` and `organizations` |
 | Free tier | Cost Management after a day | Cosmos DB at 0 |
 | Secrets | in the UI, create a project and a Standard secret | **Settings → Secrets** shows the project's key; `az keyvault key list --vault-name "$KV"` lists a `kek-…` key |
+| Step-up | more than 10 minutes after signing in, reveal the secret in the UI; then `sform story kv get <key> --reveal` with a session older than 10 minutes | the UI asks to **Confirm it's you** and shows the value after the new sign-in; `sform` ends with `44` and `StepUpRequired` |
+| MFA | once MFA is **Required** (step 13), sign in to the UI with Magic Auth | WorkOS asks for the second factor |
 | Certificate kinds off | in **Settings → Machines**, enable `Certificate` | `400` "… is turned off in this deployment." |
 | Timers | Application Insights, `traces` of the last hours | `KeyValueProtectionTimer` runs hourly without errors |
 | Storage key off | `az storage account show -n "$SA" --query allowSharedKeyAccess` | `false` |

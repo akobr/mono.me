@@ -30,6 +30,14 @@ A declined sign-in ends with exit code `44`, a code that expired before you conf
 
 Every other command uses the stored session and refreshes it silently. `sform account logout` signs you out.
 
+**A recent sign-in.** Reading or writing secret values, changing roles and members, inviting people, and creating or resetting machines need a sign-in of the last 10 minutes, unless the platform sets another window. A refresh keeps the time of your sign-in, so a session older than that gets "This needs a recent sign-in: a sign-in counts for 10 minutes.", the error code `StepUpRequired` and a hint, and ends with exit code `44`. `sform account logout` clears only the session of `sform`, and a code you approve in a browser that is still signed in may not count as a new sign-in. So:
+
+1. Sign out in the browser first (**Sign out** in the admin UI ends the browser's session), or approve the code in a private window.
+2. Run `sform account logout`, then `sform account`, and approve the new code.
+3. Repeat the command.
+
+Machines never need it. An older `sform` prints its general refusal for the same answer; the remedy is the same.
+
 `sform account set -p <organization>.<project>` picks the default project and view of the commands without `-p` and `-v`; without `-p` it offers your projects to choose from, in a terminal. They are kept with your other preferences in `sform.settings.json`, see [Settings](#settings).
 
 ## Sign in from a pipeline
@@ -142,7 +150,7 @@ sform account machine create -w -m configuration-transfer,schema-write,template-
 sform account machine create --scope configuration-write -m schema-write,template-write   # a pipeline that deploys schemas and templates
 ```
 
-`--scope secrets-read` alone gives only `Secrets.Read`, because it is a runtime scope: add `-r` or `-w` for the documents themselves. Creating a machine needs the Contributor role, the `ContributorWithSecrets` role when it gets `Secrets.Read` or `Secrets.Write`, and the Administrator role when it gets a management scope; resetting it, replacing its federation rules and deleting it (`sform account machine delete`) need the same role. `sform account machine` lists the machines with the columns `Id`, `Scopes` (the runtime scopes), `Kind`, `Secret`, `RestrictionTo` and `Management` (the management scopes).
+`--scope secrets-read` alone gives only `Secrets.Read`, because it is a runtime scope: add `-r` or `-w` for the documents themselves. Creating a machine needs the Contributor role, the `ContributorWithSecrets` role when it gets `Secrets.Read` or `Secrets.Write`, and the Administrator role when it gets a management scope; resetting it, replacing its federation rules and deleting it (`sform account machine delete`) need the same role. Creating, resetting and replacing the rules also need a [recent sign-in](#sign-in); deleting does not. `sform account machine` lists the machines with the columns `Id`, `Scopes` (the runtime scopes), `Kind`, `Secret`, `RestrictionTo` and `Management` (the management scopes).
 
 Without a scope it needs, the API answers `403` with a message that names the scope, such as "This operation needs the scope Annotation.Manage, which the machine was not created with.", and `sform` prints it. Machines created before these scopes existed have none: their API keys and certificates get `401`, their client credentials `403`, and a federated machine gets no token. A machine cannot be edited: create a new one with the scopes the job needs.
 
@@ -187,7 +195,7 @@ sform story config exe.northwind.invoicing.production -r -f yaml -e values.yaml
 sform story config exe.northwind.invoicing.production --version 3 -f properties --content-only
 ```
 
-A resolved configuration holds secret values only for a caller with the right to read secrets: a user with the `ContributorWithSecrets` role, or a machine with `Secrets.Read`, which by default must call with its certificate over mTLS. When the API withholds the secrets (`X-2S-Secrets-Withheld: mtls-required`), the values of secret bindings are their expressions, and `sform` warns about it. A machine without `Secrets.Read` gets the expressions without that header: when a resolved value starts with `@`, `sform` also reads the effective configuration, and warns about every value that is still the expression the effective configuration has at the same path. Warnings and errors name paths, never a value. To hand a resolved configuration to a CI job with masks, use `sform story config export`, see [Export to GitHub Actions](#export-to-github-actions).
+A resolved configuration holds secret values only for a caller with the right to read secrets: a user with the `ContributorWithSecrets` role, or a machine with `Secrets.Read`, which by default must call with its certificate over mTLS. When the API withholds the secrets (`X-2S-Secrets-Withheld`), the values of secret bindings are their expressions, and `sform` warns about it with what helps for the reason: a machine's certificate for `mtls-required`, a sign-in of your own for `actor-restricted`, and a new sign-in for `step-up-required` (see [Sign in](#sign-in)). A machine without `Secrets.Read` gets the expressions without that header: when a resolved value starts with `@`, `sform` also reads the effective configuration, and warns about every value that is still the expression the effective configuration has at the same path. Warnings and errors name paths, never a value. To hand a resolved configuration to a CI job with masks, use `sform story config export`, see [Export to GitHub Actions](#export-to-github-actions).
 
 | Exit code | When |
 |---|---|
@@ -274,7 +282,7 @@ The policy is per project: turned off, it lets every machine of the project with
 
 Without `Secrets.Read` or such a sign-in, the export stops with exit code `2` on the withheld secrets, or on the expressions of the bindings that were not resolved; `--allow-unresolved` exports such expressions as they are.
 
-**Set up a certificate machine.** `sform account machine create` without `-k` creates the default kind of the project, which is an API key unless an Administrator changed it. So a certificate machine takes `-k certificate`, and an Administrator enables the kind for the project first: `sform account machine machine-auth` prints the policy, and with `-k` it sets the whole policy, so name the kinds it printed, the default kind first, add `-k certificate`, and add `-l` when the project has a certificate lifetime of its own. A user with the `ContributorWithSecrets` role then creates the machine. `machine create` prints the password of the certificate once. The repository keeps the password as the secret `STORYTELLER_CERTIFICATE_PASSWORD`, and the file, in base64 on one line, as `STORYTELLER_CERTIFICATE_BASE64`:
+**Set up a certificate machine.** `sform account machine create` without `-k` creates the default kind of the project, which is an API key unless an Administrator changed it. So a certificate machine takes `-k certificate`, and an Administrator enables the kind for the project first: `sform account machine machine-auth` prints the policy, and with `-k` it sets the whole policy, so name the kinds it printed, the default kind first, add `-k certificate`, and add `-l` when the project has a certificate lifetime of its own. A user with the `ContributorWithSecrets` role then creates the machine, with a [recent sign-in](#sign-in). `machine create` prints the password of the certificate once. The repository keeps the password as the secret `STORYTELLER_CERTIFICATE_PASSWORD`, and the file, in base64 on one line, as `STORYTELLER_CERTIFICATE_BASE64`:
 
 ``` bash
 sform account machine machine-auth                              # the enabled kinds, the default kind and the lifetime
@@ -450,7 +458,7 @@ Every command ends with one of these codes. A refusal or a failure of the API is
 | `40` | The command stopped before it finished: you declined a confirmation, or a job of `story export` or `story import` outlasted the wait and continues on the server |
 | `42` | Nothing to do: no changes, or nothing to import or delete |
 | `43` | The command needs a terminal or a confirmation, see [Run without a terminal](#run-without-a-terminal); or your account is not registered yet (`account`, `account set` and the `account points` commands), run `sform account register` |
-| `44` | Not authorized: the sign-in failed or was declined, or the API refused the request (`401`, `403`) |
+| `44` | Not authorized: the sign-in failed or was declined, or the API refused the request (`401`, `403`), also for a sign-in that is not recent enough (`StepUpRequired`, see [Sign in](#sign-in)) |
 | `45` | A partial result, for example a bulk operation that skipped some keys |
 | `1` | A crash of the tool, with the log file named in the output; a job of `story export` or `story import` that failed on the server, with its error; or an editor of an `edit` command (or of `config patch` without `-i`) that exited with a non-zero code |
 

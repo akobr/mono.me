@@ -237,6 +237,7 @@ az role assignment list --assignee $deployment.PrincipalId --all --query "[].{ro
 8. Optional, for invitation emails: create an **API key** (`sk_…`) and keep it for phase 8.
 9. **User impersonation off**: **Authentication → Features**, the "User impersonation" card stays disabled. That is the default. The setting is per environment, and only an Admin can turn it on. The API refuses impersonation tokens anyway ([How AuthKit tokens are checked](../Storyteller/authentication.md#how-authkit-tokens-are-checked)).
 10. **Dashboard members**: one or two named people, each with the least role that does the job and with MFA, or SSO through an identity provider that enforces MFA. SSO needs a verified domain, and with directory sync the members are managed in the identity provider. A member can change a user's email and then sign in as that user ([decisions](decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary)).
+11. **Multi-factor authentication: Required**, as the [MFA policy](../Storyteller/authentication.md#mfa-policy) asks for every sign-in without SSO (Magic Auth here): every user enrols a factor (TOTP) at the next sign-in, yours included. Note the day in the ISO 27001 notes, kept outside the repository. Staging stays without MFA for the automation pools. **Impersonation** stays off.
 
 ## 6. DNS records [C12]
 
@@ -366,6 +367,8 @@ From an up-to-date `main` (with the parameter commits) at the repository root:
 git switch main; git pull
 ```
 
+**Deploy the admin UI (11.3) together with the API (11.1), or first**, whenever the API brings the [step-up](../Storyteller/authentication.md#rollout-of-the-step-up) for the first time: an admin UI from before it answers the step-up with a plain sign-in redirect, which keeps the old sign-in, so nobody gets through to secrets, roles or machines. If a client cannot satisfy it, `stepUpEnabled = 'false'` in `parameters/prod.bicepparam` and a run of `main.bicep` turn it off (what-if: only `+ Auth__StepUp__Enabled` in `prod-2s-api-fa/appsettings`).
+
 Each build-and-deploy below is **one script block** (`& { … }`): paste it whole. In it, a failing command (`$PSNativeCommandUseErrorActionPreference`, PowerShell 7.4+: a nonzero exit of `dotnet`, `npm` or `az` throws) stops the whole block, so an old or half-built output is never deployed. Lines pasted one by one would not stop: the console runs the next line after an error. A cleanup that can't delete an old output stops the block too; only a missing path is skipped.
 
 ### 11.1 The API
@@ -480,7 +483,7 @@ A later schema change that adds a container needs the limit back at `-1` for the
 ## 12. Verify [C17]
 
 ```powershell
-curl.exe -s https://api.2s.42for.net/api/v1/auth/configuration          # 200, "Provider":"AuthKit", "AuthKitDomain":"https://<subdomain>.authkit.app"
+curl.exe -s https://api.2s.42for.net/api/v1/auth/configuration          # 200, "Provider":"AuthKit", "AuthKitDomain":"https://<subdomain>.authkit.app", "StepUp":{"Enabled":true,"MaxAge":600}
 curl.exe -sI http://api.2s.42for.net/api/v1/auth/configuration         # a redirect to https
 curl.exe -sI -X OPTIONS -H "Origin: https://app.2s.42for.net" -H "Access-Control-Request-Method: GET" `
   https://api.2s.42for.net/api/v1/auth/configuration                    # Access-Control-Allow-Origin: https://app.2s.42for.net
@@ -493,6 +496,8 @@ az lock list -g prod-2s-eusec-rg -o table                               # the ac
 - Open `https://app.2s.42for.net` and sign in with your production account: the organization `42dotnet` is listed.
 - Create a **test** organization and project (never a customer's), and a Standard secret: **Settings → Secrets** shows the project's key, and `az keyvault key list --vault-name prod-2s-42fornet-kv --query "[].name" -o tsv` lists a `kek-…` key.
 - **Settings → Machines**: enabling `Certificate` answers `400` "… is turned off in this deployment."
+- **The step-up**: more than 10 minutes after you signed in, reveal the test secret. The UI asks you to **Confirm it's you**, signs you in again (with the second factor once MFA is required) and shows the value. `sform story kv get <key> --reveal` with a session older than 10 minutes ends with `44` and `StepUpRequired`, and its hint says how to sign in again.
+- **MFA**, once it is required (phase 5): a sign-in with Magic Auth asks for the second factor.
 - Application Insights (`prod-2s-api-appi`), **Logs → traces**: `KeyValueProtectionTimer` runs hourly without errors.
 - Sentry: the uptime monitor is green.
 - WorkOS dashboard, as an Admin, Production and Staging: user impersonation is off, the members and their roles are the named ones, and each member has MFA. If SSO stands in for it, check that the identity provider enforces MFA; SSO alone does not count. Record the date, the reviewer and the result in the ISO 27001 supplier notes ([decisions](decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary)). Don't turn impersonation on to try the refusal: the API's tests cover it.
@@ -585,5 +590,6 @@ To turn the exhibition off, remove the three parameters and run `main.bicep` aga
 ## Later
 
 - Every later infrastructure change: what-if, then create, from an up-to-date checkout, with the two `PLATFORM_OWNER_*` variables. The template owns the app settings: add a setting to `modules/functions.bicep`, never in the portal.
+- The step-up window or its escape hatch: `stepUpMaxAge` (a `TimeSpan`, `1.00:00:00` for 24 hours) and `stepUpEnabled` in `parameters/prod.bicepparam`, through a pull request, what-if (only `Auth__StepUp__*` in `prod-2s-api-fa/appsettings`), then create.
 - Rotating the Cosmos DB key: cookbook, step 7.
 - The workflows `platform-infrastructure.yml` and `platform-deploy.yml` replace phases 2–8 and 11 later (spec, section 10).

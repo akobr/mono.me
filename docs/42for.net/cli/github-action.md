@@ -58,6 +58,8 @@ The step fails with the exit code of `sform`, `2` when it refuses the configurat
 
 Credentials are not inputs: `sform` reads them from the environment of the job or of the step, as in [Sign in from a pipeline](/cli/sform#sign-in-from-a-pipeline). An API key or a certificate names its project; client credentials and federated machines need `project`, or `STORYTELLER_PROJECT` or `STORYTELLER_KEY` in the job.
 
+The job signs in as a machine, so the platform's recent sign-in never stops it. The person who creates the machine, resets its key or replaces its federation rules needs one: a sign-in of the last 10 minutes by default, see [Sign in](/cli/sform#sign-in).
+
 For a configuration with secrets, a **certificate machine over mTLS** is the recommendation, see [Secrets need more than a credential](#secrets-need-more-than-a-credential). The job writes its `.pfx` file from a secret under `$RUNNER_TEMP`:
 
 ``` yaml
@@ -113,7 +115,7 @@ Without `Secrets.Read` or such a sign-in, the API withholds the secrets or retur
 `sform account machine create` without `-k` creates the default kind of the project, which is an API key unless an Administrator changed it. So a certificate machine takes `-k certificate`, and the project enables the kind first. Once:
 
 1. An Administrator enables `Certificate` for the project. `sform account machine machine-auth` prints the policy. With `-k` it sets the whole policy, so name the kinds it printed, the default kind first, add `-k certificate`, and add `-l` when the project has a certificate lifetime of its own.
-2. A user with the `ContributorWithSecrets` role creates the machine with `Secrets.Read` and writes its certificate to a file. `machine create` prints the password of the certificate once.
+2. A user with the `ContributorWithSecrets` role creates the machine with `Secrets.Read` and writes its certificate to a file. `machine create` prints the password of the certificate once. Creating the machine needs a recent sign-in of that user (the last 10 minutes by default): an older session ends with exit code `44` and `StepUpRequired`, and [Sign in](/cli/sform#sign-in) says how to sign in again.
 3. The repository gets two secrets: `STORYTELLER_CERTIFICATE_BASE64`, the file in base64 on one line, and `STORYTELLER_CERTIFICATE_PASSWORD`, the password. Then delete the file.
 
 ``` bash

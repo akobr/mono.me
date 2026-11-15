@@ -269,6 +269,19 @@ The tool answers with a text that names the cause; the server logs the status an
 | No request: the server cannot produce its proof (no managed identity token, no token file, or no readable key) | The server could not produce the credential of its actor (`Mcp:Actor`). |
 | Anything else | "The MCP server could not get a token for the Storyteller API ({error})." |
 
+## A recent sign-in
+
+The API needs a recent sign-in of the person for secret values, role changes and machine credentials (the [step-up](authentication.md#recent-sign-in-step-up), on by default under AuthKit, 10 minutes by default). The Storyteller user token carries the time of the person's sign-in at the MCP client, copied from the token the client signed in with, and a refresh of that token keeps it. So once the window has passed since the person signed in to the MCP client, these tools meet the step-up:
+
+- `create_machine`, `reset_machine` and `set_machine_federation_rules`;
+- `set_key_value` and `delete_key_value` of a secret, and `protect_key_values`;
+- `restore_key_values` and `purge_key_values`, which answer per key: the secret keys get `ErrorCode` `StepUpRequired`, and the result starts with a `StepUpNotice` that says what helps;
+- with the [tools that return secrets](#tools-that-return-secrets): `reveal_key_value` of a secret; `get_resolved_configuration` and `check_configuration_bindings`, whose secret bindings stay unresolved, and which say so in `SecretsWithheld` (`step-up-required`) and `SecretsWithheldNotice`, so the model does not take the expressions for the values.
+
+The tool answers `401 StepUpRequired` with a fixed text: the API needs a recent sign-in of the person for this, within the window it names (`MaxAge` in the structured content, in seconds), for reading or writing secret values, creating or resetting machine credentials and changing federation rules. MCP clients sign the person in at the identity provider themselves and cannot ask for a new sign-in (`max_age`), and a reconnect that reuses the person's browser session keeps the old sign-in. So the text asks the person to sign out at the identity provider first (under AuthKit, **Sign out** in the admin UI), then to reconnect the MCP server in the client and retry, or to make the change in the admin UI; the assistant cannot do it itself.
+
+Through an actor under `NoSecretReveal` the reads of secrets answer `ActorRestricted` first, because a new sign-in does not lift the restriction. Under Entra ID and Keycloak the step-up is off unless the API sets `Auth:StepUp:Enabled`.
+
 ## Tools
 
 Every tool takes `organization` and `project` (from `list_projects`, keys `organization.project`) where it works on a project, and `view` (default `default`) where it works on a view. Lists are paged by the server: `limit` (default 50, at most 200) and the `ContinuationToken` of the previous result. A page can be empty and still carry a `ContinuationToken` when the list is filtered page by page; follow it. Deleting, restoring or changing listed items between pages can skip items, so after acting on a page start again from the first one. Results are JSON with the API's PascalCase names, in a text block and as structured content. An error has the composed text in the text block and `Status`, `ErrorCode`, `Message` (the API's message alone), `Hint` and `Errors` in the structured content.
@@ -348,7 +361,7 @@ More details of the analysis:
 
 See [Scopes of machines](authentication.md#scopes-of-machines) for the roles. The `Federated` kind returns no secret and suits workloads with their own identity. Certificate renewal, shared certificates and trusted issuers stay with `sform`, the admin UI and the API.
 
-While the server's actor has `NoSecretReveal`, the default, the API refuses `create_machine` and `reset_machine` for a machine with a `Secrets.*` scope, and `set_machine_federation_rules` for such a machine, with `403 ActorRestricted` (see [Restrictions of actors](authentication.md#restrictions-of-actors)). Deleting such a machine stays open.
+While the server's actor has `NoSecretReveal`, the default, the API refuses `create_machine` and `reset_machine` for a machine with a `Secrets.*` scope, and `set_machine_federation_rules` for such a machine, with `403 ActorRestricted` (see [Restrictions of actors](authentication.md#restrictions-of-actors)). Deleting such a machine stays open. Creating and resetting any machine and replacing its federation rules need a [recent sign-in](#a-recent-sign-in) of the person; deleting does not.
 
 ### Values store
 
@@ -359,7 +372,7 @@ While the server's actor has `NoSecretReveal`, the default, the API refuses `cre
 | `restore_key_values`, `purge_key_values`, `protect_key_values` | Bulk operations with per-key outcomes |
 | `get_key_value_policy`, `set_key_value_policy`, `get_key_value_audit`, `get_key_value_usage` | Policy, audit and usage of a project (Administrator for writes, audit and usage); `set_key_value_policy` changes only the members it is given and always keeps `Public` allowed |
 
-`set_key_value` replaces the stored content type: an update without `contentType` clears it, so pass the `ContentType` from `get_key_value` to keep it (a secret reference needs `application/vnd.2s.secret-reference` on every update). A secret value given to the tool enters the conversation; `sform` or the admin UI keep it out. See [key-values.md](key-values.md).
+`set_key_value` replaces the stored content type: an update without `contentType` clears it, so pass the `ContentType` from `get_key_value` to keep it (a secret reference needs `application/vnd.2s.secret-reference` on every update). A secret value given to the tool enters the conversation; `sform` or the admin UI keep it out. The writes of secrets and the bulk operations on secrets need a [recent sign-in](#a-recent-sign-in) of the person. See [key-values.md](key-values.md).
 
 ### Tools that return secrets
 
@@ -368,8 +381,8 @@ With `Mcp:SecretTools:Enabled` set to `true`, three more tools are registered. T
 | Tool | What it does |
 | --- | --- |
 | `reveal_key_value` | The secret value of a pair or a version; needs `ContributorWithSecrets`. The API records a reveal of the current value as a `Reveal` event; a reveal of an older version too, by an API that audits its version route (older APIs do not) |
-| `get_resolved_configuration` | The configuration with bindings evaluated; secret bindings are filled in with secret rights, and the API records every secret it reads |
-| `check_configuration_bindings` | Per binding, whether it resolves; never the value, but the API reads the secrets for the check |
+| `get_resolved_configuration` | The configuration with bindings evaluated; secret bindings are filled in with secret rights, and the API records every secret it reads. When the API withheld the secrets although the role gives them (`X-2S-Secrets-Withheld`, for example `step-up-required` after the window of the [step-up](#a-recent-sign-in)), `SecretsWithheld` and `SecretsWithheldNotice` come first and say that the secret bindings stayed unresolved, and why |
+| `check_configuration_bindings` | Per binding, whether it resolves; never the value, but the API reads the secrets for the check. Withheld secrets are reported as for `get_resolved_configuration` |
 
 - **Fail closed.** `tools/list` asks the token exchange for the person (cached, so the tool calls that follow cost no second exchange). Without a token, or when the exchange fails, the list leaves the three tools out and still answers; the server logs the error code or the exception type.
 - **Per person.** The list then differs per person, so every answer of `tools/list` is marked private for caches (`CacheScope` `Private`).
@@ -383,7 +396,7 @@ A value returned by a tool enters the model's context, the client's transcript a
 
 - Credentials returned by `create_machine` and `reset_machine` are shown once. The server's instructions ask the assistant to tell the person to copy them from the tool result.
 - The server logs tool names, statuses and error codes, never arguments, results, tokens or response bodies; the token exchange is logged with its status and OAuth error code only. Outside Development no logging rule can lower the `ModelContextProtocol` categories below `Information`, because the MCP SDK writes whole messages at `Trace`.
-- API errors reach the assistant with their status, error code, message and hint. `500` and `422` answers get fixed texts, because their messages can carry storage messages or evaluated secrets, and `403 ActorRestricted` gets a fixed text that says what the actor may not do. Stack traces never pass.
+- API errors reach the assistant with their status, error code, message and hint. `500` and `422` answers get fixed texts, because their messages can carry storage messages or evaluated secrets, `403 ActorRestricted` gets a fixed text that says what the actor may not do, and `401 StepUpRequired` one that says how the person signs in again ([A recent sign-in](#a-recent-sign-in)). Stack traces never pass.
 - Writes are not retried by the HTTP client, so a write runs once. A call may take up to five minutes. A call that times out or loses its connection answers that it may have completed on the server and names the read that checks it; lost one-time credentials mean a reset of the machine (or a new `Certificate` machine).
 - The token exchange has an HTTP client of its own: no retries, because every attempt counts against the API's replay limit; no redirects, so the person's token goes to `Storyteller:BaseUrl` only; and a timeout of 30 seconds for the whole exchange, the actor's credential included.
 - The Storyteller tokens are cached in memory by the SHA-256 of the person's token, until 60 seconds before they expire; a token that expires within the minute is kept until 5 seconds before. The cache holds at most 10,000 tokens, concurrent calls with one token share one exchange, and a failed exchange is not cached.
