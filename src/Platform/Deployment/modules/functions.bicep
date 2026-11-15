@@ -52,6 +52,15 @@ param byokClientId string
 @description('The DSN of the Sentry project of the API (2s-api); the setting is left out while it is empty, and the API reports nothing.')
 param sentryDsn string
 
+@description('The organization of the exhibition project; the three Exhibition__ settings are left out unless all three parameters are set, and the API then has no exhibition.')
+param exhibitionOrganization string
+
+@description('The exhibition project.')
+param exhibitionProject string
+
+@description('The id of the account that owns the exhibition project: the --owner of its seed.')
+param exhibitionOwner string
+
 @description('The machine credential kinds turned off until mTLS exists.')
 param disabledCredentialKinds string[]
 
@@ -133,6 +142,15 @@ var authKitApiKeySetting = authKitApiKeyEnabled
 var byokSetting = empty(byokClientId) ? {} : { KeyValues__Protection__Byok__ClientId: byokClientId }
 
 var sentryDsnSetting = empty(sentryDsn) ? {} : { Sentry__Dsn: sentryDsn }
+
+// All three or none: the API stops at its start with one or two of them.
+var exhibitionSettings = empty(exhibitionOrganization) || empty(exhibitionProject) || empty(exhibitionOwner)
+  ? {}
+  : {
+      Exhibition__Organization: exhibitionOrganization
+      Exhibition__Project: exhibitionProject
+      Exhibition__Owner: exhibitionOwner
+    }
 
 resource plan 'Microsoft.Web/serverfarms@2025-03-01' = {
   name: planName
@@ -217,7 +235,7 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
 resource appSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   parent: site
   name: 'appsettings'
-  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting, sentryDsnSetting)
+  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting, sentryDsnSetting, exhibitionSettings)
 }
 
 resource scmCredentials 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2025-03-01' = {
