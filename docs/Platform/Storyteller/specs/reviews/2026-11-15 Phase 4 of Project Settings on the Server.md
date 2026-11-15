@@ -11,6 +11,7 @@ Phase 4 delivers the DbCreator part of [Project Settings on the Server](../2026-
 | `e7d405ef7` | feat(platform): seed project settings with data sets (424-266) |
 | `24dcdd9c0` | docs(platform): describe the project settings of data sets (424-266) |
 | `cad7a7725` | fix(platform): describe the project settings of an existing project in the seed's --project option (424-266) |
+| `4a149eac6` | fix(platform): add the reviews of phases 4 and 5 of the project settings on the server (424-266) |
 
 ## What Was Done
 
@@ -108,11 +109,13 @@ Run again for this review:
 | `DbCreator/testint --filter-class "*BuiltInSetsTests"` (vNext container) | 5 passed |
 | `DbCreator/testint --filter-class "*.SeedTests"` and `"*BulkSeedTests"` (vNext container) | 8 and 1 passed |
 
+The final regression run of the branch ([Phase 5](2026-11-15%20Phase%205%20of%20Project%20Settings%20on%20the%20Server.md)) ran `DbCreator/test` again (166 passed) and the whole `DbCreator/testint` in one run on the vNext container (19 passed in 7 min 13 s).
+
 ### Reviews
 
-The review of phases 4 and 5 confirmed two findings, both low and both documentation:
+The review of phases 4 and 5 confirmed two findings, both low and both documentation. No finding was refused.
 
-1. **The reviews of phases 4 and 5 were missing.** This review and [Phase 5](2026-11-15%20Phase%205%20of%20Project%20Settings%20on%20the%20Server.md) were added.
+1. **The reviews of phases 4 and 5 were missing.** This review and [Phase 5](2026-11-15%20Phase%205%20of%20Project%20Settings%20on%20the%20Server.md) were added (`4a149eac6`) and completed with the final regression run.
 2. **The `--project` row of the seed options in `data-sets.md` still said that an existing project is used as it is.** A seed writes the set's settings into an existing project whose settings were never set. The row now matches the command's help: an existing project is used when the owner is its Administrator or Owner, keeps its access, and gets the set's settings only when its settings were never set (`cad7a7725`).
 
 ### Deviations from the spec
