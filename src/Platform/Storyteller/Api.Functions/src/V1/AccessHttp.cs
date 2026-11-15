@@ -286,7 +286,7 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Permission), Description = "The requested permission to grant.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The affected access point (organization or project).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenRoleGrant)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostGrantPermission(
@@ -307,6 +307,8 @@ public class AccessHttp
         }
 
         EnsureActorMayGrantRole(request, permissionModel.Role);
+        // A role change, a member removal or a credential given out needs a recent sign-in (Auth:StepUp): 401 otherwise.
+        request.EnsureRecentSignIn();
 
         var accountId = request.GetIdentityUniqueId();
         permissionModel = permissionModel with { CreatedById = accountId };
@@ -321,7 +323,7 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Permission), Description = "The requested permission to revoke.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The affected access point (organization or project).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostRevokePermission(
@@ -340,6 +342,9 @@ public class AccessHttp
         {
             return badRequestResult;
         }
+
+        // A role change, a member removal or a credential given out needs a recent sign-in (Auth:StepUp): 401 otherwise.
+        request.EnsureRecentSignIn();
 
         var accountId = request.GetIdentityUniqueId();
         permissionModel = permissionModel with { CreatedById = accountId };
@@ -413,7 +418,7 @@ public class AccessHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAccessCreate), Description = "An organization or project to create.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAccess), Description = "The created access point (organization or project).")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequestMachineAccessCreate)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
     [OpenApiResponseWithBody(HttpStatusCode.NotImplemented, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseNotImplementedMachineAccess)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -462,6 +467,9 @@ public class AccessHttp
         await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, scopes);
         EnsureActorMayGiveOutSecretReads(request, scopes);
 
+        // Before the try below: its mapping would drop the challenge header.
+        request.EnsureRecentSignIn();
+
         // TODO: [P1] hide the model from the client
         machineModel = machineModel with
         {
@@ -490,7 +498,7 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdMachine)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAccess), Description = "The restarted machine access.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine id is not valid, or the machine has no key to reset: a Federated or Certificate machine (MachineAccessNotSupported).")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine doesn't exist, it was deleted during its reset, or it has no API key because it is being deleted or its creation failed (NotFound).")]
@@ -514,6 +522,9 @@ public class AccessHttp
         // A new secret gives out the machine's scopes, so the reset needs the role they need.
         var machine = await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
         EnsureActorMayGiveOutSecretReads(request, machine?.Scopes ?? []);
+
+        // A new secret is a credential given out (Auth:StepUp); before the try, whose mapping would drop the header.
+        request.EnsureRecentSignIn();
 
         try
         {

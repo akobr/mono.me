@@ -19,6 +19,12 @@ internal static class TestRequests
 
     public const string ActorId = "mcp";
 
+    // The judgements of the bearer middleware (Auth:StepUp): every user request of these helpers has a recent sign-in, as
+    // a fresh token gives, unless a test replaces it (WithSignIn).
+    public static readonly SignInRecency RecentSignIn = new(IsRecent: true, StepUpOptions.DefaultMaxAge);
+
+    public static readonly SignInRecency StaleSignIn = SignInRecency.Stale(StepUpOptions.DefaultMaxAge);
+
     public static TestHttpRequestData User(string method = "GET", string? body = null, IServiceProvider? services = null, string userId = UserId)
     {
         return UserCarrying([Scopes.User.Impersonation], method, body, services, userId);
@@ -57,6 +63,23 @@ internal static class TestRequests
         }
 
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
+        context.Items[FunctionContextItemKeys.SignInRecency] = RecentSignIn;
+        return request;
+    }
+
+    // The request with another judgement of the sign-in; null removes it, as for a request that never passed the bearer
+    // middleware (none in Debug builds, not recent in Release builds).
+    public static TestHttpRequestData WithSignIn(this TestHttpRequestData request, SignInRecency? recency)
+    {
+        if (recency is null)
+        {
+            request.FunctionContext.Items.Remove(FunctionContextItemKeys.SignInRecency);
+        }
+        else
+        {
+            request.FunctionContext.Items[FunctionContextItemKeys.SignInRecency] = recency;
+        }
+
         return request;
     }
 

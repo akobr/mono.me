@@ -22,4 +22,8 @@ public class FunctionContextItemKeys
     // Delegation of the Storyteller token validator, never from claims.
     public const string DelegatedActor = nameof(DelegatedActor);
     public const string DelegatedRestrictions = nameof(DelegatedRestrictions);
+
+    // How recent the sign-in of a user is (a SignInRecency), judged by the bearer middleware against Auth:StepUp for every
+    // user it stores, never for a machine.
+    public const string SignInRecency = nameof(SignInRecency);
 }

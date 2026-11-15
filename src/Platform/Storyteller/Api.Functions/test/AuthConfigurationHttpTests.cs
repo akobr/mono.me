@@ -166,6 +166,31 @@ public class AuthConfigurationHttpTests
         AuthConfigurationHttp.Describe(options, new TokenExchangeOptions { Enabled = true }).TokenExchange.Enabled.ShouldBeTrue();
     }
 
+    // The step-up of users (Auth:StepUp, 424-264): on by default only under AuthKit and only in Release builds, with the
+    // window in seconds.
+    [Theory]
+    [InlineData(IdentityProviderKind.AuthKit, null, true)]
+    [InlineData(IdentityProviderKind.Keycloak, null, false)]
+    [InlineData(IdentityProviderKind.EntraId, null, false)]
+    [InlineData(IdentityProviderKind.EntraId, true, true)]
+    [InlineData(IdentityProviderKind.AuthKit, false, false)]
+    public void Describe_TellsTheStepUp(IdentityProviderKind provider, bool? enabled, bool expected)
+    {
+        var options = new UserAuthenticationOptions
+        {
+            Provider = provider,
+            ClientId = "client-id",
+            AuthKit = new AuthKitOptions { ClientId = "client_123" },
+            Keycloak = new KeycloakUserOptions { Issuer = "https://keycloak.example/realms/storyteller", Audience = "storyteller-api" },
+        };
+
+        var stepUp = AuthConfigurationHttp.Describe(options, null, new StepUpOptions { Enabled = enabled, MaxAge = TimeSpan.FromMinutes(15) }).StepUp;
+
+        stepUp.Enabled.ShouldBe(expected && (enabled is not null || !Security.HttpRequestDataExtensions.IsDevelopmentAuthentication));
+        stepUp.MaxAge.ShouldBe(900);
+        AuthConfigurationHttp.Describe(options).StepUp.MaxAge.ShouldBe(600);
+    }
+
     // Only the flag: who may act for users stays in the configuration.
     [Fact]
     public void Describe_NeverExposesTheActorsOrTheAdditionalIssuers()

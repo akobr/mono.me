@@ -275,8 +275,8 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
     // of a machine, the actor of an entry of Auth:TokenExchange:Actors while the exchange is enabled (so turning it off or
     // removing the actor ends its tokens at once), and known restrictions only. The restrictions enforced are the token's
     // plus those of the actor's settings of now, so adding a restriction or turning AllowSecrets off applies to its tokens
-    // at once too, and none is ever dropped here. The scopes become scp claims, which the API reads; the actor and the
-    // restrictions go into the Delegation, never into claims.
+    // at once too, and none is ever dropped here. The scopes become scp claims, which the API reads, and so does auth_time;
+    // the actor and the restrictions go into the Delegation, never into claims.
     private BearerValidationResult? ValidateUser(JsonElement payload)
     {
         var accountId = GetString(payload, JwtRegisteredClaimNames.Sub);
@@ -331,6 +331,16 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
         foreach (var value in scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).Where(value => allowed.Contains(value, StringComparer.Ordinal)))
         {
             claims.Add(new Claim("scp", value));
+        }
+
+        // When the person last signed in, copied from the subject token: the step-up of the API (Auth:StepUp) judges it as
+        // for a provider token. Only a non-negative integer counts; without it the token has no sign-in time.
+        if (payload.TryGetProperty(StorytellerTokenClaims.AuthTime, out var authTime)
+            && authTime.ValueKind == JsonValueKind.Number
+            && authTime.TryGetInt64(out var authTimeSeconds)
+            && authTimeSeconds >= 0)
+        {
+            claims.Add(new Claim(StorytellerTokenClaims.AuthTime, authTimeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64));
         }
 
         return new BearerValidationResult(

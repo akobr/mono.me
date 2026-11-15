@@ -152,7 +152,9 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         validated.ShouldNotBeNull();
         validated.IsMachine.ShouldBeFalse();
         validated.MachineId.ShouldBeNull();
-        validated.Claims.Select(claim => (claim.Type, claim.Value)).ShouldBe([("sub", AccountId), ("scp", UserScopes.Impersonation)]);
+        // The subject token's sign-in time reaches the API, which judges the step-up with it (424-264).
+        var authTime = (_time.GetUtcNow().ToUnixTimeSeconds() - 300).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        validated.Claims.Select(claim => (claim.Type, claim.Value)).ShouldBe([("sub", AccountId), ("scp", UserScopes.Impersonation), ("auth_time", authTime)]);
         var delegation = validated.Delegation.ShouldNotBeNull();
         delegation.ActorId.ShouldBe(ActorId);
         delegation.Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);

@@ -40,6 +40,13 @@ public static class UserAuthenticationEntryPoint
         services.AddOptions<TokenExchangeOptions>()
             .Bind(configuration.GetSection(TokenExchangeOptions.SectionName))
             .ValidateOnStart();
+
+        // The step-up of users (Auth:StepUp); the bearer middleware judges the sign-in of each request with the clock.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<StepUpOptions>, StepUpOptionsValidator>());
+        services.AddOptions<StepUpOptions>()
+            .Bind(configuration.GetSection(StepUpOptions.SectionName))
+            .ValidateOnStart();
+        services.TryAddSingleton(TimeProvider.System);
         return services;
     }
 

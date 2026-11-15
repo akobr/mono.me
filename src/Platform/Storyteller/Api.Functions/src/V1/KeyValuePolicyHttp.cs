@@ -212,7 +212,7 @@ public class KeyValuePolicyHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ClientEncryptionRecipient), Description = "The recipient with its public key as a JWK.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key is not RSA, too short, or the id is malformed (RecipientInvalid).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The id exists (RecipientExists), or the project has 20 recipients.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> AddRecipient(
@@ -234,6 +234,9 @@ public class KeyValuePolicyHttp
             return new BadRequestObjectResult(new ErrorResponse("A body with Name and PublicKey is required.") { ErrorCode = ErrorCodes.RecipientInvalid });
         }
 
+        // The holder of the recipient's private key reads every value encrypted for it from now on (Auth:StepUp).
+        request.EnsureRecentSignIn();
+
         var caller = await GetCallerAsync(request, organization, project);
         var recipient = await _policies.AddRecipientAsync(organization, project, create, caller, request.FunctionContext.CancellationToken);
         return new OkObjectResult(recipient);
@@ -251,7 +254,7 @@ public class KeyValuePolicyHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The recipient does not exist (RecipientNotFound).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The last enabled recipient of a project that allows Hyok (ProtectionInUse).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> UpdateRecipient(
@@ -273,6 +276,9 @@ public class KeyValuePolicyHttp
         {
             return new BadRequestObjectResult(new ErrorResponse("A body with Name or IsEnabled is required."));
         }
+
+        // Enabling a recipient again gives its key holder the values encrypted for it (Auth:StepUp).
+        request.EnsureRecentSignIn();
 
         var caller = await GetCallerAsync(request, organization, project);
         var recipient = await _policies.UpdateRecipientAsync(organization, project, id, update, caller, request.FunctionContext.CancellationToken);

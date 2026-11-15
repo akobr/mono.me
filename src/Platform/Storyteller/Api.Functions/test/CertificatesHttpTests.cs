@@ -88,6 +88,20 @@ public class CertificatesHttpTests
         backend.Callers[1].ShouldBeUserCaller();
     }
 
+    // A shared certificate is a credential, its private key and password: it needs a recent sign-in (Auth:StepUp), in
+    // every build, before anything is issued (424-264).
+    [Fact]
+    public async Task PostSharedCertificate_WithAStaleSignIn_RequiresAStepUp()
+    {
+        var backend = new SharedCertificateBackend();
+        var http = CreateHttp(backend.CreateService());
+        var body = FunctionTestDoubles.ToJsonBody(new SharedCertificateCreate { Label = "build-agent" });
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.PostSharedCertificate(UserRequest(body).WithSignIn(TestRequests.StaleSignIn), "acme", "billing"));
+
+        backend.Calls.ShouldNotContain(call => call.StartsWith("issue:", StringComparison.Ordinal));
+    }
+
     // A shared certificate belongs to CertificateAndApiKey: a project without that kind gets a coded 400 and no
     // certificate.
     [Fact]
@@ -296,6 +310,7 @@ public class CertificatesHttpTests
             new("sub", "user-1"),
             new("scp", Scopes.User.Impersonation),
         };
+        context.Items[FunctionContextItemKeys.SignInRecency] = TestRequests.RecentSignIn;
         return request;
     }
 

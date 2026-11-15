@@ -23,6 +23,16 @@ internal static class UserOnlyRoutes
         return TestRequests.UserCarrying(MachineScopes.ToScopeStrings(MachineScopes.All), method, body, services);
     }
 
+    // The step-up (Auth:StepUp): a user whose sign-in is not recent gets 401 StepUpRequired with the window, in every build.
+    public static async Task<StepUpRequiredException> ShouldRequireStepUpAsync(Func<Task> call)
+    {
+        var exception = await Should.ThrowAsync<StepUpRequiredException>(call);
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.StepUpRequired);
+        exception.MaxAge.ShouldBe(StepUpOptions.DefaultMaxAge);
+        return exception;
+    }
+
     public static async Task ShouldRefuseMachineAsync(Func<Task> call, string message = MachineMessage)
     {
         var exception = await Should.ThrowAsync<AccessDeniedException>(call);

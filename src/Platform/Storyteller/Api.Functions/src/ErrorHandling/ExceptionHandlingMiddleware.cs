@@ -110,6 +110,11 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             httpErrorResponse.Headers.Add("Retry-After", ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
+        if (exception is StepUpRequiredException stepUp)
+        {
+            httpErrorResponse.Headers.Add("WWW-Authenticate", StepUpChallenge.Format(stepUp.MaxAgeSeconds));
+        }
+
         await httpErrorResponse.WriteAsJsonAsync(errorResponse);
         context.SetInvocationResult(httpErrorResponse);
     }

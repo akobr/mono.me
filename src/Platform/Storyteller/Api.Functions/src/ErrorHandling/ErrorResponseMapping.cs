@@ -16,6 +16,7 @@ public static class ErrorResponseMapping
         (statusCode, var errorCode) = exception switch
         {
             AccessDeniedException e => (HttpStatusCode.Forbidden, e.ErrorCode),
+            StepUpRequiredException e => (HttpStatusCode.Unauthorized, e.ErrorCode),
             NotFoundException e => (HttpStatusCode.NotFound, e.ErrorCode),
             ConflictException e => (HttpStatusCode.Conflict, e.ErrorCode),
             InvalidInputException e => (HttpStatusCode.BadRequest, e.ErrorCode),
@@ -40,7 +41,12 @@ public static class ErrorResponseMapping
         {
             ErrorCode = errorCode,
             Hint = exception.TryGetErrorHint(),
-            Details = (exception as KeyValueImportInvalidException)?.Items,
+            Details = exception switch
+            {
+                KeyValueImportInvalidException e => e.Items,
+                StepUpRequiredException e => new StepUpDetails(e.MaxAgeSeconds),
+                _ => null,
+            },
         };
         return true;
     }

@@ -857,18 +857,13 @@ public partial class ConfigurationHttp
     }
 
     // The same on the 200 and the 304s. Only the read right counts: mTLS would not let a machine with Secrets.Write alone
-    // read secrets. A user acting through an actor under NoSecretReveal is a user and never a machine, so at most one
-    // reason applies.
+    // read secrets. One reason is sent (SecretRights.ReadWithheldReason): mTLS concerns machines only, and for a user the
+    // actor wins over the step-up, because a new sign-in does not lift NoSecretReveal.
     private static void SetResolvedHeaders(HttpRequestData request, SecretRights rights)
     {
-        if (rights.IsReadWithheldByMtls)
+        if (rights.ReadWithheldReason is { } reason)
         {
-            request.SetResponseHeader(SecretRights.WithheldHeader, SecretRights.WithheldByMtls);
-        }
-
-        if (rights.IsReadWithheldByActor)
-        {
-            request.SetResponseHeader(SecretRights.WithheldHeader, SecretRights.WithheldByActor);
+            request.SetResponseHeader(SecretRights.WithheldHeader, reason);
         }
 
         if (rights.CanReadSecrets)
