@@ -5,13 +5,16 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import { getPath } from '@/mock/archive-names'
 import type { DocumentId } from '@/mock/documents'
+import { keyPattern } from '@/mock/key-values'
 import { buildShowcaseScope } from '@/mock/showcase'
+import { showcaseKeyValues } from '@/mock/showcase/key-values'
 import { annotationDocument } from '@/mock/transfer-handlers'
 
 // The built-in data set showcase of DbCreator (424-252) is the fabrikam / invoicing-suite / default scope of the
 // showcase, written in the export's folder format: an annotation file per active annotation and the current version of
-// every document, as a Git export of the view gives them. The files are snapshots, so `npm test` fails when the mock and
-// the set part (CI writes no snapshot); regenerate them with `npx vitest run test/unit/mock/showcase-set.test.ts -u`
+// every document, as a Git export of the view gives them, and the current value of every pair that is not deleted in
+// key-values.json, as the key/value export gives them (424-265). The files are snapshots, so `npm test` fails when the
+// mock and the set part (CI writes no snapshot); regenerate them with `npx vitest run test/unit/mock/showcase-set.test.ts -u`
 // (the path first: -u takes a value) and delete the files the test reports as stale. Only set.json is written by hand.
 
 const [org, project, view] = ['fabrikam', 'invoicing-suite', 'default']
@@ -46,6 +49,23 @@ function documentPath(id: DocumentId): { path: string; owner?: string } {
   return { path: getPath('DescendantTypeSchema', rest.slice(separator + 1), key), owner: key }
 }
 
+/** The pairs of the scope as the key/value export lists them: the current value of every pair that is not deleted, by key. */
+function keyValuesDocument() {
+  const items = showcaseKeyValues(`${org}/${project}/${view}`)
+    .filter((stored) => stored.Deleted === undefined)
+    .map((stored) => {
+      const current = stored.Versions.at(-1)!
+      return {
+        Key: stored.Key,
+        Protection: current.Protection,
+        Value: current.Value,
+        ...(current.ContentType === undefined ? {} : { ContentType: current.ContentType }),
+      }
+    })
+    .toSorted((left, right) => (left.Key < right.Key ? -1 : left.Key > right.Key ? 1 : 0))
+  return { Format: '2s.key-values.v1', Items: items }
+}
+
 /** The files of the set by path, as an export of the view writes them. */
 function setFiles(): Map<string, string> {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -65,6 +85,7 @@ function setFiles(): Map<string, string> {
         files.set(path, json(current))
       }
     }
+    files.set('key-values.json', json(keyValuesDocument()))
     return files
   } finally {
     vi.useRealTimers()
@@ -94,6 +115,18 @@ describe('the data set showcase of DbCreator', () => {
         'templates/uxe.template.json',
       ]),
     )
+  })
+
+  it('holds pairs a seed can write: Public and Standard, with valid keys and a value each', () => {
+    const { Items: items } = keyValuesDocument()
+    expect(items.map((item) => item.Protection)).toEqual(expect.arrayContaining(['Public', 'Standard']))
+    for (const item of items) {
+      expect(item.Key, item.Key).toMatch(keyPattern)
+      expect(['Public', 'Standard'], item.Key).toContain(item.Protection)
+      expect(item.Value, item.Key).not.toBe('')
+    }
+    // the deleted pair of the mock stays out of the set
+    expect(items.map((item) => item.Key)).not.toContain('legacy.ftpHost')
   })
 
   it.each([...files.keys()].toSorted())('writes %s', async (path) => {

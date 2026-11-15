@@ -9,25 +9,27 @@ Fourth Wall Software builds CRM, HR, CAD and Social solutions for two customers:
 | `schemas/` | 11 schemas (type, annotation, descendant type) |
 | `templates/` | 3 templates, gated per Company with JSON-e |
 | `configurations/` | 30 configurations |
-| `key-values.json` | 19 public pairs, a secret reference and one `Standard` pair (a demo value, not a secret) |
+| `key-values.json` | 20 pairs: 18 public pairs, a secret reference (public too) and one `Standard` pair (a demo value, not a secret) |
 | `project-settings.json` | the type names (Company, Department, Solution, Application, AppUsage, Job, JobInstance) for the admin UI |
 
 A seed counts `README.md` and `project-settings.json` as ignored files. They are part of the set's hash, so changing them makes the next seed read the set again; that writes nothing, because a seed never overwrites.
 
 ## Seed
 
+The seed writes the pairs of `key-values.json` too ([data sets](../../../../../../../docs/Platform/Storyteller/data-sets.md#key-valuesjson)). The `Standard` pair needs a Standard vault: without one, the seed refuses the set before it writes anything (exit `2`). Locally, give DbCreator the Lowkey Vault of the Aspire host (the endpoint of its `keyvault` resource, which the dashboard shows):
+
 ```sh
-dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed exhibit
+AzureKeyVaults__default=https://127.0.0.1:<port>/ KeyValues__Protection__Emulator=true   dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed exhibit
 ```
 
-Until key/value pairs are seedable (Linear 424-265), `key-values.json` is ignored by the seed and the pairs come from the API. Many configurations interpolate them (`@[...]`), so a resolved read answers `422` without them:
+Many configurations interpolate the pairs (`@[...]`), so a resolved read answers `422` without them. To add the pairs to a project that was seeded or imported without them, import them through the API:
 
 ```sh
 sform account set -p fourth-wall.toons-and-tyrants -v default
 sform story kv import src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/key-values.json
 ```
 
-The `Standard` pair needs the right to write secrets, and when 424-265 seeds it, a Standard vault (Lowkey Vault locally).
+The `Standard` pair needs the right to write secrets there.
 
 ## Import instead of seeding
 

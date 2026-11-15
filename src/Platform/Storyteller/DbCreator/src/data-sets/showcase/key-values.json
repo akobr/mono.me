@@ -1,0 +1,57 @@
+{
+  "Format": "2s.key-values.v1",
+  "Items": [
+    {
+      "Key": "dunning.maxReminders",
+      "Protection": "Public",
+      "Value": "4"
+    },
+    {
+      "Key": "einvoice.peppol.apiKey",
+      "Protection": "Public",
+      "Value": "kv://fabrikam-prod/peppol-api-key",
+      "ContentType": "application/vnd.2s.secret-reference"
+    },
+    {
+      "Key": "einvoice.peppol.participantId",
+      "Protection": "Public",
+      "Value": "0088:5790000435968"
+    },
+    {
+      "Key": "features.flags",
+      "Protection": "Public",
+      "Value": "{\"eInvoice\":true,\"creditNotesV2\":false}",
+      "ContentType": "application/json"
+    },
+    {
+      "Key": "payments.adyen.hmacKey",
+      "Protection": "Standard",
+      "Value": "demo-hmac-1f2e3d4c"
+    },
+    {
+      "Key": "payments.adyen.merchantAccount",
+      "Protection": "Public",
+      "Value": "FabrikamInvoicingEUR"
+    },
+    {
+      "Key": "pdf.rendererUrl",
+      "Protection": "Public",
+      "Value": "https://pdf.invoicing-suite.example/render"
+    },
+    {
+      "Key": "smtp.host",
+      "Protection": "Public",
+      "Value": "smtp.invoicing.fabrikam.example"
+    },
+    {
+      "Key": "smtp.password",
+      "Protection": "Standard",
+      "Value": "Is-smtp-2026-09"
+    },
+    {
+      "Key": "smtp.sender",
+      "Protection": "Public",
+      "Value": "billing@invoicing-suite.example"
+    }
+  ]
+}
