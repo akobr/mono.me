@@ -83,7 +83,11 @@ function joinAccessPoint(db: MockDb, point: AccessPoint, role: AccountRole): Acc
 function exhibitionOf(db: MockDb): { exhibition: MockExhibition; point: AccessPoint } | undefined {
   const exhibition = db.exhibition
   const point = exhibition ? db.accessPoints[`${exhibition.Organization}.${exhibition.Project}`] : undefined
-  return exhibition && point ? { exhibition, point } : undefined
+  // As the API's Exhibition:Owner rule: offered only while one account manages the project, as its Owner. A second
+  // Administrator or Owner switches it off.
+  const managers = Object.values(point?.AccessMap ?? {}).filter((role) => roleRank(role) >= roleRank('Administrator'))
+  const offered = managers.length === 1 && managers[0] === 'Owner'
+  return exhibition && point && offered ? { exhibition, point } : undefined
 }
 
 const ownerCount = (db: MockDb, key: string) =>

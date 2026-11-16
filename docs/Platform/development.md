@@ -222,10 +222,10 @@ STORYTELLER_TESTS_USE_CONTAINER=true dotnet test --project src/Platform/Storytel
 
 The onboarding of the admin UI offers a new user the exhibition, a demo project they join as a Reader ([access](Storyteller/access.md#exhibition)). The API has one only with three settings, and `local.settings.json` stays without them, because the owner is your own account. Without them the onboarding has no exhibition step. To turn it on:
 
-1. Seed the set `exhibit` with your account as the owner (`baseAccount__id` as above, or `--owner`). It goes into its own names, `fourth-wall` / `toons-and-tyrants`, or into others with `--organization` and `--project`:
+1. Seed the set `exhibit` with your account as the owner. Pass it as `--owner`, with the Windows emulator and with the container of the Aspire host alike: without it and without `baseAccount__id`, DbCreator falls back to its legacy owner, which matches no account. It goes into its own names, `fourth-wall` / `toons-and-tyrants`, or into others with `--organization` and `--project`:
 
    ```powershell
-   dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed exhibit
+   dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed exhibit --owner user_01…
    ```
 
    The seed does not bring the key/value pairs of the set yet (424-265). Import them with `sform` as the set's [README](../../src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/README.md) says, or a resolved read of many of its configurations answers `422`.

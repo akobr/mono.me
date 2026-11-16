@@ -174,7 +174,7 @@ public class ExhibitionHttp
         {
             await _accessService.CreateAccountAsync(new AccountCreate { IdentityId = accountId, UserName = userName, Name = name });
         }
-        catch
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // A concurrent request of the caller created the account meanwhile: the service's own read found it
             // (AccountExists), or its write met the other one. Only a create that left no account has failed.
@@ -193,7 +193,7 @@ public class ExhibitionHttp
         {
             return await _accessService.GetAccountAsync(accountId) is not null;
         }
-        catch
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             return false;
         }

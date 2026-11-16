@@ -162,3 +162,23 @@ The switch, `hostingStatement` and their two forms of the text are removed: the 
 - e2e: `onboarding.spec.ts` walks the five steps (four without an exhibition), `accessibility.spec.ts` has the residency step (seven onboarding states per theme), `visual.spec.ts` has the screen `onboarding-residency`. `npx playwright test onboarding accessibility --project=desktop --project=mobile`: 184 passed. The visual project was not run: the five `onboarding-*` baselines need to be made again in the Linux container, `onboarding-residency` for the first time.
 - Automation: `OnboardingPage.cs` has the headings and texts of the five steps as constants, `Topics`, `Agreements`, `ExhibitionChoiceDescription` (now a locator) and `ExpectLinksAsync`. In `SignInTests.Onboarding.cs` the eight tests keep their ids; three are renamed: `Onboarding_WelcomeAndResidency_StateEuHostingAndSubProcessors` (492, now the welcome step too), `Onboarding_Security_ExplainsSafeguardsAndLinksToDetails` (493) and `Onboarding_NoExhibition_HasFourSteps` (497); case 21 checks the agreements line. Against `npm run dev:mock` on `http://localhost:5174`: 8 of 8 with `UITESTS_PROFILE=mock` and 8 of 8 with `mock,mobile`. The titles of ACC-SGN-07 and ACC-SGN-08 in `test-cases.md` follow; the cases in Testiny are not updated yet.
 - Docs: `docs/42for.net/platform/admin-ui.md` (the five steps), `src/Platform/ui.admin/README.md` (the e2e list), `docs/Platform/Deployment/decisions.md` (the wording and the safeguards) and `docs/Platform/Storyteller/access.md` (the description of the project no longer shows in onboarding).
+
+## Fixes after the code reviews (2026-11-16)
+
+The reviews of CodeRabbit and Grok on PR #204, each finding checked against the code first.
+
+- **A chosen join is never dropped silently.** When the exhibition failed to load and the address keeps the choice (`join=1`), the last step shows "You chose to join the exhibition, but it did not load." with **Retry** and **Continue without the exhibition**, and the form waits for one of them. Before, the form created the organization without the join.
+- **An unknown account holds the form back.** After a failed join of the exhibition only, a read of the account that fails with anything but `404` no longer counts as "no account": the form stays disabled with "We could not check your account…", and the button tries again.
+- **An exhibition that disappears ends the wizard.** A join that answers `404` after the account was created leaves to the new project (or `/orgs`) with a warning toast, as **Try again** could never work.
+- **The mock follows the owner rule of the API.** The exhibition is offered only while one account manages the project, as its Owner; a user who is its second Owner or an Administrator gets `404` on both routes, without a write.
+- **The API lets a cancellation through.** The catches of the account create in `ExhibitionHttp` no longer catch `OperationCanceledException`, so a cancelled invocation reads nothing more (a new test).
+- **Docs.** The runbook no longer claims that settings set before the seed always answer `404`; `development.md` seeds `exhibit` with `--owner` for both emulator modes; `decisions.md` says that only public users never see the safeguards before they hold, while the owner and the testers may.
+
+Not changed, with the reason:
+
+- **The growth of the exhibition's access map** (Grok) is a known limit, already in `access.md` under **Limits**; a different membership model is its own change.
+- **The claude.ai link** (Grok) is gone since the rework.
+- **"Continue without the exhibition" to `/orgs` with an empty account** (Grok): `/orgs` shows **New organization** in its empty state, which creates the first organization with `POST v1/access/points` for an existing account; no new test.
+- **One Warning per request on a misconfigured deployment**, the optional constructor dependencies (the convention of `AccessHttp`), the cancellation token of `IAccessService`, and the policy of delegated callers after 424-262 to 424-264: left as they are; the last two are follow-ups.
+
+Runs: unit 2075 passed, Playwright onboarding and accessibility 184 passed (desktop and mobile), `Api.Functions/test` 3160 passed.

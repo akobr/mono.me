@@ -196,14 +196,30 @@ describe('POST /access/exhibition/join', () => {
     expect(loadDb().accessPoints[projectKey]?.AccessMap).toEqual({ [grace]: 'Owner', [mockUser.id]: 'Reader' })
   })
 
-  it.each<AccountRole>(['Owner', 'Contributor'])('keeps the higher role of a user who is its %s', async (role) => {
-    startAsMember(role)
-    const before = stored()
+  it.each<AccountRole>(['Contributor', 'ContributorWithSecrets'])(
+    'keeps the higher role of a user who is its %s',
+    async (role) => {
+      startAsMember(role)
+      const before = stored()
 
-    expect((await joinExhibition()).AccessMap?.[projectKey]).toBe(role)
-    expect(loadDb().accessPoints[projectKey]?.AccessMap?.[mockUser.id]).toBe(role)
-    expect(stored()).toBe(before)
-  })
+      expect((await joinExhibition()).AccessMap?.[projectKey]).toBe(role)
+      expect(loadDb().accessPoints[projectKey]?.AccessMap?.[mockUser.id]).toBe(role)
+      expect(stored()).toBe(before)
+    },
+  )
+
+  // As the API: a second Administrator or Owner of the project switches the exhibition off, without a write.
+  it.each<AccountRole>(['Owner', 'Administrator'])(
+    'is not offered while the user is a second manager of the project, as its %s',
+    async (role) => {
+      startAsMember(role)
+      const before = stored()
+
+      await expectNotFound(getExhibition())
+      await expectNotFound(joinExhibition())
+      expect(stored()).toBe(before)
+    },
+  )
 
   it('raises a membership without a role to Reader', async () => {
     startAsMember('None')

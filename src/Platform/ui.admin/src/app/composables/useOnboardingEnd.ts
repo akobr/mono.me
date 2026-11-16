@@ -1,6 +1,13 @@
 import { ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
-import { createAccount, getAccount, joinExhibition, type Account, type Exhibition } from '@42for.net/2splatform.sdk'
+import {
+  createAccount,
+  getAccount,
+  isNotFound,
+  joinExhibition,
+  type Account,
+  type Exhibition,
+} from '@42for.net/2splatform.sdk'
 import type { OrganizationForm } from '@/forms/names.schema'
 import { useSessionStore } from '@/stores/session'
 import { onboardingTexts as texts } from '@/utils/onboarding'
@@ -27,6 +34,11 @@ export function useOnboardingEnd(exhibition: () => Exhibition | undefined) {
   const exhibitionOnlyError = shallowRef<unknown>()
   /** In joinFailed: Try again is in flight, or the wizard is leaving. */
   const retrying = ref(false)
+  /**
+   * A join of the exhibition only failed, and so did the read of the account after it (not with a 404): the account
+   * may exist, and createAccount would refuse it. Until the button settles it, the form creates nothing.
+   */
+  const accountUnknown = ref(false)
 
   let account: Account | undefined
   /** The project the user created, when they did. */
@@ -69,6 +81,13 @@ export function useOnboardingEnd(exhibition: () => Exhibition | undefined) {
     try {
       account = await joinExhibition()
     } catch (error) {
+      if (isNotFound(error)) {
+        // The deployment stopped offering the exhibition since the wizard loaded it: Try again could never work, so the
+        // wizard ends without it, where it would have ended.
+        toast.add({ title: texts.end.notOffered, color: 'warning', icon: 'i-lucide-circle-alert' })
+        await leave(ownPath ?? '/orgs')
+        return
+      }
       joinError.value = error
       state.value = 'joinFailed'
       retrying.value = false
@@ -83,7 +102,7 @@ export function useOnboardingEnd(exhibition: () => Exhibition | undefined) {
    * createAccount refuses an existing one. Its failure is thrown for the form to show.
    */
   async function createOrganization(values: OrganizationForm, withExhibition: boolean): Promise<void> {
-    if (state.value !== 'idle') {
+    if (state.value !== 'idle' || accountUnknown.value) {
       return
     }
 
@@ -120,8 +139,14 @@ export function useOnboardingEnd(exhibition: () => Exhibition | undefined) {
       account = await joinExhibition()
     } catch (error) {
       // The API creates the account before it joins. With an account the form could create nothing any more
-      // (createAccount refuses it), so the wizard goes on from joinFailed; without one the button tries again.
-      account = await getAccount().catch(() => undefined)
+      // (createAccount refuses it), so the wizard goes on from joinFailed; without one the button tries again. Only a
+      // 404 says there is none: after any other failure of the read the account is unknown, and the form waits.
+      let unknown = false
+      account = await getAccount().catch((reason: unknown) => {
+        unknown = !isNotFound(reason)
+        return undefined
+      })
+      accountUnknown.value = unknown
       if (account) {
         joinError.value = error
         state.value = 'joinFailed'
@@ -131,6 +156,8 @@ export function useOnboardingEnd(exhibition: () => Exhibition | undefined) {
       }
       return
     }
+
+    accountUnknown.value = false
 
     await leave(projectPath(target.Organization, target.Project), target)
   }
@@ -156,5 +183,15 @@ export function useOnboardingEnd(exhibition: () => Exhibition | undefined) {
     await leave(ownPath ?? '/orgs')
   }
 
-  return { state, joinError, exhibitionOnlyError, retrying, createOrganization, joinOnly, retryJoin, continueWithout }
+  return {
+    state,
+    joinError,
+    exhibitionOnlyError,
+    retrying,
+    accountUnknown,
+    createOrganization,
+    joinOnly,
+    retryJoin,
+    continueWithout,
+  }
 }
