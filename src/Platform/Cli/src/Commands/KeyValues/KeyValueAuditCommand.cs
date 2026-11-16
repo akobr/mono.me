@@ -101,8 +101,8 @@ public class KeyValueUsageCommand : KeyValueCommandBase
     internal const string HelpDetail = """
 
         The daily meters of the project's key/value pairs and their totals over a
-        range of days: the last 30 by default, or --from to --to (at most 400 days),
-        with the estimated charges when the deployment has prices.
+        range of days: --from to --to, by default from 30 days before today to today
+        (at most 400 days), with the estimated charges when the deployment has prices.
 
         A user needs the Administrator role on the project. A machine cannot read the
         usage, whatever its scopes.

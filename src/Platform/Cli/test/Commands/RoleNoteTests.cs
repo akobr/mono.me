@@ -62,6 +62,7 @@ public partial class RoleNoteTests
         }
 
         descriptions.Count.ShouldBeGreaterThan(100);
+        // The 11 notes of 424-222 and those of story export and import.
         notes.ShouldBeGreaterThanOrEqualTo(13);
         wrong.ShouldBeEmpty();
     }
@@ -104,7 +105,18 @@ public partial class RoleNoteTests
         lines[index][(2 + command.Name!.Length)..].TrimStart().ShouldBe(description);
 
         // The next command or the end of the list, not a continuation of the description.
-        lines[index + 1].ShouldMatch(@"^(  \S.*)?$");
+        (index + 1 < lines.Count ? lines[index + 1] : string.Empty).ShouldMatch(@"^(  \S.*)?$");
+    }
+
+    // A line that ends inside a note, also right after "(for"; "(for example" is not a note.
+    [Theory]
+    [InlineData("  --permanent   Delete permanently (for", true)]
+    [InlineData("  --permanent   Delete permanently (for administrators", true)]
+    [InlineData("  --permanent   Delete permanently (for administrators).", false)]
+    [InlineData("  -x            A path (for example", false)]
+    public void SplitNote_FindsALineThatEndsInsideANote(string line, bool split)
+    {
+        SplitNote().IsMatch(line).ShouldBe(split);
     }
 
     [Theory]
@@ -148,7 +160,7 @@ public partial class RoleNoteTests
     // What the descriptions said before they moved after the options.
     [Theory]
     [InlineData("story kv audit", "newest first", "Without -v the events of every view are listed; -v, --key, --operation, --from and --to narrow them.")]
-    [InlineData("story kv usage", "the last 30 by default, or --from to --to (at most 400 days)", "with the estimated charges when the deployment has prices.")]
+    [InlineData("story kv usage", "--from to --to, by default from 30 days before today to today (at most 400 days)", "with the estimated charges when the deployment has prices.")]
     [InlineData("story kv purge", "removed with every version before their retention ends, without a way to restore them.", "-y skips it.")]
     [InlineData("story kv policy set", "Only the members given change; the others keep their value.", "--allow lists every allowed level and replaces the stored list")]
     [InlineData("account machine issuer set", "Settings not given are cleared, and the issuer URL (--issuer) of an existing issuer cannot change.", "unless --jwks-uri or --jwks-file gives them.")]
@@ -213,7 +225,7 @@ public partial class RoleNoteTests
     }
 
     // A role named right after an opening parenthesis: (Administrator), (Contributor or a higher role), …
-    [GeneratedRegex(@"\((Reader|Contributor|ContributorWithSecrets|Administrator|Owner)\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\((Reader|Contributor|ContributorWithSecrets|Administrator|Owner)\b", RegexOptions.None)]
     private static partial Regex RoleInParentheses();
 
     // A note, but not "(for example …)".
@@ -221,6 +233,6 @@ public partial class RoleNoteTests
     private static partial Regex Note();
 
     // A note whose closing parenthesis is on the next line.
-    [GeneratedRegex(@"\(for (?!example\b)[^)]*$")]
+    [GeneratedRegex(@"\(for(?: (?!example\b)[^)]*)?$")]
     private static partial Regex SplitNote();
 }
