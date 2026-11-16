@@ -104,6 +104,7 @@ declare module 'vue' {
     NumberControl: typeof import('./components/configuration/renderers/NumberControl.vue')['default']
     ObjectRenderer: typeof import('./components/configuration/renderers/ObjectRenderer.vue')['default']
     OnboardingExhibition: typeof import('./components/onboarding/OnboardingExhibition.vue')['default']
+    OnboardingResidency: typeof import('./components/onboarding/OnboardingResidency.vue')['default']
     OnboardingSecurity: typeof import('./components/onboarding/OnboardingSecurity.vue')['default']
     OnboardingSteps: typeof import('./components/onboarding/OnboardingSteps.vue')['default']
     OnboardingWelcome: typeof import('./components/onboarding/OnboardingWelcome.vue')['default']

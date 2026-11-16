@@ -11,13 +11,17 @@ defineEmits<{ select: [step: OnboardingStep] }>()
 </script>
 
 <template>
-  <nav :aria-label="texts.stepList">
-    <ol class="flex flex-wrap items-center gap-x-1 gap-y-2 sm:gap-x-3">
+  <nav :aria-label="texts.stepList" class="@container">
+    <ol class="flex flex-nowrap items-center gap-x-1 @min-[37rem]:gap-x-1.5">
       <li v-for="(step, index) in steps" :key="step">
         <button
           type="button"
-          class="flex min-h-9 items-center gap-2 rounded-full p-1 text-sm focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-75"
-          :class="step === current ? 'pe-3 font-medium text-highlighted' : 'text-muted hover:text-highlighted sm:pe-3'"
+          class="flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-full p-1 text-sm focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-75"
+          :class="
+            step === current
+              ? 'pe-2.5 font-medium text-highlighted'
+              : 'text-muted hover:text-highlighted @min-[37rem]:pe-2.5'
+          "
           :aria-label="stepLabel(index + 1, step)"
           :aria-current="step === current ? 'step' : undefined"
           :disabled="disabled"
@@ -29,7 +33,7 @@ defineEmits<{ select: [step: OnboardingStep] }>()
           >
             {{ index + 1 }}
           </span>
-          <span :class="step === current ? '' : 'sr-only sm:not-sr-only'">{{ stepNames[step] }}</span>
+          <span :class="step === current ? '' : 'sr-only @min-[37rem]:not-sr-only'">{{ stepNames[step] }}</span>
         </button>
       </li>
     </ol>

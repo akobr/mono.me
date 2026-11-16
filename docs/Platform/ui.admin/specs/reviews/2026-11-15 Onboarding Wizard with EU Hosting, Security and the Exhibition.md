@@ -128,3 +128,37 @@ All five are constants of `app/utils/onboarding.ts` or parameters; none needs a 
 - **Modeling** is locked for Readers in the admin UI, so a visitor does not see the exhibition's schemas and templates there.
 - Every join rewrites the access point of the exhibition project, and its member list is not paged.
 - Each visited step is an entry of the browser's history. After the wizard ends, the browser's back stays on the page, once per visited step, before it leaves the app.
+
+## Rework after the first review (2026-11-16)
+
+The owner reworked the texts and the layout of the wizard by hand after this review; the tests and the docs followed. This section supersedes what the sections above say about the steps, their texts, the links and `safeguardsLive`.
+
+### The five steps
+
+- **Welcome** (new, `OnboardingWelcome.vue`): the heading "Meet the 2S Platform" with a rocket icon, the motto, a paragraph about the pricing (free while it takes shape, then based on usage, not on seats, announced well in advance) and the link **Documentation** to `https://42for.net/platform/introduction`.
+- **Residency** (the former Welcome, `OnboardingResidency.vue`, `?step=residency`): the callout "Your platform's data stays in the EU"; its lead names machine access too, followed by the sentence about AI processing. The purpose of Microsoft Azure is "Hosting, storage, secrets, logs". The entry of WorkOS has two paragraphs: its purpose (`workosPurpose`: what it does and receives) and a note, "Every authorization decision is made and recorded by 2S in the EU." The sentence about an EU-only identity provider moved to the security step.
+- **Security**: a new lead and four sections with icons, in this order: **Secrets**, **Machines and pipelines**, **People** (WorkOS AuthKit signs people in and 2S alone decides; the three safeguards; a second paragraph about an EU-only identity provider) and **Security testing**. The list of Entra ID and Keycloak and the limit of such a deployment are gone.
+- **Exhibition**: a sparkles icon, new texts (Fourth Wall Software, and what the demo shows), the checkbox **Show me the exhibition**, and a fixed description under it: "Adds the demo project to your account as a Reader. Nothing you do there can break it: you join read-only." The description of the project from the API is no longer shown, and `exhibitionChoiceDescription` ignores its parameter.
+- **Organization**: an icon on its heading, and a line under the form: "By creating an organization or joining the exhibition, you agree to the Customer License Agreement and the Data Processing Agreement.", each a link to `42for.software/legal/` (`agreementLinks`).
+
+The step labels are "Step 1: Welcome" to "Step 5: Organization"; without an exhibition the wizard has four steps, and **Organization** is "Step 4: Organization".
+
+### `safeguardsLive` is gone
+
+The switch, `hostingStatement` and their two forms of the text are removed: the security step names the three safeguards always. The platform opens to the public only once 424-262, 424-263 and 424-264 run in production, so no user sees the claim before it holds. Section 8 above no longer applies; `docs/Platform/Deployment/decisions.md` says so.
+
+### Links
+
+`hostingLink` (the discussion on claude.ai) is gone. The residency step has `residencyLinks`: **Cloud hosting** (`https://42for.net/platform/cloud`) and **Sub-processors list** (`https://42for.software/legal/sub-processors`). The security step's `securityLinks` are **Security details**, **Authentication of machines** and **Self-hosting option** on `42for.net/platform/`, in place of the four links to GitHub and the CLI docs. Every link opens in a new tab. Of the `42for.net/platform/` pages, only `introduction` exists in `docs/42for.net` today: `cloud`, `security`, `auth-machine` and `self-hosting` are not written yet.
+
+### Layout
+
+- The step list (`OnboardingSteps.vue`) is a container (`@container`) and switches to the compact names (only the current step named) by a container query on its own width (`@min-[37rem]`), not by the viewport, and does not wrap.
+- The card has one padding, `p-5`, at every width, so nothing in it moves when the step list switches.
+
+### Tests and docs
+
+- Unit: `onboarding-texts.test.ts` and `onboarding-page.test.ts` rewritten for the five steps, the new texts and exports, with new cases for the welcome step (motto, pricing, **Documentation** with `target="_blank"`), the residency step and its links, the order of the security sections, the exhibition step without the project's description, and the agreements line; every behaviour case stays (failures, focus, query). 72 tests in `test/unit/onboarding/`; the whole suite 2070 passed (112 files). `typecheck`, `lint` and Prettier clean.
+- e2e: `onboarding.spec.ts` walks the five steps (four without an exhibition), `accessibility.spec.ts` has the residency step (seven onboarding states per theme), `visual.spec.ts` has the screen `onboarding-residency`. `npx playwright test onboarding accessibility --project=desktop --project=mobile`: 184 passed. The visual project was not run: the five `onboarding-*` baselines need to be made again in the Linux container, `onboarding-residency` for the first time.
+- Automation: `OnboardingPage.cs` has the headings and texts of the five steps as constants, `Topics`, `Agreements`, `ExhibitionChoiceDescription` (now a locator) and `ExpectLinksAsync`. In `SignInTests.Onboarding.cs` the eight tests keep their ids; three are renamed: `Onboarding_WelcomeAndResidency_StateEuHostingAndSubProcessors` (492, now the welcome step too), `Onboarding_Security_ExplainsSafeguardsAndLinksToDetails` (493) and `Onboarding_NoExhibition_HasFourSteps` (497); case 21 checks the agreements line. Against `npm run dev:mock` on `http://localhost:5174`: 8 of 8 with `UITESTS_PROFILE=mock` and 8 of 8 with `mock,mobile`. The titles of ACC-SGN-07 and ACC-SGN-08 in `test-cases.md` follow; the cases in Testiny are not updated yet.
+- Docs: `docs/42for.net/platform/admin-ui.md` (the five steps), `src/Platform/ui.admin/README.md` (the e2e list), `docs/Platform/Deployment/decisions.md` (the wording and the safeguards) and `docs/Platform/Storyteller/access.md` (the description of the project no longer shows in onboarding).

@@ -1,8 +1,8 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { goto, isMobile, openApp, signedOut } from './support'
 
-// The onboarding wizard of a user without an account (424-267): Welcome, Security, Exhibition and Organization. The
-// step and the choice of the exhibition are in the address, so a test opens a step by it.
+// The onboarding wizard of a user without an account (424-267): Welcome, Residency, Security, Exhibition and
+// Organization. The step and the choice of the exhibition are in the address, so a test opens a step by it.
 
 const exhibitionPath = '/exhibition/exhibition/default/annotations'
 
@@ -13,7 +13,9 @@ const currentStep = (page: Page) => stepList(page).locator('[aria-current="step"
 const stepHeading = (page: Page, name: string) => page.getByRole('heading', { name, exact: true, level: 2 })
 const next = (page: Page) => page.getByRole('button', { name: 'Next', exact: true })
 const back = (page: Page) => page.getByRole('button', { name: 'Back', exact: true })
-const joinBox = (page: Page) => page.getByRole('checkbox', { name: 'Join the exhibition' })
+const joinBox = (page: Page) => page.getByRole('checkbox', { name: 'Show me the exhibition' })
+/** The heading of the residency step. */
+const residency = "Your platform's data stays in the EU"
 const exhibitionOnly = (page: Page) => page.getByRole('button', { name: 'Continue with the exhibition only' })
 
 /** The step and the choice in the address: its query without the mock scenario of openApp. */
@@ -31,13 +33,14 @@ async function nextTo(page: Page, heading: string): Promise<void> {
 
 /** Walks from the first step to the last with Next. */
 async function walkToOrganization(page: Page): Promise<void> {
-  await expect(stepHeading(page, 'Customer data stays in the EU')).toBeVisible()
+  await expect(stepHeading(page, 'Meet the 2S Platform')).toBeVisible()
+  await nextTo(page, residency)
   await nextTo(page, 'Security first')
   await nextTo(page, 'Join the exhibition')
   await nextTo(page, 'Create your organization')
 }
 
-/** Checks the box of step 3. The choice goes through the address, so the box follows a moment after the click. */
+/** Checks the box of step 4. The choice goes through the address, so the box follows a moment after the click. */
 async function chooseExhibition(page: Page): Promise<void> {
   await joinBox(page).click()
   await expect(joinBox(page)).toBeChecked()
@@ -106,13 +109,19 @@ test('the description of the first project shows on the organization overview', 
 
 test('Next, Back and the step list move between the steps, which the address names', async ({ page }, testInfo) => {
   await openApp(page, '/onboarding', 'new-user')
-  const names = ['Step 1: Welcome', 'Step 2: Security', 'Step 3: Exhibition', 'Step 4: Organization']
+  const names = [
+    'Step 1: Welcome',
+    'Step 2: Residency',
+    'Step 3: Security',
+    'Step 4: Exhibition',
+    'Step 5: Organization',
+  ]
   for (const [index, name] of names.entries()) {
     await expect(stepList(page).getByRole('button').nth(index)).toHaveAccessibleName(name)
   }
-  await expect(stepList(page).getByRole('button')).toHaveCount(4)
+  await expect(stepList(page).getByRole('button')).toHaveCount(5)
   await expect(currentStep(page)).toHaveAccessibleName('Step 1: Welcome')
-  await expect(stepHeading(page, 'Customer data stays in the EU')).toBeVisible()
+  await expect(stepHeading(page, 'Meet the 2S Platform')).toBeVisible()
   // The first step has nothing to go back to; the Back of the form is in the page, hidden with its step.
   await expect(back(page)).toBeHidden()
   expect(query(page)).toEqual({})
@@ -123,22 +132,30 @@ test('Next, Back and the step list move between the steps, which the address nam
     return (box?.width ?? 0) > 1
   }
   expect(await shown('Welcome')).toBe(true)
-  expect(await shown('Security')).toBe(!isMobile(testInfo))
+  expect(await shown('Residency')).toBe(!isMobile(testInfo))
 
   // A change of step moves the focus to its heading, so a screen reader announces the step.
   await next(page).click()
-  await expect.poll(() => query(page)).toEqual({ step: 'security' })
-  await expect(currentStep(page)).toHaveAccessibleName('Step 2: Security')
-  await expect(stepHeading(page, 'Security first')).toBeFocused()
-  expect(await shown('Security')).toBe(true)
+  await expect.poll(() => query(page)).toEqual({ step: 'residency' })
+  await expect(currentStep(page)).toHaveAccessibleName('Step 2: Residency')
+  await expect(stepHeading(page, residency)).toBeFocused()
+  expect(await shown('Residency')).toBe(true)
   expect(await shown('Welcome')).toBe(!isMobile(testInfo))
 
+  await next(page).click()
+  await expect.poll(() => query(page)).toEqual({ step: 'security' })
+  await expect(currentStep(page)).toHaveAccessibleName('Step 3: Security')
+  await expect(stepHeading(page, 'Security first')).toBeFocused()
+
+  await back(page).click()
+  await expect.poll(() => query(page)).toEqual({ step: 'residency' })
+  await expect(stepHeading(page, residency)).toBeFocused()
   await back(page).click()
   await expect.poll(() => query(page)).toEqual({})
-  await expect(stepHeading(page, 'Customer data stays in the EU')).toBeFocused()
+  await expect(stepHeading(page, 'Meet the 2S Platform')).toBeFocused()
 
   // Every step is reachable from the list at any time.
-  await step(page, 'Step 3: Exhibition').click()
+  await step(page, 'Step 4: Exhibition').click()
   await expect.poll(() => query(page)).toEqual({ step: 'exhibition' })
   await expect(stepHeading(page, 'Join the exhibition')).toBeFocused()
   await expect(joinBox(page)).not.toBeChecked()
@@ -146,9 +163,9 @@ test('Next, Back and the step list move between the steps, which the address nam
   await expect.poll(() => query(page)).toEqual({ step: 'exhibition', join: '1' })
 
   // The last step has the buttons of its form instead of Next, and the focus goes to the first field.
-  await step(page, 'Step 4: Organization').click()
+  await step(page, 'Step 5: Organization').click()
   await expect.poll(() => query(page)).toEqual({ step: 'organization', join: '1' })
-  await expect(currentStep(page)).toHaveAccessibleName('Step 4: Organization')
+  await expect(currentStep(page)).toHaveAccessibleName('Step 5: Organization')
   await expect(stepHeading(page, 'Create your organization')).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Organization' })).toBeFocused()
   await expect(next(page)).toHaveCount(0)
@@ -165,6 +182,7 @@ test('Next, Back and the step list move between the steps, which the address nam
 
 test('the browser history moves between the steps, and a reload keeps the step and the choice', async ({ page }) => {
   await openApp(page, '/onboarding', 'new-user')
+  await nextTo(page, residency)
   await nextTo(page, 'Security first')
   await nextTo(page, 'Join the exhibition')
   await chooseExhibition(page)
@@ -196,7 +214,7 @@ test('the browser history moves between the steps, and a reload keeps the step a
   await page.reload()
   await expect(stepHeading(page, 'Join the exhibition')).toBeVisible()
   await expect(joinBox(page)).toBeChecked()
-  await expect(currentStep(page)).toHaveAccessibleName('Step 3: Exhibition')
+  await expect(currentStep(page)).toHaveAccessibleName('Step 4: Exhibition')
   expect(query(page)).toEqual({ step: 'exhibition', join: '1' })
 })
 
@@ -221,8 +239,8 @@ test('the back of the browser after the end never shows the wizard again', async
     }).observe(document.body, { childList: true, subtree: true })
   })
 
-  // Exhibition, Security and Welcome; the entry of the last step became the project.
-  for (let entry = 0; entry < 3; entry++) {
+  // Exhibition, Security, Residency and Welcome; the entry of the last step became the project.
+  for (let entry = 0; entry < 4; entry++) {
     await page.goBack()
     await expect(page).toHaveURL(/\/globex\/portal\/default\/annotations$/)
     await expect(page.getByText('No annotations in this view')).toBeVisible()
@@ -236,16 +254,22 @@ test('a new user joins the exhibition with an own organization and opens it as a
 }, testInfo) => {
   await openApp(page, '/onboarding?step=exhibition', 'new-user')
   await expect(stepHeading(page, 'Join the exhibition')).toBeVisible()
-  // The description of the exhibition project, as the API gives it.
+  // The story of the exhibition; the description of its project, as the API gives it, is not shown.
+  await expect(
+    page.getByText('Step into Fourth Wall Software, a fictional software house', { exact: false }),
+  ).toBeVisible()
+  await expect(
+    page.getByText('Explore 30 annotations, configurations that resolve live, and the graph that ties them together.'),
+  ).toBeVisible()
   await expect(
     page.getByText(
       'The exhibition of the 2S Platform. A small catalog of customers and their responsibilities per context.',
     ),
-  ).toBeVisible()
+  ).toHaveCount(0)
   await expect(joinBox(page)).not.toBeChecked()
   await expect(
     page.getByText(
-      'Adds you to exhibition/exhibition as a Reader. Its administrators see your name and email in the list of members; other visitors do not.',
+      'Adds the demo project to your account as a Reader. Nothing you do there can break it: you join read-only.',
     ),
   ).toBeVisible()
 
@@ -295,7 +319,7 @@ test('a new user joins only the exhibition and creates an organization later', a
   // The second way to end comes with the choice.
   await expect(exhibitionOnly(page)).toBeHidden()
 
-  await step(page, 'Step 3: Exhibition').click()
+  await step(page, 'Step 4: Exhibition').click()
   await chooseExhibition(page)
   await nextTo(page, 'Create your organization')
   await expect(page.getByText('You are joining the exhibition.')).toBeVisible()
@@ -331,20 +355,21 @@ test('a new user joins only the exhibition and creates an organization later', a
   await expect(organizationHeader(page, 'exhibition').getByText('Project member', { exact: true })).toBeVisible()
 })
 
-test('a deployment without an exhibition has three steps', async ({ page }) => {
+test('a deployment without an exhibition has four steps', async ({ page }) => {
   // The wizard asks for the exhibition once per page load: turn it off, then open the page again. The hooks of the
   // mock come with its start, which the first wizard has behind it once it shows its steps.
   await openApp(page, '/onboarding', 'new-user')
-  await expect(stepList(page).getByRole('button')).toHaveCount(4)
+  await expect(stepList(page).getByRole('button')).toHaveCount(5)
   await page.evaluate(() => window.storytellerMock!.setExhibition(null))
   await goto(page, '/onboarding')
 
-  const names = ['Step 1: Welcome', 'Step 2: Security', 'Step 3: Organization']
+  const names = ['Step 1: Welcome', 'Step 2: Residency', 'Step 3: Security', 'Step 4: Organization']
   for (const [index, name] of names.entries()) {
     await expect(stepList(page).getByRole('button').nth(index)).toHaveAccessibleName(name)
   }
-  await expect(stepList(page).getByRole('button')).toHaveCount(3)
+  await expect(stepList(page).getByRole('button')).toHaveCount(4)
 
+  await nextTo(page, residency)
   await nextTo(page, 'Security first')
   await nextTo(page, 'Create your organization')
   await expect(page).toHaveURL('/onboarding?step=organization')
@@ -352,7 +377,7 @@ test('a deployment without an exhibition has three steps', async ({ page }) => {
 
   // The address of the missing step is the first step, and a choice in the address joins nothing.
   await goto(page, '/onboarding?step=exhibition')
-  await expect(stepHeading(page, 'Customer data stays in the EU')).toBeVisible()
+  await expect(stepHeading(page, 'Meet the 2S Platform')).toBeVisible()
   await expect(currentStep(page)).toHaveAccessibleName('Step 1: Welcome')
   await goto(page, '/onboarding?step=organization&join=1')
   await expect(stepHeading(page, 'Create your organization')).toBeVisible()

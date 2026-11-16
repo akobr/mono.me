@@ -5,13 +5,20 @@ import type { Exhibition } from '@42for.net/2splatform.sdk'
  * one file. The hosting and sign-in wording repeats docs/Platform/Deployment/decisions.md: change them together.
  */
 
-export type OnboardingStep = 'welcome' | 'security' | 'exhibition' | 'organization'
+export type OnboardingStep = 'welcome' | 'residency' | 'security' | 'exhibition' | 'organization'
 
 /** The steps in their order; a deployment without an exhibition has no `exhibition` step. */
-export const onboardingSteps: readonly OnboardingStep[] = ['welcome', 'security', 'exhibition', 'organization']
+export const onboardingSteps: readonly OnboardingStep[] = [
+  'welcome',
+  'residency',
+  'security',
+  'exhibition',
+  'organization',
+]
 
 export const stepNames: Record<OnboardingStep, string> = {
   welcome: 'Welcome',
+  residency: 'Residency',
   security: 'Security',
   exhibition: 'Exhibition',
   organization: 'Organization',
@@ -23,42 +30,32 @@ export const stepLabel = (number: number, step: OnboardingStep) => `Step ${numbe
 /** The heading of the page; the name is personal data (ph-no-capture). */
 export const welcomeLine = (name?: string) => (name ? `Welcome, ${name}` : 'Welcome')
 
-/**
- * The release switch of the three safeguards the hosting statement names: blocked impersonation (424-262), the audit
- * log of access changes (424-263) and the recent sign-in for secrets (424-264). It turns true only once all three run
- * in the production API and the WorkOS dashboard check of 424-262 is recorded; until then the wizard does not claim
- * them.
- */
-export const safeguardsLive: boolean = false
-
-/** What WorkOS does, the purpose of its entry in the sub-processors, with or without the three safeguards. */
-export function hostingStatement(live: boolean = safeguardsLive): string[] {
-  return [
-    'Signs in the operators of the 2S Platform and sends their invitation emails.',
-    'It processes only their name, email, IP address and session data, and the email address of a person they invite.',
-    ...(live
-      ? [
-          'Every authorization decision is made and recorded by 2S in the EU.',
-          'Impersonation is blocked, access to secrets requires a recent sign-in, and every access change is in an append-only audit log.',
-        ]
-      : ['Every authorization decision is made by 2S in the EU.']),
-    'Customers that need an EU-only identity provider can use their own SSO provider or host the platform themselves.',
-  ]
-}
+/** What WorkOS does, the purpose of its entry in the sub-processors. */
+export const workosPurpose = [
+  'Signs in the operators of the 2S Platform and sends their invitation emails.',
+  'It processes only their name, email, IP address and session data, and the email address of a person they invite.',
+].join(' ')
 
 export type SubProcessorRegion = 'EU only' | 'USA'
 
 export interface SubProcessor {
   name: string
   purpose: string
+  /** A second paragraph under the purpose. */
+  note?: string
   region: SubProcessorRegion
 }
 
 export const subProcessors: readonly SubProcessor[] = [
-  { name: 'Microsoft Azure', purpose: 'Hosting, database, storage, secrets', region: 'EU only' },
+  { name: 'Microsoft Azure', purpose: 'Hosting, storage, secrets, logs', region: 'EU only' },
   { name: 'Sentry', purpose: 'Error reporting', region: 'EU only' },
   { name: 'PostHog', purpose: 'Product analytics', region: 'EU only' },
-  { name: 'WorkOS', purpose: hostingStatement().join(' '), region: 'USA' },
+  {
+    name: 'WorkOS',
+    purpose: workosPurpose,
+    note: 'Every authorization decision is made and recorded by 2S in the EU.',
+    region: 'USA',
+  },
 ]
 
 export interface OnboardingLink {
@@ -66,23 +63,22 @@ export interface OnboardingLink {
   to: string
 }
 
-/** The discussion that the issue names for the details of the hosting. */
-export const hostingLink: OnboardingLink = {
-  label: 'Details of the EU hosting',
-  to: 'https://claude.ai/share/c9fbe93d-61c4-466c-8490-2ba028fb1999',
-}
+/** The agreements a new customer accepts with the account (the organization form, or the join of the exhibition). */
+export const agreementLinks = {
+  license: { label: 'Customer License Agreement', to: 'https://42for.software/legal/customer-license-agreement' },
+  dataProcessing: { label: 'Data Processing Agreement', to: 'https://42for.software/legal/data-processing-agreement' },
+} as const
+
+/** The links of the residency step. */
+export const residencyLinks: readonly OnboardingLink[] = [
+  { label: 'Cloud hosting', to: 'https://42for.net/platform/cloud' },
+  { label: 'Sub-processors list', to: 'https://42for.software/legal/sub-processors' },
+]
 
 export const securityLinks: readonly OnboardingLink[] = [
-  {
-    label: 'Authentication: Entra ID and Keycloak',
-    to: 'https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#selecting-the-provider',
-  },
-  {
-    label: 'Federated auth of machines',
-    to: 'https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#machine-access-with-workload-identity-federation',
-  },
-  { label: 'sform', to: 'https://42for.net/cli/sform' },
-  { label: 'GitHub Action', to: 'https://42for.net/cli/github-action' },
+  { label: 'Security details', to: 'https://42for.net/platform/security' },
+  { label: 'Authentication of machines', to: 'https://42for.net/platform/auth-machine' },
+  { label: 'Self-hosting option', to: 'https://42for.net/platform/self-hosting' },
 ]
 
 export const onboardingTexts = {
@@ -91,34 +87,48 @@ export const onboardingTexts = {
   next: 'Next',
   signOut: 'Sign out',
   welcome: {
-    heading: 'Customer data stays in the EU',
-    lead: 'All customer data, configuration and secrets are stored and processed only in the EU (Sweden).',
+    heading: 'Meet the 2S Platform',
+    pricing:
+      'The platform is free to use while we shape its pricing. When pricing arrives, it will apply to every customer, existing ones included, and you will hear from us well in advance. It will be based on usage, not on seats, with a generous free tier.',
+    documentation: { label: 'Documentation', to: 'https://42for.net/platform/introduction' },
+    motto:
+      'Built to tame the configuration mayhem of complex systems and fast-growing application catalogs, AI-made ones included.',
+  },
+  residency: {
+    heading: "Your platform's data stays in the EU",
+    lead: 'All customer data, configuration, secrets and machine access are stored and processed only in the EU (Sweden).',
     ai: 'The same applies to all AI data processing within the platform.',
     subProcessors: 'Sub-processors',
   },
   security: {
     heading: 'Security first',
-    lead: 'Security is the main focus of the 2S Platform.',
+    lead: "Security isn't a feature we added later. It is the ground the 2S Platform stands on.",
+    secrets: {
+      title: 'Secrets',
+      text: 'Keep them your way: encrypted with keys in an EU vault, with a key you bring yourself, or encrypted for the one recipient that needs them, so that nobody else can read them, not even us.',
+    },
     machines: {
       title: 'Machines and pipelines',
-      text: 'They need no stored secret. A machine exchanges its own platform token, for example a GitHub Actions OIDC token or a Kubernetes service account token, for a short-lived 2S token.',
+      text: 'No stored passwords, no long-lived keys waiting to leak. A machine proves who it is with its own mTLS certificate or a federated token from the system it runs on, and gets exactly the access its scopes allow.',
     },
     people: {
       title: 'People',
-      text: 'This platform signs you in with WorkOS AuthKit. A dedicated deployment can sign people in with an identity provider of your own instead:',
-      // The name is bold; the rest follows it as written, with its own space or comma.
-      providers: [
-        { name: 'Entra ID', rest: ' in your own tenant' },
-        { name: 'Keycloak', rest: ', self-hosted, for example in the EU' },
-      ],
-      limit:
-        'Sign-in is then fully under your control, and WorkOS is not involved. Such a deployment is used through sform and the API; the Admin UI is not available in it today.',
+      // The three safeguards: blocked impersonation (424-262), the recent sign-in for secrets (424-264) and the audit log
+      // of access changes (424-263). The platform opens to the public only once all three run in production.
+      text: 'You sign in with WorkOS AuthKit, and 2S alone decides what you may do. Impersonation is blocked, secrets ask for a recent sign-in, and every change of access lands in an append-only audit log.',
+      identityProvider:
+        'Need an EU-only identity provider? Bring your own SSO provider, or host the platform yourself.',
+    },
+    testing: {
+      title: 'Security testing',
+      text: 'Security is built into how we develop the platform, and our testing programme grows with it. We are rolling out automated scanning in our build pipeline and run manual security testing across our REST API, admin interface, CLI and MCP server. Our approach follows recognised industry standards, and every finding is tracked and resolved within defined timelines.',
     },
   },
   exhibition: {
     heading: 'Join the exhibition',
-    text: 'The exhibition is a demo project with the data of a fictional company. It shows the core concepts of the platform at work. You join as a Reader: you can browse its annotations, their configurations and the graph, and you cannot change anything.',
-    choice: 'Join the exhibition',
+    text: 'Step into Fourth Wall Software, a fictional software house whose customers include Acme Corp and Globex. See how the platform keeps their CRM, HR and CAD solutions configured.',
+    promise: 'Explore 30 annotations, configurations that resolve live, and the graph that ties them together.',
+    choice: 'Show me the exhibition',
     // The note names the button of the last step between its two parts.
     noteStart:
       'This step is optional. To join only the exhibition and create your own organization later, check the box and choose',
@@ -142,5 +152,5 @@ export const onboardingTexts = {
 } as const
 
 /** What checking the box does, under its label. */
-export const exhibitionChoiceDescription = (exhibition: Pick<Exhibition, 'Organization' | 'Project'>) =>
-  `Adds you to ${exhibition.Organization}/${exhibition.Project} as a Reader. Its administrators see your name and email in the list of members; other visitors do not.`
+export const exhibitionChoiceDescription = (_exhibition?: Pick<Exhibition, 'Organization' | 'Project'>) =>
+  'Adds the demo project to your account as a Reader. Nothing you do there can break it: you join read-only.'

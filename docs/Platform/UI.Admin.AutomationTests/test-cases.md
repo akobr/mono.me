@@ -45,12 +45,12 @@ The functional test cases of the admin UI in Testiny project `2SP` (id 1) and th
 | ACC-SGN-04 | 19 | The login, callback and unsupported pages handle the return path, sign-in errors and the configured state | Medium | Any | B | `SignIn_LoginPage_HandlesReturnPathAndErrors` |
 | ACC-SGN-05 | 20 | The Account page shows the profile and the memberships, and a membership opens its project | Medium | Any | B | `Account_Memberships_OpenTheProject` |
 | ACC-SGN-06 | 21 | A new user passes the onboarding steps and creates the first organization and project | Medium | Any | M | `Onboarding_NewUser_CreatesFirstOrganization` |
-| ACC-SGN-07 | 492 | The first onboarding step states the EU hosting and lists the sub-processors | Medium | Any | M | `Onboarding_Welcome_StatesEuHostingAndSubProcessors` |
-| ACC-SGN-08 | 493 | The security step of onboarding explains federated auth and links to the documentation | Low | Any | M | `Onboarding_Security_ExplainsFederatedAuthAndLinksToDocs` |
+| ACC-SGN-07 | 492 | The welcome and residency steps of onboarding introduce the platform, state the EU hosting and list the sub-processors | Medium | Any | M | `Onboarding_WelcomeAndResidency_StateEuHostingAndSubProcessors` |
+| ACC-SGN-08 | 493 | The security step of onboarding explains secrets, machines, people and security testing and links to the details | Low | Any | M | `Onboarding_Security_ExplainsSafeguardsAndLinksToDetails` |
 | ACC-SGN-09 | 494 | Back, Next, the step list and the browser's back move between the onboarding steps and keep what was entered | Medium | Any | M | `Onboarding_Steps_MoveBackAndForthAndKeepInput` |
 | ACC-SGN-10 | 495 | A new user joins the exhibition with an own organization and opens it as a Reader | High | Any | M | `Onboarding_JoinExhibitionWithOrganization_OpensItAsReader` |
 | ACC-SGN-11 | 496 | A new user joins only the exhibition and creates an organization later | Medium | Any | M | `Onboarding_JoinOnlyExhibition_CreatesOrganizationLater` |
-| ACC-SGN-12 | 497 | Onboarding has no exhibition step when the deployment has none | Medium | Any | M | `Onboarding_NoExhibition_HasThreeSteps` |
+| ACC-SGN-12 | 497 | Onboarding has no exhibition step when the deployment has none | Medium | Any | M | `Onboarding_NoExhibition_HasFourSteps` |
 | ACC-SGN-13 | 498 | Sign out on onboarding returns to the sign-in page | Low | Any | M | `Onboarding_SignOut_ReturnsToSignIn` |
 
 The cases of the onboarding wizard (ACC-SGN-06 to ACC-SGN-13) are in the class's second file, `SignInTests.Onboarding.cs`.

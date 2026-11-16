@@ -186,7 +186,7 @@ Both routes are for users only: they need the scope `User.Impersonation`, and ma
 
 ### The owner
 
-The join makes every caller a member of the project that the settings name, and anyone who signs in may register a free organization name and becomes its `Owner`. Without a check, settings that are live before the seed (a wrong order of the steps, a typo, a self-hosted deployment) would hand the exhibition to the first person who registers the names: their description would show in every newcomer's onboarding, and they would list the name and the email of everyone who joins.
+The join makes every caller a member of the project that the settings name, and anyone who signs in may register a free organization name and becomes its `Owner`. Without a check, settings that are live before the seed (a wrong order of the steps, a typo, a self-hosted deployment) would hand the exhibition to the first person who registers the names: every newcomer's onboarding would offer their project, and they would list the name and the email of everyone who joins.
 
 So both routes offer and join the exhibition only while both of these hold:
 

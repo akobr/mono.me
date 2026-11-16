@@ -6,12 +6,18 @@ import { useOnboardingEnd } from '@/composables/useOnboardingEnd'
 import type { OrganizationForm } from '@/forms/names.schema'
 import { useSessionStore } from '@/stores/session'
 import { errorMessage } from '@/utils/errors'
-import { onboardingSteps, onboardingTexts as texts, welcomeLine, type OnboardingStep } from '@/utils/onboarding'
+import {
+  agreementLinks,
+  onboardingSteps,
+  onboardingTexts as texts,
+  welcomeLine,
+  type OnboardingStep,
+} from '@/utils/onboarding'
 
 definePage({ meta: { layout: 'bare', allowWithoutAccount: true, wide: true } })
 
 /**
- * The onboarding wizard of a user without an account (424-267): where the data lives, how people and machines sign
+ * The onboarding wizard of a user without an account (424-267): a welcome, where the data lives, how people and machines sign
  * in, the optional exhibition, and the organization with its first project. The step and the choice of the exhibition
  * are in the query, so the browser's back and forward move between the steps and a reload keeps both.
  */
@@ -19,7 +25,7 @@ const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 
-/** The wizard waits this long for the exhibition; then step 3 offers Retry. */
+/** The wizard waits this long for the exhibition; then the exhibition step offers Retry. */
 const exhibitionTimeoutMs = 5_000
 
 const exhibition = shallowRef<Exhibition>()
@@ -71,7 +77,7 @@ function go(step: OnboardingStep | undefined) {
   void router.push({ query: step === 'welcome' ? query : { ...query, step } })
 }
 
-/** The choice of step 3, in the query next to the step; it counts once the exhibition has loaded. */
+/** The choice of the exhibition step, in the query next to the step; it counts once the exhibition has loaded. */
 const join = computed({
   get: () => first(route.query.join) === '1',
   set: (value) => {
@@ -141,7 +147,8 @@ watch(
       {{ welcomeLine(session.user?.name) }}
     </h1>
 
-    <UCard>
+    <!-- One padding at every width, so nothing in the card moves when the step list switches. -->
+    <UCard :ui="{ body: 'p-5' }">
       <LoadingState v-if="hasExhibition === undefined" />
 
       <!-- The account exists and the join failed: the steps are over, the error never reaches the form. -->
@@ -179,6 +186,9 @@ watch(
           <section v-if="current === 'welcome'" data-step="welcome">
             <OnboardingWelcome />
           </section>
+          <section v-else-if="current === 'residency'" data-step="residency">
+            <OnboardingResidency />
+          </section>
           <section v-else-if="current === 'security'" data-step="security">
             <OnboardingSecurity />
           </section>
@@ -195,7 +205,10 @@ watch(
           <!-- Stays mounted, so the values of the form survive Back and Next. -->
           <section v-show="current === 'organization'" data-step="organization" class="space-y-5">
             <div class="space-y-1">
-              <h2 class="text-lg font-semibold text-highlighted">{{ texts.organization.heading }}</h2>
+              <h2 class="flex items-center gap-2 text-lg font-semibold text-highlighted">
+                <UIcon name="i-lucide-building-2" class="size-5 shrink-0 text-primary" />
+                {{ texts.organization.heading }}
+              </h2>
               <p class="text-sm text-muted">{{ texts.organization.text }}</p>
             </div>
             <OrganizationForm
@@ -215,6 +228,22 @@ watch(
                 />
               </template>
             </OrganizationForm>
+
+            <!-- Both ways to end create the account, so the agreements stand above the second one too. -->
+            <p class="text-xs text-muted">
+              By creating an organization or joining the exhibition, you agree to the
+              <a :href="agreementLinks.license.to" target="_blank" rel="noopener" class="text-primary underline">{{
+                agreementLinks.license.label
+              }}</a>
+              and the
+              <a
+                :href="agreementLinks.dataProcessing.to"
+                target="_blank"
+                rel="noopener"
+                class="text-primary underline"
+                >{{ agreementLinks.dataProcessing.label }}</a
+              >.
+            </p>
 
             <div v-if="joining" class="space-y-3 border-t border-default pt-4">
               <div class="flex flex-wrap items-center justify-between gap-2">

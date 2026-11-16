@@ -6,10 +6,10 @@ using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Access;
 
-// The onboarding wizard of Sign In and Account (ACC-SGN-06 to ACC-SGN-13): its steps Welcome, Security, Exhibition and
-// Organization, the ways between them, its three ends and Sign out. Mock only, in the new-user scenario, where Ada
-// Lovelace is signed in without an account: every pool user of a deployed target has one. Each test builds its own App,
-// because the first navigation of PlatformTest.App would add the default scenario.
+// The onboarding wizard of Sign In and Account (ACC-SGN-06 to ACC-SGN-13): its steps Welcome, Residency, Security,
+// Exhibition and Organization, the ways between them, its three ends and Sign out. Mock only, in the new-user scenario,
+// where Ada Lovelace is signed in without an account: every pool user of a deployed target has one. Each test builds
+// its own App, because the first navigation of PlatformTest.App would add the default scenario.
 public sealed partial class SignInTests
 {
     // The exhibition of the mock: the project exhibition/exhibition of Grace Hopper, with a small catalog, which any
@@ -18,8 +18,9 @@ public sealed partial class SignInTests
 
     // ACC-SGN-06: A new user passes the onboarding steps and creates the first organization and project.
     // In the mock's new-user scenario Ada Lovelace has no account, so the app opens onboarding on its first step; Next
-    // leads through Security and Exhibition to the organization form, which refuses empty and reserved names, then
-    // creates the organization and the project, whose card shows the trimmed description.
+    // leads through Residency, Security and Exhibition to the organization form, which names the two agreements under
+    // it, refuses empty and reserved names, then creates the organization and the project, whose card shows the trimmed
+    // description.
     [Test]
     [TestCase(21)]
     [MockOnly("the new-user scenario, a signed-in user without an account")]
@@ -36,15 +37,22 @@ public sealed partial class SignInTests
         var onboarding = new OnboardingPage(app, created);
         await onboarding.WaitForAsync();
         await Expect(onboarding.Heading).ToHaveTextAsync("Welcome, Ada Lovelace");
-        await onboarding.ExpectStepsAsync("Step 1: Welcome", "Step 2: Security", "Step 3: Exhibition", "Step 4: Organization");
+        await onboarding.ExpectStepsAsync("Step 1: Welcome", "Step 2: Residency", "Step 3: Security", "Step 4: Exhibition", "Step 5: Organization");
         await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 1: Welcome");
-        await Expect(onboarding.StepHeading("Customer data stays in the EU")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.WelcomeHeading)).ToBeVisibleAsync();
 
-        await onboarding.NextAsync("Security first");
-        await onboarding.NextAsync("Join the exhibition");
-        await onboarding.NextAsync("Create your organization");
+        await onboarding.NextAsync(OnboardingPage.ResidencyHeading);
+        await onboarding.NextAsync(OnboardingPage.SecurityHeading);
+        await onboarding.NextAsync(OnboardingPage.ExhibitionHeading);
+        await onboarding.NextAsync(OnboardingPage.OrganizationHeading);
         await Expect(onboarding.Intro).ToBeVisibleAsync();
         await Expect(onboarding.CreateAndContinueButton).ToBeVisibleAsync();
+
+        // Both ways to end create the account, so the agreements stand under the form.
+        await Expect(onboarding.Agreements).ToHaveTextAsync(OnboardingPage.AgreementsText);
+        await onboarding.ExpectLinksAsync(
+            ("Customer License Agreement", "https://42for.software/legal/customer-license-agreement"),
+            ("Data Processing Agreement", "https://42for.software/legal/data-processing-agreement"));
 
         await onboarding.SubmitAsync();
         await Expect(onboarding.FieldError("Enter a organization name.")).ToBeVisibleAsync();
@@ -67,88 +75,87 @@ public sealed partial class SignInTests
         await Expect(overview.ProjectCardDescription(project)).ToHaveAttributeAsync("title", description);
     }
 
-    // ACC-SGN-07: The first onboarding step states the EU hosting and lists the sub-processors.
-    // The first step says in its heading and in bold that customer data and AI data processing stay in the EU. Its list
-    // names the four sub-processors, each with its region and purpose; the purpose of WorkOS says what it receives,
-    // without the sentence about the three safeguards that are not live yet. Its only link opens the details of the
-    // hosting in a new tab.
+    // ACC-SGN-07: The welcome and residency steps of onboarding introduce the platform, state the EU hosting and list
+    // the sub-processors.
+    // The first step meets the user with the platform, its motto, its pricing and a link to the documentation. The
+    // second says in its heading and in bold that customer data, machine access and AI data processing stay in the EU.
+    // Its list names the four sub-processors, each with its region and purpose; the entry of WorkOS says what it
+    // receives and that 2S makes and records every authorization decision in the EU. Its two links open the cloud
+    // hosting and the list of sub-processors in a new tab.
     [Test]
     [TestCase(492)]
     [MockOnly("the new-user scenario, a signed-in user without an account")]
-    public async Task Onboarding_Welcome_StatesEuHostingAndSubProcessors()
+    public async Task Onboarding_WelcomeAndResidency_StateEuHostingAndSubProcessors()
     {
         // Not PlatformTest.App: its first navigation would add the default scenario.
         var app = new App(Page, "new-user");
         var onboarding = new OnboardingPage(app, Routes);
         await onboarding.OpenAsync();
-        await Expect(onboarding.StepHeading("Customer data stays in the EU")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.WelcomeHeading)).ToBeVisibleAsync();
+        await Expect(onboarding.Text(OnboardingPage.MottoText)).ToBeVisibleAsync();
+        await Expect(onboarding.Text(OnboardingPage.PricingText)).ToBeVisibleAsync();
+        await onboarding.ExpectLinksAsync(("Documentation", "https://42for.net/platform/introduction"));
+
+        await onboarding.NextAsync(OnboardingPage.ResidencyHeading);
+        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 2: Residency");
         await Expect(onboarding.HostingLead).ToBeVisibleAsync();
-        await Expect(onboarding.HostingStatement).ToBeVisibleAsync();
-        await Expect(Page.GetByText("Impersonation is blocked")).ToHaveCountAsync(0);
 
         await Expect(onboarding.Topic("Sub-processors")).ToBeVisibleAsync();
-        var subProcessors = new (string Name, string Region, string Purpose)[]
+        var subProcessors = new (string Name, string Region, string[] Texts)[]
         {
-            ("Microsoft Azure", "EU only", "Hosting, database, storage, secrets"),
-            ("Sentry", "EU only", "Error reporting"),
-            ("PostHog", "EU only", "Product analytics"),
-            ("WorkOS", "USA", OnboardingPage.HostingStatementText),
+            ("Microsoft Azure", "EU only", ["Hosting, storage, secrets, logs"]),
+            ("Sentry", "EU only", ["Error reporting"]),
+            ("PostHog", "EU only", ["Product analytics"]),
+            ("WorkOS", "USA", [OnboardingPage.WorkOsPurposeText, OnboardingPage.WorkOsNoteText]),
         };
         await Expect(onboarding.SubProcessors).ToHaveCountAsync(subProcessors.Length);
         for (var index = 0; index < subProcessors.Length; index++)
         {
-            var (name, region, purpose) = subProcessors[index];
+            var (name, region, texts) = subProcessors[index];
             var entry = onboarding.SubProcessors.Nth(index);
             await Expect(entry.GetByText(name, new() { Exact = true })).ToBeVisibleAsync();
             await Expect(entry.GetByText(region, new() { Exact = true })).ToBeVisibleAsync();
-            await Expect(entry.GetByText(purpose, new() { Exact = true })).ToBeVisibleAsync();
+            foreach (var text in texts)
+            {
+                await Expect(entry.GetByText(text, new() { Exact = true })).ToBeVisibleAsync();
+            }
         }
 
-        await Expect(onboarding.StepLinks).ToHaveCountAsync(1);
-        var details = onboarding.Link("Details of the EU hosting");
-        await Expect(details).ToHaveAttributeAsync("href", "https://claude.ai/share/c9fbe93d-61c4-466c-8490-2ba028fb1999");
-        await Expect(details).ToHaveAttributeAsync("target", "_blank");
+        await onboarding.ExpectLinksAsync(
+            ("Cloud hosting", "https://42for.net/platform/cloud"),
+            ("Sub-processors list", "https://42for.software/legal/sub-processors"));
     }
 
-    // ACC-SGN-08: The security step of onboarding explains federated auth and links to the documentation.
-    // The security step, opened by its address, says that machines need no stored secret and that a dedicated
-    // deployment can sign people in with Entra ID or Keycloak, with the limit of such a deployment; its four links
-    // open the documentation of the providers, of federated auth, of sform and of the GitHub Action in a new tab.
+    // ACC-SGN-08: The security step of onboarding explains secrets, machines, people and security testing and links to
+    // the details.
+    // The security step, opened by its address, has a lead and four sections in this order: Secrets, Machines and
+    // pipelines, People (with the three safeguards and the way to an EU-only identity provider) and Security testing;
+    // its three links open the security details, the authentication of machines and the self-hosting option in a new
+    // tab.
     [Test]
     [TestCase(493)]
     [MockOnly("the new-user scenario, a signed-in user without an account")]
-    public async Task Onboarding_Security_ExplainsFederatedAuthAndLinksToDocs()
+    public async Task Onboarding_Security_ExplainsSafeguardsAndLinksToDetails()
     {
         // Not PlatformTest.App: its first navigation would add the default scenario.
         var app = new App(Page, "new-user");
         var onboarding = new OnboardingPage(app, Routes);
         await onboarding.OpenAsync("security");
-        await Expect(onboarding.StepHeading("Security first")).ToBeVisibleAsync();
-        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 2: Security");
-        await Expect(onboarding.Text("Security is the main focus of the 2S Platform.")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.SecurityHeading)).ToBeVisibleAsync();
+        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 3: Security");
+        await Expect(onboarding.Text(OnboardingPage.SecurityLeadText)).ToBeVisibleAsync();
 
-        await Expect(onboarding.Topic("Machines and pipelines")).ToBeVisibleAsync();
+        await Expect(onboarding.Topics).ToHaveTextAsync(["Secrets", "Machines and pipelines", "People", "Security testing"]);
+        await Expect(onboarding.Text(OnboardingPage.SecretsText)).ToBeVisibleAsync();
         await Expect(onboarding.Text(OnboardingPage.MachinesText)).ToBeVisibleAsync();
-
-        await Expect(onboarding.Topic("People")).ToBeVisibleAsync();
         await Expect(onboarding.Text(OnboardingPage.PeopleText)).ToBeVisibleAsync();
-        await Expect(onboarding.IdentityProviders).ToHaveTextAsync(["Entra ID in your own tenant", "Keycloak, self-hosted, for example in the EU"]);
-        await Expect(onboarding.Text(OnboardingPage.PeopleLimitText)).ToBeVisibleAsync();
+        await Expect(onboarding.Text(OnboardingPage.IdentityProviderText)).ToBeVisibleAsync();
+        await Expect(onboarding.Text(OnboardingPage.SecurityTestingText)).ToBeVisibleAsync();
 
-        var links = new (string Name, string Address)[]
-        {
-            ("Authentication: Entra ID and Keycloak", "https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#selecting-the-provider"),
-            ("Federated auth of machines", "https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#machine-access-with-workload-identity-federation"),
-            ("sform", "https://42for.net/cli/sform"),
-            ("GitHub Action", "https://42for.net/cli/github-action"),
-        };
-        await Expect(onboarding.StepLinks).ToHaveCountAsync(links.Length);
-        foreach (var (name, address) in links)
-        {
-            var link = onboarding.Link(name);
-            await Expect(link).ToHaveAttributeAsync("href", address);
-            await Expect(link).ToHaveAttributeAsync("target", "_blank");
-        }
+        await onboarding.ExpectLinksAsync(
+            ("Security details", "https://42for.net/platform/security"),
+            ("Authentication of machines", "https://42for.net/platform/auth-machine"),
+            ("Self-hosting option", "https://42for.net/platform/self-hosting"));
     }
 
     // ACC-SGN-09: Back, Next, the step list and the browser's back move between the onboarding steps and keep what was
@@ -167,53 +174,60 @@ public sealed partial class SignInTests
         var app = new App(Page, "new-user");
         var onboarding = new OnboardingPage(app, Routes);
         await onboarding.OpenAsync();
-        await Expect(onboarding.StepHeading("Customer data stays in the EU")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.WelcomeHeading)).ToBeVisibleAsync();
         await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 1: Welcome");
 
         // The Back of the form is in the page, hidden with its step.
         await Expect(onboarding.BackButton).ToBeHiddenAsync();
         await app.ExpectQueryAsync("step", null);
 
-        await onboarding.NextAsync("Security first");
+        await onboarding.NextAsync(OnboardingPage.ResidencyHeading);
         await app.ExpectAtAsync(Routes.Onboarding);
-        await app.ExpectQueryAsync("step", "security");
-        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 2: Security");
+        await app.ExpectQueryAsync("step", "residency");
+        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 2: Residency");
 
-        await onboarding.BackAsync("Customer data stays in the EU");
+        await onboarding.NextAsync(OnboardingPage.SecurityHeading);
+        await app.ExpectQueryAsync("step", "security");
+        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 3: Security");
+
+        await onboarding.BackAsync(OnboardingPage.ResidencyHeading);
+        await app.ExpectQueryAsync("step", "residency");
+        await onboarding.BackAsync(OnboardingPage.WelcomeHeading);
         await app.ExpectAtAsync(Routes.Onboarding);
         await app.ExpectQueryAsync("step", null);
         await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 1: Welcome");
 
-        await onboarding.SelectStepAsync("Step 3: Exhibition", "Join the exhibition");
+        await onboarding.SelectStepAsync("Step 4: Exhibition", OnboardingPage.ExhibitionHeading);
         await Expect(onboarding.JoinExhibitionCheckbox).Not.ToBeCheckedAsync();
         await onboarding.ChooseExhibitionAsync();
         await app.ExpectQueryAsync("step", "exhibition");
         await app.ExpectQueryAsync("join", "1");
 
-        await onboarding.SelectStepAsync("Step 4: Organization", "Create your organization");
+        await onboarding.SelectStepAsync("Step 5: Organization", OnboardingPage.OrganizationHeading);
         await onboarding.OrganizationField.FillAsync(organization);
-        await onboarding.BackAsync("Join the exhibition");
+        await onboarding.BackAsync(OnboardingPage.ExhibitionHeading);
         await Expect(onboarding.OrganizationField).ToBeHiddenAsync();
-        await onboarding.NextAsync("Create your organization");
+        await onboarding.NextAsync(OnboardingPage.OrganizationHeading);
         await Expect(onboarding.OrganizationField).ToHaveValueAsync(organization);
         await Expect(onboarding.JoiningExhibition).ToBeVisibleAsync();
 
         // The choice came with the step: both are in the address of the history entry.
         await Page.GoBackAsync();
-        await Expect(onboarding.StepHeading("Join the exhibition")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.ExhibitionHeading)).ToBeVisibleAsync();
         await Expect(onboarding.JoinExhibitionCheckbox).ToBeCheckedAsync();
 
         await Page.ReloadAsync();
-        await Expect(onboarding.StepHeading("Join the exhibition")).ToBeVisibleAsync();
-        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 3: Exhibition");
+        await Expect(onboarding.StepHeading(OnboardingPage.ExhibitionHeading)).ToBeVisibleAsync();
+        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 4: Exhibition");
         await Expect(onboarding.JoinExhibitionCheckbox).ToBeCheckedAsync();
     }
 
     // ACC-SGN-10: A new user joins the exhibition with an own organization and opens it as a Reader.
-    // The exhibition step's box is unchecked at first and says what joining does. Checked, the last step says so; the
-    // form creates the organization and the wizard ends in its project with a toast that links to the exhibition.
-    // /orgs lists the own organization as Owner and the exhibition's as a project member with the Reader role, and
-    // the exhibition's catalog has annotations and no create action.
+    // The exhibition step tells the story of the demo and what it shows; its box "Show me the exhibition" is unchecked
+    // at first and says what joining does. Checked, the last step says so; the form creates the organization and the
+    // wizard ends in its project with a toast that links to the exhibition. /orgs lists the own organization as Owner
+    // and the exhibition's as a project member with the Reader role, and the exhibition's catalog has annotations and no
+    // create action.
     [Test]
     [TestCase(495)]
     [MockOnly("the new-user scenario, a signed-in user without an account, and the exhibition of the mock")]
@@ -227,12 +241,14 @@ public sealed partial class SignInTests
         var app = new App(Page, "new-user");
         var onboarding = new OnboardingPage(app, created);
         await onboarding.OpenAsync("exhibition");
-        await Expect(onboarding.StepHeading("Join the exhibition")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.ExhibitionHeading)).ToBeVisibleAsync();
+        await Expect(onboarding.Text(OnboardingPage.ExhibitionText)).ToBeVisibleAsync();
+        await Expect(onboarding.Text(OnboardingPage.ExhibitionPromiseText)).ToBeVisibleAsync();
         await Expect(onboarding.JoinExhibitionCheckbox).Not.ToBeCheckedAsync();
-        await Expect(onboarding.ExhibitionChoiceDescription(Exhibition.Organization, Exhibition.Project)).ToBeVisibleAsync();
+        await Expect(onboarding.ExhibitionChoiceDescription).ToBeVisibleAsync();
 
         await onboarding.ChooseExhibitionAsync();
-        await onboarding.NextAsync("Create your organization");
+        await onboarding.NextAsync(OnboardingPage.OrganizationHeading);
         await Expect(onboarding.JoiningExhibition).ToBeVisibleAsync();
         await Expect(onboarding.ExhibitionOnlyButton).ToBeVisibleAsync();
 
@@ -278,15 +294,15 @@ public sealed partial class SignInTests
         var app = new App(Page, "new-user");
         var onboarding = new OnboardingPage(app, created);
         await onboarding.OpenAsync("organization");
-        await Expect(onboarding.StepHeading("Create your organization")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.OrganizationHeading)).ToBeVisibleAsync();
 
         // The second way to end comes with the choice.
         await Expect(onboarding.JoiningExhibition).ToBeHiddenAsync();
         await Expect(onboarding.ExhibitionOnlyButton).ToBeHiddenAsync();
 
-        await onboarding.SelectStepAsync("Step 3: Exhibition", "Join the exhibition");
+        await onboarding.SelectStepAsync("Step 4: Exhibition", OnboardingPage.ExhibitionHeading);
         await onboarding.ChooseExhibitionAsync();
-        await onboarding.NextAsync("Create your organization");
+        await onboarding.NextAsync(OnboardingPage.OrganizationHeading);
         await Expect(onboarding.JoiningExhibition).ToBeVisibleAsync();
         await Expect(onboarding.ExhibitionOnlyButton).ToBeVisibleAsync();
 
@@ -319,33 +335,34 @@ public sealed partial class SignInTests
 
     // ACC-SGN-12: Onboarding has no exhibition step when the deployment has none.
     // The mock's exhibition is turned off after the first load of the wizard, which asks for it once per page load.
-    // Opened again, the wizard has three steps and Next leads from Security to the organization form, without the
+    // Opened again, the wizard has four steps and Next leads from Security to the organization form, without the
     // second way to end; the address of the exhibition step shows the first step.
     [Test]
     [TestCase(497)]
     [MockOnly("the new-user scenario, and the hook that turns the exhibition of the mock off")]
-    public async Task Onboarding_NoExhibition_HasThreeSteps()
+    public async Task Onboarding_NoExhibition_HasFourSteps()
     {
         // Not PlatformTest.App: its first navigation would add the default scenario.
         var app = new App(Page, "new-user");
         var onboarding = new OnboardingPage(app, Routes);
         await onboarding.OpenAsync();
-        await Expect(onboarding.Steps).ToHaveCountAsync(4);
+        await Expect(onboarding.Steps).ToHaveCountAsync(5);
 
         await new MockApi(app, Routes).SetExhibitionAsync(null);
         await onboarding.OpenAsync();
-        await onboarding.ExpectStepsAsync("Step 1: Welcome", "Step 2: Security", "Step 3: Organization");
+        await onboarding.ExpectStepsAsync("Step 1: Welcome", "Step 2: Residency", "Step 3: Security", "Step 4: Organization");
 
-        await onboarding.NextAsync("Security first");
-        await onboarding.NextAsync("Create your organization");
+        await onboarding.NextAsync(OnboardingPage.ResidencyHeading);
+        await onboarding.NextAsync(OnboardingPage.SecurityHeading);
+        await onboarding.NextAsync(OnboardingPage.OrganizationHeading);
         await app.ExpectAtAsync(Routes.Onboarding);
         await app.ExpectQueryAsync("step", "organization");
-        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 3: Organization");
+        await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 4: Organization");
         await Expect(onboarding.ExhibitionOnlyButton).ToBeHiddenAsync();
 
         // The address of the missing step is the first step.
         await onboarding.OpenAsync("exhibition");
-        await Expect(onboarding.StepHeading("Customer data stays in the EU")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.WelcomeHeading)).ToBeVisibleAsync();
         await Expect(onboarding.CurrentStep).ToHaveAccessibleNameAsync("Step 1: Welcome");
     }
 
@@ -360,7 +377,7 @@ public sealed partial class SignInTests
         var app = new App(Page, "new-user");
         var onboarding = new OnboardingPage(app, Routes);
         await onboarding.OpenAsync("security");
-        await Expect(onboarding.StepHeading("Security first")).ToBeVisibleAsync();
+        await Expect(onboarding.StepHeading(OnboardingPage.SecurityHeading)).ToBeVisibleAsync();
         await Expect(onboarding.SignOutButton).ToBeVisibleAsync();
 
         await onboarding.SignOutButton.ClickAsync();

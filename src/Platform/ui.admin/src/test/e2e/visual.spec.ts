@@ -55,6 +55,7 @@ const screens: {
   { name: 'monitor-audit', path: '/acme/billing/monitor?tab=audit' },
   // The steps of the onboarding wizard (424-267) by their addresses; `onboarding` is its first step.
   { name: 'onboarding', path: '/onboarding', scenario: 'new-user' },
+  { name: 'onboarding-residency', path: '/onboarding?step=residency', scenario: 'new-user' },
   { name: 'onboarding-security', path: '/onboarding?step=security', scenario: 'new-user' },
   { name: 'onboarding-exhibition', path: '/onboarding?step=exhibition', scenario: 'new-user' },
   { name: 'onboarding-organization', path: '/onboarding?step=organization', scenario: 'new-user' },
