@@ -93,7 +93,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     // The onboarding wizard (424-267), each step by its address; the step is checked, not the loading state before it.
     for (const [name, path, heading] of [
-      ['welcome', '/onboarding', 'Customer data stays in the EU'],
+      ['welcome', '/onboarding', 'Meet the 2S Platform'],
+      ['residency', '/onboarding?step=residency', "Your platform's data stays in the EU"],
       ['security', '/onboarding?step=security', 'Security first'],
       ['exhibition', '/onboarding?step=exhibition', 'Join the exhibition'],
       ['organization', '/onboarding?step=organization', 'Create your organization'],
@@ -111,7 +112,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       page,
     }) => {
       await openApp(page, '/onboarding?step=exhibition&join=1', 'new-user')
-      await expect(page.getByRole('checkbox', { name: 'Join the exhibition' })).toBeChecked()
+      await expect(page.getByRole('checkbox', { name: 'Show me the exhibition' })).toBeChecked()
       await expectAccessible(page)
     })
 

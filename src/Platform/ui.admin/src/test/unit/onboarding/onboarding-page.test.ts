@@ -87,6 +87,9 @@ function hold(method: 'get' | 'post', url: string) {
   return release
 }
 
+/** The heading of the residency step. */
+const residency = "Your platform's data stays in the EU"
+
 const eventually = (assertion: () => void) => vi.waitFor(assertion, { timeout: 5_000 })
 
 /** Waits by turns of the event loop: under fake timers vi.waitFor would move the clock. */
@@ -177,7 +180,7 @@ function watchSession(view: Awaited<ReturnType<typeof mountWizard>>) {
 }
 
 describe('the steps of the onboarding wizard', () => {
-  it('shows Loading… until the exhibition answers, then the four steps with the first one current', async () => {
+  it('shows Loading… until the exhibition answers, then the five steps with the first one current', async () => {
     const release = hold('get', exhibitionUrl)
     const view = await mountWizard('/onboarding', false)
     await settle()
@@ -192,9 +195,15 @@ describe('the steps of the onboarding wizard', () => {
     release()
     await eventually(() => expect(stepList()).toBeTruthy())
     expect(document.body.querySelector('[role="status"]')).toBeNull()
-    expect(stepLabels()).toEqual(['Step 1: Welcome', 'Step 2: Security', 'Step 3: Exhibition', 'Step 4: Organization'])
+    expect(stepLabels()).toEqual([
+      'Step 1: Welcome',
+      'Step 2: Residency',
+      'Step 3: Security',
+      'Step 4: Exhibition',
+      'Step 5: Organization',
+    ])
     expect(currentSteps()).toEqual(['Step 1: Welcome'])
-    expect(stepHeadings()).toEqual(['Customer data stays in the EU'])
+    expect(stepHeadings()).toEqual(['Meet the 2S Platform'])
     expect(button('Back')).toBeUndefined()
     expect(button('Next')).toBeTruthy()
     expect(view.route().fullPath).toBe('/onboarding')
@@ -207,20 +216,25 @@ describe('the steps of the onboarding wizard', () => {
     const view = await mountWizard()
 
     await click(button('Next'))
+    await eventually(() => expect(stepHeadings()).toEqual([residency]))
+    expect(view.route().fullPath).toBe('/onboarding?step=residency')
+    expect(currentSteps()).toEqual(['Step 2: Residency'])
+    expect(button('Back')).toBeTruthy()
+
+    await click(button('Next'))
     await eventually(() => expect(stepHeadings()).toEqual(['Security first']))
     expect(view.route().fullPath).toBe('/onboarding?step=security')
-    expect(currentSteps()).toEqual(['Step 2: Security'])
-    expect(button('Back')).toBeTruthy()
+    expect(currentSteps()).toEqual(['Step 3: Security'])
 
     await click(button('Next'))
     await eventually(() => expect(stepHeadings()).toEqual(['Join the exhibition']))
     expect(view.route().fullPath).toBe('/onboarding?step=exhibition')
-    expect(currentSteps()).toEqual(['Step 3: Exhibition'])
+    expect(currentSteps()).toEqual(['Step 4: Exhibition'])
 
     await click(button('Next'))
     await eventually(() => expect(stepHeadings()).toEqual(['Create your organization']))
     expect(view.route().fullPath).toBe('/onboarding?step=organization')
-    expect(currentSteps()).toEqual(['Step 4: Organization'])
+    expect(currentSteps()).toEqual(['Step 5: Organization'])
     // The last step ends with the form: its submit and Back, no Next.
     expect(button('Next')).toBeUndefined()
     expect(button('Create and continue')).toBeTruthy()
@@ -233,18 +247,18 @@ describe('the steps of the onboarding wizard', () => {
     expect(view.route().fullPath).toBe('/onboarding?step=exhibition')
 
     await click(step('Step 1: Welcome'))
-    await eventually(() => expect(stepHeadings()).toEqual(['Customer data stays in the EU']))
+    await eventually(() => expect(stepHeadings()).toEqual(['Meet the 2S Platform']))
     // The first step is the address without a step.
     expect(view.route().fullPath).toBe('/onboarding')
     expect(button('Back')).toBeUndefined()
 
-    await click(step('Step 4: Organization'))
+    await click(step('Step 5: Organization'))
     await eventually(() => expect(stepHeadings()).toEqual(['Create your organization']))
     expect(view.route().fullPath).toBe('/onboarding?step=organization')
 
     // Every step is an entry of the history.
     view.router.back()
-    await eventually(() => expect(stepHeadings()).toEqual(['Customer data stays in the EU']))
+    await eventually(() => expect(stepHeadings()).toEqual(['Meet the 2S Platform']))
     view.router.back()
     await eventually(() => expect(stepHeadings()).toEqual(['Join the exhibition']))
 
@@ -256,18 +270,18 @@ describe('the steps of the onboarding wizard', () => {
     const view = await mountWizard('/onboarding?mock-scenario=new-user&join=1')
 
     await click(button('Next'))
-    await eventually(() => expect(stepHeadings()).toEqual(['Security first']))
-    expect(view.route().query).toEqual({ 'mock-scenario': 'new-user', join: '1', step: 'security' })
+    await eventually(() => expect(stepHeadings()).toEqual([residency]))
+    expect(view.route().query).toEqual({ 'mock-scenario': 'new-user', join: '1', step: 'residency' })
 
     await click(button('Back'))
-    await eventually(() => expect(stepHeadings()).toEqual(['Customer data stays in the EU']))
+    await eventually(() => expect(stepHeadings()).toEqual(['Meet the 2S Platform']))
     expect(view.route().query).toEqual({ 'mock-scenario': 'new-user', join: '1' })
   })
 
   it.each([
-    ['an unknown step', '/onboarding?step=billing', 'Customer data stays in the EU'],
-    ['the name of the first step', '/onboarding?step=welcome', 'Customer data stays in the EU'],
-    ['an empty step', '/onboarding?step=', 'Customer data stays in the EU'],
+    ['an unknown step', '/onboarding?step=billing', 'Meet the 2S Platform'],
+    ['the name of the first step', '/onboarding?step=welcome', 'Meet the 2S Platform'],
+    ['an empty step', '/onboarding?step=', 'Meet the 2S Platform'],
     ['a repeated step, of which the first counts', '/onboarding?step=security&step=organization', 'Security first'],
   ])('shows the step of %s', async (_what, path, heading) => {
     await mountWizard(path)
@@ -277,9 +291,10 @@ describe('the steps of the onboarding wizard', () => {
   })
 
   it.each([
-    ['/onboarding?step=security', 'Security first', 'Step 2: Security'],
-    ['/onboarding?step=exhibition', 'Join the exhibition', 'Step 3: Exhibition'],
-    ['/onboarding?step=organization', 'Create your organization', 'Step 4: Organization'],
+    ['/onboarding?step=residency', residency, 'Step 2: Residency'],
+    ['/onboarding?step=security', 'Security first', 'Step 3: Security'],
+    ['/onboarding?step=exhibition', 'Join the exhibition', 'Step 4: Exhibition'],
+    ['/onboarding?step=organization', 'Create your organization', 'Step 5: Organization'],
   ])('opens %s on its step, as after a reload', async (path, heading, current) => {
     await mountWizard(path)
 
@@ -287,22 +302,24 @@ describe('the steps of the onboarding wizard', () => {
     expect(currentSteps()).toEqual([current])
   })
 
-  it('has three steps in a deployment without an exhibition, where the exhibition step is the first step', async () => {
+  it('has four steps in a deployment without an exhibition, where the exhibition step is the first step', async () => {
     start((db) => {
       db.exhibition = null
     })
     const view = await mountWizard('/onboarding?step=exhibition&join=1')
 
-    expect(stepLabels()).toEqual(['Step 1: Welcome', 'Step 2: Security', 'Step 3: Organization'])
-    expect(stepHeadings()).toEqual(['Customer data stays in the EU'])
+    expect(stepLabels()).toEqual(['Step 1: Welcome', 'Step 2: Residency', 'Step 3: Security', 'Step 4: Organization'])
+    expect(stepHeadings()).toEqual(['Meet the 2S Platform'])
     expect(currentSteps()).toEqual(['Step 1: Welcome'])
 
+    await click(button('Next'))
+    await eventually(() => expect(stepHeadings()).toEqual([residency]))
     await click(button('Next'))
     await eventually(() => expect(stepHeadings()).toEqual(['Security first']))
     await click(button('Next'))
     await eventually(() => expect(stepHeadings()).toEqual(['Create your organization']))
     expect(view.route().query.step).toBe('organization')
-    expect(currentSteps()).toEqual(['Step 3: Organization'])
+    expect(currentSteps()).toEqual(['Step 4: Organization'])
     // The choice in the address counts for nothing without an exhibition.
     expect(body()).not.toContain('You are joining the exhibition.')
     expect(button('Continue with the exhibition only')).toBeUndefined()
@@ -312,11 +329,17 @@ describe('the steps of the onboarding wizard', () => {
     expect(count('GET /access/exhibition')).toBe(1)
   })
 
-  it('keeps four steps when the exhibition fails to load, with Retry in step 3 and nothing to check', async () => {
+  it('keeps five steps when the exhibition fails to load, with Retry in step 4 and nothing to check', async () => {
     server.use(http.get(exhibitionUrl, () => HttpResponse.json({ Message: 'The database is down.' }, { status: 500 })))
     await mountWizard('/onboarding?step=organization&join=1')
 
-    expect(stepLabels()).toEqual(['Step 1: Welcome', 'Step 2: Security', 'Step 3: Exhibition', 'Step 4: Organization'])
+    expect(stepLabels()).toEqual([
+      'Step 1: Welcome',
+      'Step 2: Residency',
+      'Step 3: Security',
+      'Step 4: Exhibition',
+      'Step 5: Organization',
+    ])
     // Nothing can be joined until the exhibition loads, whatever the address says.
     expect(body()).not.toContain('You are joining the exhibition.')
     expect(button('Continue with the exhibition only')).toBeUndefined()
@@ -341,7 +364,7 @@ describe('the steps of the onboarding wizard', () => {
     await click(button('Retry'))
     await eventually(() => expect(checkbox()).toBeTruthy())
     expect(button('Retry')).toBeUndefined()
-    expect(body()).toContain('Adds you to exhibition/exhibition as a Reader.')
+    expect(body()).toContain('Adds the demo project to your account as a Reader.')
     // The choice of the address counts now.
     expect(isChecked()).toBe(true)
     await click(button('Next'))
@@ -353,21 +376,26 @@ describe('the steps of the onboarding wizard', () => {
     server.use(http.get(exhibitionUrl, () => HttpResponse.json({ Message: 'The database is down.' }, { status: 500 })))
     const view = await mountWizard('/onboarding?step=exhibition')
     expect(stepHeadings()).toEqual(['Join the exhibition'])
-    expect(stepLabels()).toHaveLength(4)
+    expect(stepLabels()).toHaveLength(5)
 
     server.use(http.get(exhibitionUrl, () => new HttpResponse(null, { status: 404 })))
     await click(button('Retry'))
 
     // The step is gone; the one that followed it shows, not the first one.
     await eventually(() =>
-      expect(stepLabels()).toEqual(['Step 1: Welcome', 'Step 2: Security', 'Step 3: Organization']),
+      expect(stepLabels()).toEqual([
+        'Step 1: Welcome',
+        'Step 2: Residency',
+        'Step 3: Security',
+        'Step 4: Organization',
+      ]),
     )
     await eventually(() => expect(stepHeadings()).toEqual(['Create your organization']))
     expect(view.route().query.step).toBe('organization')
-    expect(currentSteps()).toEqual(['Step 3: Organization'])
+    expect(currentSteps()).toEqual(['Step 4: Organization'])
   })
 
-  it('waits 5 seconds for the exhibition, then goes on with Retry in step 3', async () => {
+  it('waits 5 seconds for the exhibition, then goes on with Retry in step 4', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     hold('get', exhibitionUrl)
     await mountWizard('/onboarding?step=exhibition', false)
@@ -381,7 +409,7 @@ describe('the steps of the onboarding wizard', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     await turnsUntil(() => stepList() !== null)
-    expect(stepLabels()).toHaveLength(4)
+    expect(stepLabels()).toHaveLength(5)
     expect(stepHeadings()).toEqual(['Join the exhibition'])
     expect(body()).toContain('The API did not answer in time')
     expect(button('Retry')).toBeTruthy()
@@ -392,7 +420,13 @@ describe('the steps of the onboarding wizard', () => {
     await mountWizard()
     const heading = () => document.body.querySelector('h1')!
 
-    for (const name of ['Step 1: Welcome', 'Step 2: Security', 'Step 3: Exhibition', 'Step 4: Organization']) {
+    for (const name of [
+      'Step 1: Welcome',
+      'Step 2: Residency',
+      'Step 3: Security',
+      'Step 4: Exhibition',
+      'Step 5: Organization',
+    ]) {
       await click(step(name))
       await eventually(() => expect(currentSteps()).toEqual([name]))
       expect(document.body.querySelectorAll('h1')).toHaveLength(1)
@@ -410,42 +444,42 @@ describe('the steps of the onboarding wizard', () => {
     await eventually(() => expect(auth.signOut).toHaveBeenCalledWith(`${location.origin}/login`))
   })
 
-  it('shows the hosting statement without the safeguards that are not live', async () => {
+  it('meets the user with the motto, the pricing and the documentation, which opens in a new tab', async () => {
     await mountWizard()
 
     expect(body()).toContain(
-      'All customer data, configuration and secrets are stored and processed only in the EU (Sweden). The same applies to all AI data processing within the platform.',
+      'Built to tame the configuration mayhem of complex systems and fast-growing application catalogs, AI-made ones included.',
     )
-    expect(body()).toContain('Every authorization decision is made by 2S in the EU.')
-    expect(body()).not.toContain('recorded')
-    expect(body()).not.toContain('Impersonation')
+    expect(body()).toContain(
+      'The platform is free to use while we shape its pricing. When pricing arrives, it will apply to every customer, existing ones included, and you will hear from us well in advance. It will be based on usage, not on seats, with a generous free tier.',
+    )
+    expect(
+      all<HTMLAnchorElement>('section[data-step] a').map((anchor) => [
+        text(anchor),
+        anchor.getAttribute('href'),
+        anchor.getAttribute('target'),
+      ]),
+    ).toEqual([['Documentation', 'https://42for.net/platform/introduction', '_blank']])
+  })
+
+  it('states where the data is, with the sub-processors and links that open in a new tab', async () => {
+    await mountWizard('/onboarding?step=residency')
+
+    expect(body()).toContain(
+      'All customer data, configuration, secrets and machine access are stored and processed only in the EU (Sweden). The same applies to all AI data processing within the platform.',
+    )
     const list = document.body.querySelector('ul[aria-label="Sub-processors"]')!
     expect([...list.querySelectorAll('li')].map(leaves)).toEqual([
-      ['Microsoft Azure', 'EU only', 'Hosting, database, storage, secrets'],
+      ['Microsoft Azure', 'EU only', 'Hosting, storage, secrets, logs'],
       ['Sentry', 'EU only', 'Error reporting'],
       ['PostHog', 'EU only', 'Product analytics'],
       [
         'WorkOS',
         'USA',
-        'Signs in the operators of the 2S Platform and sends their invitation emails. It processes only their name, email, IP address and session data, and the email address of a person they invite. Every authorization decision is made by 2S in the EU. Customers that need an EU-only identity provider can use their own SSO provider or host the platform themselves.',
+        'Signs in the operators of the 2S Platform and sends their invitation emails. It processes only their name, email, IP address and session data, and the email address of a person they invite.',
+        'Every authorization decision is made and recorded by 2S in the EU.',
       ],
     ])
-    const details = link('Details of the EU hosting')!
-    expect(details.getAttribute('href')).toBe('https://claude.ai/share/c9fbe93d-61c4-466c-8490-2ba028fb1999')
-    expect(details.getAttribute('target')).toBe('_blank')
-  })
-
-  it('explains the sign-in of machines and people, with links that open in a new tab', async () => {
-    await mountWizard('/onboarding?step=security')
-
-    expect(body()).toContain('Security is the main focus of the 2S Platform.')
-    expect(all('section[data-step] h3').map(text)).toEqual(['Machines and pipelines', 'People'])
-    expect(all('section[data-step] ul li').map(text)).toEqual([
-      'Entra ID in your own tenant',
-      'Keycloak, self-hosted, for example in the EU',
-    ])
-    expect(body()).toContain('WorkOS is not involved')
-    const docs = 'https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md'
     expect(
       all<HTMLAnchorElement>('section[data-step] a').map((anchor) => [
         text(anchor),
@@ -453,28 +487,59 @@ describe('the steps of the onboarding wizard', () => {
         anchor.getAttribute('target'),
       ]),
     ).toEqual([
-      ['Authentication: Entra ID and Keycloak', `${docs}#selecting-the-provider`, '_blank'],
-      ['Federated auth of machines', `${docs}#machine-access-with-workload-identity-federation`, '_blank'],
-      ['sform', 'https://42for.net/cli/sform', '_blank'],
-      ['GitHub Action', 'https://42for.net/cli/github-action', '_blank'],
+      ['Cloud hosting', 'https://42for.net/platform/cloud', '_blank'],
+      ['Sub-processors list', 'https://42for.software/legal/sub-processors', '_blank'],
+    ])
+  })
+
+  it('explains secrets, machines, people and security testing in this order, with links that open in a new tab', async () => {
+    await mountWizard('/onboarding?step=security')
+
+    expect(body()).toContain("Security isn't a feature we added later. It is the ground the 2S Platform stands on.")
+    expect(all('section[data-step] h3').map(text)).toEqual([
+      'Secrets',
+      'Machines and pipelines',
+      'People',
+      'Security testing',
+    ])
+    expect(body()).toContain(
+      'or encrypted for the one recipient that needs them, so that nobody else can read them, not even us.',
+    )
+    expect(body()).toContain('A machine proves who it is with its own mTLS certificate or a federated token')
+    expect(body()).toContain(
+      'You sign in with WorkOS AuthKit, and 2S alone decides what you may do. Impersonation is blocked, secrets ask for a recent sign-in, and every change of access lands in an append-only audit log.',
+    )
+    expect(body()).toContain(
+      'Need an EU-only identity provider? Bring your own SSO provider, or host the platform yourself.',
+    )
+    expect(body()).toContain('Security is built into how we develop the platform')
+    expect(
+      all<HTMLAnchorElement>('section[data-step] a').map((anchor) => [
+        text(anchor),
+        anchor.getAttribute('href'),
+        anchor.getAttribute('target'),
+      ]),
+    ).toEqual([
+      ['Security details', 'https://42for.net/platform/security', '_blank'],
+      ['Authentication of machines', 'https://42for.net/platform/auth-machine', '_blank'],
+      ['Self-hosting option', 'https://42for.net/platform/self-hosting', '_blank'],
     ])
   })
 })
 
 describe('the choice of the exhibition', () => {
-  it('offers the exhibition unchecked, with its project and description, and sends nothing', async () => {
+  it('offers the exhibition unchecked, with what it shows and what joining does, and sends nothing', async () => {
     await mountWizard('/onboarding?step=exhibition')
 
     expect(isChecked()).toBe(false)
-    expect(body()).toContain('You join as a Reader: you can browse its annotations')
-    expect(all('section[data-step="exhibition"] > div > p').map(text)[1]).toBe(
-      loadDb().accessPoints['exhibition.exhibition']!.Description,
-    )
-    expect(body()).toContain(
-      'Adds you to exhibition/exhibition as a Reader. Its administrators see your name and email in the list of members; other visitors do not.',
-    )
-    expect(body()).toContain(
+    expect(all('section[data-step="exhibition"] > div > p').map(text)).toEqual([
+      'Step into Fourth Wall Software, a fictional software house whose customers include Acme Corp and Globex. See how the platform keeps their CRM, HR and CAD solutions configured.',
+      'Explore 30 annotations, configurations that resolve live, and the graph that ties them together.',
       'This step is optional. To join only the exhibition and create your own organization later, check the box and choose Continue with the exhibition only in the last step.',
+    ])
+    expect(text(document.body.querySelector('section[data-step="exhibition"] label')!)).toBe('Show me the exhibition')
+    expect(body()).toContain(
+      'Adds the demo project to your account as a Reader. Nothing you do there can break it: you join read-only.',
     )
 
     await click(checkbox())
@@ -484,16 +549,17 @@ describe('the choice of the exhibition', () => {
     expect(posts()).toEqual([])
   })
 
-  it('names the project of the deployment, without a description when it has none', async () => {
+  it('shows neither the project of the deployment nor its description', async () => {
     start((db) => {
       db.exhibition = { Organization: 'northwind', Project: 'portal' }
-      delete db.accessPoints['northwind.portal']!.Description
+      db.accessPoints['northwind.portal']!.Description = 'The portal of Northwind.'
     })
     await mountWizard('/onboarding?step=exhibition')
 
-    expect(body()).toContain('Adds you to northwind/portal as a Reader.')
-    // The text of the step and the note; the exhibition of the seed has a third paragraph, its description.
-    expect(all('section[data-step="exhibition"] > div > p')).toHaveLength(2)
+    expect(body()).toContain('Adds the demo project to your account as a Reader.')
+    expect(body()).not.toContain('northwind')
+    expect(body()).not.toContain('The portal of Northwind.')
+    expect(all('section[data-step="exhibition"] > div > p')).toHaveLength(3)
   })
 
   it('keeps the choice in the query, written over the entry of the step', async () => {
@@ -550,11 +616,29 @@ describe('the organization form of the wizard', () => {
     await click(button('Back'))
     await eventually(() => expect(stepHeadings()).toEqual(['Join the exhibition']))
     await click(step('Step 1: Welcome'))
-    await eventually(() => expect(stepHeadings()).toEqual(['Customer data stays in the EU']))
-    await click(step('Step 4: Organization'))
+    await eventually(() => expect(stepHeadings()).toEqual(['Meet the 2S Platform']))
+    await click(step('Step 5: Organization'))
     await eventually(() => expect(stepHeadings()).toEqual(['Create your organization']))
 
     expect(fields().map((field) => field.value)).toEqual(['globex', 'portal', 'The customer portal.'])
+  })
+
+  it('names the agreements under the form, with links that open in a new tab', async () => {
+    await mountWizard('/onboarding?step=organization')
+
+    expect(body()).toContain(
+      'By creating an organization or joining the exhibition, you agree to the Customer License Agreement and the Data Processing Agreement.',
+    )
+    expect(
+      all<HTMLAnchorElement>('section[data-step="organization"] a').map((anchor) => [
+        text(anchor),
+        anchor.getAttribute('href'),
+        anchor.getAttribute('target'),
+      ]),
+    ).toEqual([
+      ['Customer License Agreement', 'https://42for.software/legal/customer-license-agreement', '_blank'],
+      ['Data Processing Agreement', 'https://42for.software/legal/data-processing-agreement', '_blank'],
+    ])
   })
 
   it('validates the names as the form does', async () => {
@@ -576,6 +660,7 @@ describe('the focus of the wizard', () => {
 
   it.each([
     '/onboarding',
+    '/onboarding?step=residency',
     '/onboarding?step=security',
     '/onboarding?step=exhibition',
     '/onboarding?step=organization',
@@ -595,7 +680,7 @@ describe('the focus of the wizard', () => {
     await mountWizard('/onboarding?step=exhibition')
     await settle()
 
-    expect(stepHeadings()).toEqual(['Customer data stays in the EU'])
+    expect(stepHeadings()).toEqual(['Meet the 2S Platform'])
     expect(document.activeElement).toBe(document.body)
   })
 
@@ -603,7 +688,7 @@ describe('the focus of the wizard', () => {
     const view = await mountWizard()
     const focused = () => document.activeElement as HTMLElement
 
-    for (const heading of ['Security first', 'Join the exhibition']) {
+    for (const heading of [residency, 'Security first', 'Join the exhibition']) {
       await click(button('Next'))
       await eventually(() => expect(text(focused())).toBe(heading))
       expect(focused().tagName).toBe('H2')
@@ -617,7 +702,7 @@ describe('the focus of the wizard', () => {
     await eventually(() => expect(text(focused())).toBe('Join the exhibition'))
 
     await click(step('Step 1: Welcome'))
-    await eventually(() => expect(text(focused())).toBe('Customer data stays in the EU'))
+    await eventually(() => expect(text(focused())).toBe('Meet the 2S Platform'))
 
     // The browser's back and forward are changes of step too.
     view.router.back()
@@ -761,12 +846,12 @@ describe('the failures of the end of the wizard', () => {
     // idle again: everything is enabled, and a change of step is not sent to "/".
     expect(button('Create and continue')?.disabled).toBe(false)
     expect(button('Continue with the exhibition only')?.disabled).toBe(false)
-    await click(step('Step 2: Security'))
+    await click(step('Step 3: Security'))
     await eventually(() => expect(stepHeadings()).toEqual(['Security first']))
     expect(view.route().fullPath).toBe('/onboarding?join=1&step=security')
 
     // The form kept its values; another name works.
-    await click(step('Step 4: Organization'))
+    await click(step('Step 5: Organization'))
     await eventually(() => expect(stepHeadings()).toEqual(['Create your organization']))
     await fill('globex', 'portal')
     await submit()

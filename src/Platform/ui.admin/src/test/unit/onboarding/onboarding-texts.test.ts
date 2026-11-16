@@ -1,98 +1,116 @@
 import { describe, expect, it } from 'vitest'
 import {
+  agreementLinks,
   exhibitionChoiceDescription,
-  hostingLink,
-  hostingStatement,
   onboardingSteps,
   onboardingTexts,
-  safeguardsLive,
+  residencyLinks,
   securityLinks,
   stepLabel,
   stepNames,
   subProcessors,
   welcomeLine,
+  workosPurpose,
 } from '@/utils/onboarding'
 
-// The texts of the onboarding wizard (424-267, spec 3.3 to 3.6 and 8). The hosting statement has two forms: the
-// wizard claims the three safeguards only once they run in production.
+// The texts of the onboarding wizard (424-267, spec 3.3 to 3.6 and 8, reworked after the first review): one file
+// holds every text, sub-processor and link of the five steps.
 
-describe('the hosting statement', () => {
-  const workos = [
-    'Signs in the operators of the 2S Platform and sends their invitation emails.',
-    'It processes only their name, email, IP address and session data, and the email address of a person they invite.',
-  ]
-  const identityProvider =
-    'Customers that need an EU-only identity provider can use their own SSO provider or host the platform themselves.'
-
-  it('does not claim the safeguards before they are live', () => {
-    expect(hostingStatement(false)).toEqual([
-      ...workos,
-      'Every authorization decision is made by 2S in the EU.',
-      identityProvider,
-    ])
-    expect(hostingStatement(false).join(' ')).not.toMatch(/recorded|[Ii]mpersonation|recent sign-in|audit log/)
-  })
-
-  it('names the three safeguards once they are live', () => {
-    expect(hostingStatement(true)).toEqual([
-      ...workos,
-      'Every authorization decision is made and recorded by 2S in the EU.',
-      'Impersonation is blocked, access to secrets requires a recent sign-in, and every access change is in an append-only audit log.',
-      identityProvider,
-    ])
-  })
-
-  it('is released without the safeguards', () => {
-    expect(safeguardsLive).toBe(false)
-    expect(hostingStatement()).toEqual(hostingStatement(false))
-  })
-
-  it('states where the data is in its heading and its first sentence', () => {
-    expect(onboardingTexts.welcome.heading).toBe('Customer data stays in the EU')
-    expect(onboardingTexts.welcome.lead).toBe(
-      'All customer data, configuration and secrets are stored and processed only in the EU (Sweden).',
+describe('the welcome step', () => {
+  it('meets the user with the platform, its motto and its pricing', () => {
+    expect(onboardingTexts.welcome.heading).toBe('Meet the 2S Platform')
+    expect(onboardingTexts.welcome.motto).toBe(
+      'Built to tame the configuration mayhem of complex systems and fast-growing application catalogs, AI-made ones included.',
     )
-    expect(onboardingTexts.welcome.ai).toBe('The same applies to all AI data processing within the platform.')
+    expect(onboardingTexts.welcome.pricing).toBe(
+      'The platform is free to use while we shape its pricing. When pricing arrives, it will apply to every customer, existing ones included, and you will hear from us well in advance. It will be based on usage, not on seats, with a generous free tier.',
+    )
+    expect(onboardingTexts.welcome.documentation).toEqual({
+      label: 'Documentation',
+      to: 'https://42for.net/platform/introduction',
+    })
   })
 })
 
-describe('the sub-processors', () => {
-  it('are the four of the deployment, with WorkOS as the only one outside the EU', () => {
+describe('the residency step', () => {
+  it('states where the data is in its heading and its first sentence', () => {
+    expect(onboardingTexts.residency.heading).toBe("Your platform's data stays in the EU")
+    expect(onboardingTexts.residency.lead).toBe(
+      'All customer data, configuration, secrets and machine access are stored and processed only in the EU (Sweden).',
+    )
+    expect(onboardingTexts.residency.ai).toBe('The same applies to all AI data processing within the platform.')
+  })
+
+  it('names the four sub-processors of the deployment, with WorkOS as the only one outside the EU', () => {
+    expect(workosPurpose).toBe(
+      'Signs in the operators of the 2S Platform and sends their invitation emails. It processes only their name, email, IP address and session data, and the email address of a person they invite.',
+    )
     expect(subProcessors).toEqual([
-      { name: 'Microsoft Azure', purpose: 'Hosting, database, storage, secrets', region: 'EU only' },
+      { name: 'Microsoft Azure', purpose: 'Hosting, storage, secrets, logs', region: 'EU only' },
       { name: 'Sentry', purpose: 'Error reporting', region: 'EU only' },
       { name: 'PostHog', purpose: 'Product analytics', region: 'EU only' },
       {
         name: 'WorkOS',
-        purpose: hostingStatement(false).join(' '),
+        purpose: workosPurpose,
+        note: 'Every authorization decision is made and recorded by 2S in the EU.',
         region: 'USA',
       },
     ])
   })
 })
 
-describe('the links of the wizard', () => {
-  it('lead to the discussion of the hosting, the documentation of authentication and the tools', () => {
-    expect(hostingLink).toEqual({
-      label: 'Details of the EU hosting',
-      to: 'https://claude.ai/share/c9fbe93d-61c4-466c-8490-2ba028fb1999',
-    })
-    expect(securityLinks).toEqual([
-      {
-        label: 'Authentication: Entra ID and Keycloak',
-        to: 'https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#selecting-the-provider',
-      },
-      {
-        label: 'Federated auth of machines',
-        to: 'https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#machine-access-with-workload-identity-federation',
-      },
-      { label: 'sform', to: 'https://42for.net/cli/sform' },
-      { label: 'GitHub Action', to: 'https://42for.net/cli/github-action' },
+describe('the security step', () => {
+  it('has a lead and four sections: secrets, machines, people and security testing', () => {
+    const texts = onboardingTexts.security
+
+    expect(texts.heading).toBe('Security first')
+    expect(texts.lead).toBe("Security isn't a feature we added later. It is the ground the 2S Platform stands on.")
+    expect([texts.secrets.title, texts.machines.title, texts.people.title, texts.testing.title]).toEqual([
+      'Secrets',
+      'Machines and pipelines',
+      'People',
+      'Security testing',
     ])
   })
 
+  it('names the three safeguards and the way to an EU-only identity provider', () => {
+    expect(onboardingTexts.security.people.text).toBe(
+      'You sign in with WorkOS AuthKit, and 2S alone decides what you may do. Impersonation is blocked, secrets ask for a recent sign-in, and every change of access lands in an append-only audit log.',
+    )
+    expect(onboardingTexts.security.people.identityProvider).toBe(
+      'Need an EU-only identity provider? Bring your own SSO provider, or host the platform yourself.',
+    )
+  })
+})
+
+describe('the links of the wizard', () => {
+  it('lead to the hosting, the sub-processors, the security pages and the agreements', () => {
+    expect(residencyLinks).toEqual([
+      { label: 'Cloud hosting', to: 'https://42for.net/platform/cloud' },
+      { label: 'Sub-processors list', to: 'https://42for.software/legal/sub-processors' },
+    ])
+    expect(securityLinks).toEqual([
+      { label: 'Security details', to: 'https://42for.net/platform/security' },
+      { label: 'Authentication of machines', to: 'https://42for.net/platform/auth-machine' },
+      { label: 'Self-hosting option', to: 'https://42for.net/platform/self-hosting' },
+    ])
+    expect(agreementLinks).toEqual({
+      license: { label: 'Customer License Agreement', to: 'https://42for.software/legal/customer-license-agreement' },
+      dataProcessing: {
+        label: 'Data Processing Agreement',
+        to: 'https://42for.software/legal/data-processing-agreement',
+      },
+    })
+  })
+
   it('are https addresses, each with its own label', () => {
-    const links = [hostingLink, ...securityLinks]
+    const links = [
+      onboardingTexts.welcome.documentation,
+      ...residencyLinks,
+      ...securityLinks,
+      agreementLinks.license,
+      agreementLinks.dataProcessing,
+    ]
 
     for (const link of links) {
       expect(new URL(link.to).protocol, link.label).toBe('https:')
@@ -103,10 +121,11 @@ describe('the links of the wizard', () => {
 })
 
 describe('the steps and their names', () => {
-  it('are welcome, security, exhibition and organization', () => {
-    expect(onboardingSteps).toEqual(['welcome', 'security', 'exhibition', 'organization'])
+  it('are welcome, residency, security, exhibition and organization', () => {
+    expect(onboardingSteps).toEqual(['welcome', 'residency', 'security', 'exhibition', 'organization'])
     expect(onboardingSteps.map((step) => stepNames[step])).toEqual([
       'Welcome',
+      'Residency',
       'Security',
       'Exhibition',
       'Organization',
@@ -115,7 +134,8 @@ describe('the steps and their names', () => {
 
   it('are named by their number and name in the step list', () => {
     expect(stepLabel(1, 'welcome')).toBe('Step 1: Welcome')
-    expect(stepLabel(3, 'organization')).toBe('Step 3: Organization')
+    expect(stepLabel(2, 'residency')).toBe('Step 2: Residency')
+    expect(stepLabel(4, 'organization')).toBe('Step 4: Organization')
   })
 })
 
@@ -126,10 +146,23 @@ describe('the other texts', () => {
     expect(welcomeLine('')).toBe('Welcome')
   })
 
-  it('say what joining the exhibition does, with the project of the deployment', () => {
-    expect(exhibitionChoiceDescription({ Organization: 'fourth-wall', Project: 'toons-and-tyrants' })).toBe(
-      'Adds you to fourth-wall/toons-and-tyrants as a Reader. Its administrators see your name and email in the list of members; other visitors do not.',
+  it('invite to the exhibition with its story and what it shows', () => {
+    expect(onboardingTexts.exhibition.heading).toBe('Join the exhibition')
+    expect(onboardingTexts.exhibition.text).toBe(
+      'Step into Fourth Wall Software, a fictional software house whose customers include Acme Corp and Globex. See how the platform keeps their CRM, HR and CAD solutions configured.',
     )
+    expect(onboardingTexts.exhibition.promise).toBe(
+      'Explore 30 annotations, configurations that resolve live, and the graph that ties them together.',
+    )
+    expect(onboardingTexts.exhibition.choice).toBe('Show me the exhibition')
+  })
+
+  it('say what joining the exhibition does, the same for any project of the deployment', () => {
+    const description =
+      'Adds the demo project to your account as a Reader. Nothing you do there can break it: you join read-only.'
+
+    expect(exhibitionChoiceDescription({ Organization: 'fourth-wall', Project: 'toons-and-tyrants' })).toBe(description)
+    expect(exhibitionChoiceDescription()).toBe(description)
   })
 
   it('name the button of the last step in the note of the exhibition', () => {
@@ -138,12 +171,5 @@ describe('the other texts', () => {
     expect(`${noteStart} ${onboardingTexts.organization.exhibitionOnly} ${noteEnd}`).toBe(
       'This step is optional. To join only the exhibition and create your own organization later, check the box and choose Continue with the exhibition only in the last step.',
     )
-  })
-
-  it('name the own identity providers as the list shows them', () => {
-    expect(onboardingTexts.security.people.providers.map((provider) => `${provider.name}${provider.rest}`)).toEqual([
-      'Entra ID in your own tenant',
-      'Keycloak, self-hosted, for example in the EU',
-    ])
   })
 })

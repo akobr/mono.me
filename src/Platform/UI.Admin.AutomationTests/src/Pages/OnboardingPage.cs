@@ -5,41 +5,71 @@ using static Microsoft.Playwright.Assertions;
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // /onboarding (bare layout, no user menu): where the auth guard sends a signed-in user without an account and without
-// a pending invitation. "Welcome, <name>" above the card of a wizard: Welcome (where customer data lives, and the
-// sub-processors), Security (how machines and people sign in), Exhibition (the choice to join the deployment's demo
-// project as a Reader; a deployment without an exhibition has no such step) and Organization. The step list names its
-// buttons "Step <n>: <name>" in every layout (a phone shows only the name of the current one) and marks the current
-// step; every step has an h2. The step and the choice are in the address (?step=security, exhibition or organization,
-// none for Welcome, and join=1), so OpenAsync opens a step, and the browser's back and a reload keep both. "Sign out"
-// is below the card on every step.
+// a pending invitation. "Welcome, <name>" above the card of a wizard: Welcome (the platform, its motto, its pricing and
+// the documentation), Residency (where customer data lives, and the sub-processors), Security (secrets, machines,
+// people and security testing), Exhibition (the choice to join the deployment's demo project as a Reader; a deployment
+// without an exhibition has no such step) and Organization. The step list names its buttons "Step <n>: <name>" in every
+// layout (a narrow list shows only the name of the current one) and marks the current step; every step has an h2. The
+// step and the choice are in the address (?step=residency, security, exhibition or organization, none for Welcome, and
+// join=1), so OpenAsync opens a step, and the browser's back and a reload keep both. "Sign out" is below the card on
+// every step.
 // The last step is the organization form (OrganizationForm.vue): "Organization" and "First project" (required, so
 // their accessible names end in '*'), "Project description" (sent trimmed), and "Create and continue", which creates
-// the account with the organization and its first project and opens the project's annotations. The form shows the
-// first error of each field under it ("Enter a organization name.", sic). With the exhibition chosen the step says so
-// and has "Continue with the exhibition only", which joins without an organization and opens the exhibition. The step
-// stays in the page while another one shows, so it keeps what was typed: its heading, fields and buttons are then
-// hidden, not gone (ToBeHiddenAsync, not a count of 0).
+// the account with the organization and its first project and opens the project's annotations. Under the form a line
+// names the two agreements the account accepts, each a link. The form shows the first error of each field under it
+// ("Enter a organization name.", sic). With the exhibition chosen the step says so and has "Continue with the
+// exhibition only", which joins without an organization and opens the exhibition. The step stays in the page while
+// another one shows, so it keeps what was typed: its heading, fields and buttons are then hidden, not gone
+// (ToBeHiddenAsync, not a count of 0).
 public sealed partial class OnboardingPage(App app, AppRoutes routes)
 {
-    // The heading of the last step, the organization form.
+    // The headings of the steps (h2), in their order.
+    public const string WelcomeHeading = "Meet the 2S Platform";
+
+    public const string ResidencyHeading = "Your platform's data stays in the EU";
+
+    public const string SecurityHeading = "Security first";
+
+    public const string ExhibitionHeading = "Join the exhibition";
+
     public const string OrganizationHeading = "Create your organization";
 
-    // The bold sentence of the callout of the first step, under its heading.
-    public const string HostingLeadText = "All customer data, configuration and secrets are stored and processed only in the EU (Sweden). The same applies to all AI data processing within the platform.";
+    // The first step: the motto under its heading, and the paragraph of the pricing.
+    public const string MottoText = "Built to tame the configuration mayhem of complex systems and fast-growing application catalogs, AI-made ones included.";
 
-    // The purpose of WorkOS in the list of sub-processors, in the form the admin UI shows until the three safeguards run
-    // in production (blocked impersonation, the audit log of access changes, a recent sign-in for secrets): without
-    // their sentence.
-    public const string HostingStatementText = "Signs in the operators of the 2S Platform and sends their invitation emails. It processes only their name, email, IP address and session data, and the email address of a person they invite. Every authorization decision is made by 2S in the EU. Customers that need an EU-only identity provider can use their own SSO provider or host the platform themselves.";
+    public const string PricingText = "The platform is free to use while we shape its pricing. When pricing arrives, it will apply to every customer, existing ones included, and you will hear from us well in advance. It will be based on usage, not on seats, with a generous free tier.";
 
-    // The paragraph of "Machines and pipelines" on the security step.
-    public const string MachinesText = "They need no stored secret. A machine exchanges its own platform token, for example a GitHub Actions OIDC token or a Kubernetes service account token, for a short-lived 2S token.";
+    // The bold sentence of the callout of the residency step, under its heading.
+    public const string HostingLeadText = "All customer data, configuration, secrets and machine access are stored and processed only in the EU (Sweden). The same applies to all AI data processing within the platform.";
 
-    // The paragraph of "People" above its list of identity providers.
-    public const string PeopleText = "This platform signs you in with WorkOS AuthKit. A dedicated deployment can sign people in with an identity provider of your own instead:";
+    // The purpose of WorkOS in the list of sub-processors, and the second paragraph of its entry.
+    public const string WorkOsPurposeText = "Signs in the operators of the 2S Platform and sends their invitation emails. It processes only their name, email, IP address and session data, and the email address of a person they invite.";
 
-    // The paragraph of "People" under the list: what such a deployment gives up.
-    public const string PeopleLimitText = "Sign-in is then fully under your control, and WorkOS is not involved. Such a deployment is used through sform and the API; the Admin UI is not available in it today.";
+    public const string WorkOsNoteText = "Every authorization decision is made and recorded by 2S in the EU.";
+
+    // The lead of the security step, under its heading.
+    public const string SecurityLeadText = "Security isn't a feature we added later. It is the ground the 2S Platform stands on.";
+
+    // The paragraphs of the four sections of the security step, in their order.
+    public const string SecretsText = "Keep them your way: encrypted with keys in an EU vault, with a key you bring yourself, or encrypted for the one recipient that needs them, so that nobody else can read them, not even us.";
+
+    public const string MachinesText = "No stored passwords, no long-lived keys waiting to leak. A machine proves who it is with its own mTLS certificate or a federated token from the system it runs on, and gets exactly the access its scopes allow.";
+
+    public const string PeopleText = "You sign in with WorkOS AuthKit, and 2S alone decides what you may do. Impersonation is blocked, secrets ask for a recent sign-in, and every change of access lands in an append-only audit log.";
+
+    public const string IdentityProviderText = "Need an EU-only identity provider? Bring your own SSO provider, or host the platform yourself.";
+
+    public const string SecurityTestingText = "Security is built into how we develop the platform, and our testing programme grows with it. We are rolling out automated scanning in our build pipeline and run manual security testing across our REST API, admin interface, CLI and MCP server. Our approach follows recognised industry standards, and every finding is tracked and resolved within defined timelines.";
+
+    // The exhibition step: its story, what it shows, and what checking the box does, under its label.
+    public const string ExhibitionText = "Step into Fourth Wall Software, a fictional software house whose customers include Acme Corp and Globex. See how the platform keeps their CRM, HR and CAD solutions configured.";
+
+    public const string ExhibitionPromiseText = "Explore 30 annotations, configurations that resolve live, and the graph that ties them together.";
+
+    public const string ExhibitionChoiceDescriptionText = "Adds the demo project to your account as a Reader. Nothing you do there can break it: you join read-only.";
+
+    // The line under the organization form; its two agreements are links.
+    public const string AgreementsText = "By creating an organization or joining the exhibition, you agree to the Customer License Agreement and the Data Processing Agreement.";
 
     public const string IntroText = "Create your organization and its first project to start. If a colleague invited you, open the link from the invitation email instead.";
 
@@ -51,7 +81,7 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
     // exhibition, so its buttons never change under the user; the mock has started by then.
     public ILocator StepList => app.Page.GetByRole(AriaRole.Navigation, new() { Name = "Onboarding steps", Exact = true });
 
-    // The buttons of the step list in their order: four, or three without an exhibition.
+    // The buttons of the step list in their order: five, or four without an exhibition.
     public ILocator Steps => StepList.GetByRole(AriaRole.Button);
 
     public ILocator CurrentStep => StepList.Locator("[aria-current='step']");
@@ -67,20 +97,24 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
 
     public ILocator HostingLead => Text(HostingLeadText);
 
-    public ILocator HostingStatement => Text(HostingStatementText);
-
-    // The entries of the list "Sub-processors" of the first step, in their order; each holds its name, a badge with its
-    // region ("EU only" or "USA") and its purpose, three elements of their own.
+    // The entries of the list "Sub-processors" of the residency step, in their order; each holds its name, a badge with
+    // its region ("EU only" or "USA") and its purpose (WorkOS also a second paragraph), elements of their own.
     public ILocator SubProcessors => app.Page.GetByRole(AriaRole.List, new() { Name = "Sub-processors", Exact = true }).GetByRole(AriaRole.Listitem);
 
-    // The identity providers of a dedicated deployment, the list of "People" on the security step.
-    public ILocator IdentityProviders => app.Page.Locator("section[data-step='security']").GetByRole(AriaRole.Listitem);
+    // The headings of the sections of the step that shows (h3), in their order.
+    public ILocator Topics => StepSections.GetByRole(AriaRole.Heading, new() { Level = 3 });
 
-    // The links of the step that shows; each opens in a new tab.
+    // The links of the step that shows; each opens in a new tab. On the last step: the two agreements.
     public ILocator StepLinks => StepSections.GetByRole(AriaRole.Link);
 
     // A Nuxt UI checkbox, a button with the checkbox role.
-    public ILocator JoinExhibitionCheckbox => app.Page.GetByRole(AriaRole.Checkbox, new() { Name = "Join the exhibition", Exact = true });
+    public ILocator JoinExhibitionCheckbox => app.Page.GetByRole(AriaRole.Checkbox, new() { Name = "Show me the exhibition", Exact = true });
+
+    public ILocator ExhibitionChoiceDescription => Text(ExhibitionChoiceDescriptionText);
+
+    // The line of the agreements under the organization form: a paragraph with two links, so matched by its text, not
+    // by an exact text of one element.
+    public ILocator Agreements => StepSections.Locator("p").Filter(new() { HasText = "By creating an organization or joining the exhibition" });
 
     public ILocator Intro => Text(IntroText);
 
@@ -102,7 +136,7 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
     // by role finds nothing in a hidden step.
     private ILocator StepSections => app.Page.Locator("section[data-step]");
 
-    // A button of the step list by its accessible name, "Step <n>: <name>" ("Step 3: Organization" without an
+    // A button of the step list by its accessible name, "Step <n>: <name>" ("Step 4: Organization" without an
     // exhibition).
     public ILocator Step(string name)
     {
@@ -110,7 +144,7 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
         return StepList.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
     }
 
-    // The heading of a step (h2): "Customer data stays in the EU", "Security first", "Join the exhibition" or
+    // The heading of a step (h2): WelcomeHeading, ResidencyHeading, SecurityHeading, ExhibitionHeading or
     // OrganizationHeading. Only the step that shows has a visible one.
     public ILocator StepHeading(string name)
     {
@@ -118,7 +152,7 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
         return app.Page.GetByRole(AriaRole.Heading, new() { Name = name, Exact = true, Level = 2 });
     }
 
-    // A heading inside a step (h3): "Sub-processors", "Machines and pipelines", "People".
+    // A heading inside a step (h3): "Sub-processors", "Secrets", "Machines and pipelines", "People", "Security testing".
     public ILocator Topic(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -132,20 +166,28 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
         return app.Page.GetByText(text, new() { Exact = true });
     }
 
-    // A link of the step that shows by its name, e.g. "Details of the EU hosting".
+    // A link of the step that shows by its name, e.g. "Cloud hosting".
     public ILocator Link(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return StepSections.GetByRole(AriaRole.Link, new() { Name = name, Exact = true });
     }
 
-    // What checking the box of the exhibition step does, under its label; the names are those of the exhibition's
-    // organization and project.
-    public ILocator ExhibitionChoiceDescription(string organization, string project)
+    // Asserts the links of the step that shows: exactly these, in this order, each with its address and opening in a
+    // new tab.
+    public async Task ExpectLinksAsync(params (string Name, string Address)[] links)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(organization);
-        ArgumentException.ThrowIfNullOrWhiteSpace(project);
-        return Text($"Adds you to {organization}/{project} as a Reader. Its administrators see your name and email in the list of members; other visitors do not.");
+        ArgumentNullException.ThrowIfNull(links);
+
+        await Expect(StepLinks).ToHaveCountAsync(links.Length);
+        for (var index = 0; index < links.Length; index++)
+        {
+            var (name, address) = links[index];
+            var link = StepLinks.Nth(index);
+            await Expect(link).ToHaveAccessibleNameAsync(name);
+            await Expect(link).ToHaveAttributeAsync("href", address);
+            await Expect(link).ToHaveAttributeAsync("target", "_blank");
+        }
     }
 
     // A field error of the form by its exact text.
@@ -155,8 +197,8 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
         return app.Page.GetByText(text, new() { Exact = true });
     }
 
-    // Opens the wizard on a step by its address: the first step without one, else "security", "exhibition" or
-    // "organization" (an unknown one, or the exhibition of a deployment without one, shows the first step).
+    // Opens the wizard on a step by its address: the first step without one, else "residency", "security",
+    // "exhibition" or "organization" (an unknown one, or the exhibition of a deployment without one, shows the first step).
     public async Task OpenAsync(string? step = null)
     {
         await app.GotoAsync(AppRoutes.WithQuery(routes.Onboarding, ("step", step)));
