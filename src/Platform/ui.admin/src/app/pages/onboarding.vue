@@ -86,6 +86,9 @@ const join = computed({
   },
 })
 const joining = computed(() => join.value && exhibition.value !== undefined)
+// The choice stands while the exhibition failed to load: the form waits until it loads, or until the user goes on
+// without it, so a failed lookup never skips the join silently.
+const joinPending = computed(() => join.value && hasExhibition.value === true && exhibition.value === undefined)
 
 const end = useOnboardingEnd(() => exhibition.value)
 const working = computed(() => end.state.value === 'working')
@@ -216,7 +219,7 @@ watch(
               :submit-label="texts.organization.submit"
               :autofocus="false"
               :validate-on-blur="false"
-              :disabled="end.state.value !== 'idle'"
+              :disabled="end.state.value !== 'idle' || joinPending || end.accountUnknown.value"
             >
               <template #actions>
                 <UButton
@@ -228,6 +231,38 @@ watch(
                 />
               </template>
             </OrganizationForm>
+
+            <UAlert
+              v-if="joinPending"
+              role="alert"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-circle-alert"
+              :title="texts.organization.exhibitionNotLoaded"
+              :description="errorMessage(exhibitionError)"
+              :actions="[
+                {
+                  label: texts.organization.retryExhibition,
+                  icon: 'i-lucide-rotate-cw',
+                  loading: exhibitionLoading,
+                  onClick: () => loadExhibition(),
+                },
+                {
+                  label: texts.organization.withoutExhibition,
+                  color: 'neutral',
+                  variant: 'outline',
+                  onClick: () => (join = false),
+                },
+              ]"
+            />
+            <UAlert
+              v-if="end.accountUnknown.value"
+              role="alert"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-circle-alert"
+              :description="texts.end.accountUnknown"
+            />
 
             <!-- Both ways to end create the account, so the agreements stand above the second one too. -->
             <p class="text-xs text-muted">

@@ -140,6 +140,9 @@ export const onboardingTexts = {
     submit: 'Create and continue',
     joining: 'You are joining the exhibition.',
     exhibitionOnly: 'Continue with the exhibition only',
+    exhibitionNotLoaded: 'You chose to join the exhibition, but it did not load.',
+    retryExhibition: 'Retry',
+    withoutExhibition: 'Continue without the exhibition',
   },
   end: {
     joined: 'You joined the exhibition',
@@ -147,6 +150,9 @@ export const onboardingTexts = {
     joinFailed: 'Joining the exhibition failed',
     accountReady: 'Your account is ready.',
     tryAgain: 'Try again',
+    notOffered: 'The exhibition is no longer offered, so you continue without it.',
+    accountUnknown:
+      'We could not check your account. Try Continue with the exhibition only again before you create an organization.',
     withoutExhibition: 'Continue without the exhibition',
   },
 } as const

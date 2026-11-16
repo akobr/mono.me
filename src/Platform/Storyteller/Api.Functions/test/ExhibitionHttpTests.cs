@@ -278,6 +278,22 @@ public class ExhibitionHttpTests
         access.Points[ProjectKey].AccessMap.Keys.ShouldBe([OwnerId]);
     }
 
+    // A cancelled invocation is not a failed create: it goes out at once, without a read of the account after it.
+    [Fact]
+    public async Task JoinExhibition_CreateThatIsCancelled_ThrowsTheCancellationWithoutAnotherRead()
+    {
+        var cancellation = new OperationCanceledException("The invocation was cancelled.");
+        var access = new RecordingAccess { CreateFailure = cancellation, AccountAppearsWhileCreating = true };
+        access.AddProject();
+        var http = Http(access);
+
+        // An async method turns the cancellation into a cancelled task, so it comes back as a TaskCanceledException.
+        await Should.ThrowAsync<OperationCanceledException>(() => http.JoinExhibition(TestRequests.User("POST")));
+
+        access.Calls.ShouldBe([$"point:{ProjectKey}", $"account:{UserId}", $"create:{UserId}"]);
+        access.Points[ProjectKey].AccessMap.Keys.ShouldBe([OwnerId]);
+    }
+
     // The store is not reachable: the read after the failed create fails too, and says nothing about the account. The
     // exception of the create goes out, not the one of that read, and nothing is joined.
     [Fact]

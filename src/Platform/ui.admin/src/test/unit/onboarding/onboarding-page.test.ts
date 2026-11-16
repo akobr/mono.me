@@ -1079,16 +1079,74 @@ describe('the failures of the end of the wizard', () => {
     expect(setAccount).toHaveBeenCalledTimes(1)
   })
 
-  it('takes an account it cannot read for none', async () => {
+  // Only a 404 says there is no account. After any other failure of the read the account may exist, and createAccount
+  // would refuse it: the form waits until the button settles it.
+  it('holds the form back when the account cannot be read after a failed join, until a join works', async () => {
     server.use(http.post(joinUrl, conflict))
     const view = await mountWizard('/onboarding?step=organization&join=1')
     server.use(http.get(accountUrl, () => HttpResponse.json({ Message: 'The database is down.' }, { status: 500 })))
+    await fill('globex', 'portal')
 
     await click(button('Continue with the exhibition only'))
 
-    await eventually(() => expect(alerts()).toEqual(['The access point changed meanwhile.']))
+    await eventually(() =>
+      expect(alerts()).toEqual([
+        'We could not check your account. Try Continue with the exhibition only again before you create an organization.',
+        'The access point changed meanwhile.',
+      ]),
+    )
     expect(stepHeadings()).toEqual(['Create your organization'])
     expect(view.route().path).toBe('/onboarding')
+    expect(button('Create and continue')?.disabled).toBe(true)
+    expect(button('Continue with the exhibition only')?.disabled).toBe(false)
+
+    server.resetHandlers()
+    await click(button('Continue with the exhibition only'))
+    await eventually(() => expect(view.route().fullPath).toBe(exhibitionPath))
+  })
+
+  // A choice of the exhibition is never dropped silently when its lookup failed: the form waits for a Retry, or for the
+  // user to go on without it.
+  it('keeps a chosen join pending while the exhibition failed to load', async () => {
+    server.use(http.get(exhibitionUrl, () => HttpResponse.json({ Message: 'The database is down.' }, { status: 500 })))
+    const view = await mountWizard('/onboarding?step=organization&join=1')
+    await fill('globex', 'portal')
+
+    expect(alerts()[0]).toContain('You chose to join the exhibition, but it did not load.')
+    expect(button('Create and continue')?.disabled).toBe(true)
+
+    await click(button('Continue without the exhibition'))
+    await eventually(() => expect(view.route().query.join).toBeUndefined())
+    expect(button('Create and continue')?.disabled).toBe(false)
+    await submit()
+
+    await eventually(() => expect(view.route().fullPath).toBe(ownPath))
+    expect(posts()).toEqual(['POST /access/account'])
+  })
+
+  it('joins after a Retry of the exhibition from the last step', async () => {
+    server.use(http.get(exhibitionUrl, () => HttpResponse.json({ Message: 'The database is down.' }, { status: 500 })))
+    const view = await mountWizard('/onboarding?step=organization&join=1')
+    await fill('globex', 'portal')
+
+    server.resetHandlers()
+    await click(button('Retry'))
+    await eventually(() => expect(body()).toContain('You are joining the exhibition.'))
+    await submit()
+
+    await eventually(() => expect(view.route().fullPath).toBe(ownPath))
+    expect(posts()).toEqual(['POST /access/account', 'POST /access/exhibition/join'])
+  })
+
+  // The deployment stopped offering the exhibition after the wizard loaded it: Try again could never work.
+  it('ends without the exhibition when the join answers 404 after the account was created', async () => {
+    const view = await mountWizard('/onboarding?step=organization&join=1')
+    server.use(http.post(joinUrl, () => new HttpResponse(null, { status: 404 })))
+    await fill('globex', 'portal')
+    await submit()
+
+    await eventually(() => expect(view.route().fullPath).toBe(ownPath))
+    expect(body()).not.toContain('Joining the exhibition failed')
   })
 
   it('clears the failure of the exhibition only when the form is submitted', async () => {
