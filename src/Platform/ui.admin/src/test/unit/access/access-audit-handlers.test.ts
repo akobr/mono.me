@@ -129,7 +129,7 @@ describe('access audit mock: the trail', () => {
     await expectError(() => getAccessAudit('acme', { continuationToken: 'not-a-token' }), 400, 'InvalidQuery')
   })
 
-  it('pages 100 records at a time, with the offset as the continuation token', async () => {
+  it('pages 100 records at a time, after the last record of the page before', async () => {
     const db = loadDb()
     for (let index = 0; index < 120; index++) {
       recordAccessAudit(db, 'acme.billing', { Action: 'MachineReset', NewValue: 'ApiKey', Detail: `reset ${index}` })
@@ -140,12 +140,19 @@ describe('access audit mock: the trail', () => {
     const first = await getAccessAudit('acme')
     expect(first.Items).toHaveLength(accessAuditPageSize)
     expect(first.Count).toBe(accessAuditPageSize)
-    expect(first.ContinuationToken).toBe('100')
+    expect(first.ContinuationToken).toBeTruthy()
+
+    // a record written between the pages comes on a new first page only, and shifts nothing of the next one
+    const between = loadDb()
+    recordAccessAudit(between, 'acme.billing', { Action: 'MachineReset', NewValue: 'ApiKey', Detail: 'between' })
+    saveDb(between)
 
     const second = await getAccessAudit('acme', { continuationToken: first.ContinuationToken })
     expect(second.Items).toHaveLength(total - accessAuditPageSize)
     expect(second.ContinuationToken).toBeUndefined()
+    expect(second.Items!.map((entry) => entry.Detail)).not.toContain('between')
     expect(new Set([...first.Items!, ...second.Items!].map((entry) => entry.Id)).size).toBe(total)
+    expect((await getAccessAudit('acme')).Items![0]!.Detail).toBe('between')
   })
 
   it('starts the showcase with the history of fabrikam, and an organization without one empty', async () => {
@@ -350,12 +357,26 @@ describe('access audit mock: the writes', () => {
     expect(await newest()).toMatchObject({
       Action: 'FederatedIssuerCreated',
       Target: { Kind: 'Issuer', Id: 'gitlab' },
-      NewValue: JSON.stringify({ Issuer: 'https://gitlab.example.com', KeySource: 'Jwks', JwksKeys: 1 }),
+    })
+    expect(JSON.parse((await newest())!.NewValue!)).toEqual({
+      Issuer: 'https://gitlab.example.com',
+      KeySource: 'Jwks',
+      JwksKeys: 1,
+      JwksThumbprint: expect.stringMatching(/^[0-9a-f]{16}$/),
     })
 
     const before = await count()
     await setFederatedIssuer('acme', 'billing', 'gitlab', { ...gitlab })
+    // the same keys with their members in another order are the same key set
+    const reordered = JSON.stringify({ keys: [{ e: 'AQAB', n: 'modulusofthekey', kid: 'one', kty: 'RSA' }] })
+    await setFederatedIssuer('acme', 'billing', 'gitlab', { ...gitlab, Jwks: reordered })
     expect(await count()).toBe(before)
+
+    // another key in its place, the same number of keys: a change
+    const swapped = JSON.stringify({ keys: [{ kty: 'RSA', kid: 'two', n: 'anotherkeymodulus', e: 'AQAB' }] })
+    await setFederatedIssuer('acme', 'billing', 'gitlab', { ...gitlab, Jwks: swapped })
+    expect(await newest()).toMatchObject({ Action: 'FederatedIssuerUpdated' })
+    await setFederatedIssuer('acme', 'billing', 'gitlab', { ...gitlab })
 
     await setFederatedIssuer('acme', 'billing', 'gitlab', { ...gitlab, Description: 'GitLab CI' })
     expect(await newest()).toMatchObject({ Action: 'FederatedIssuerUpdated' })
@@ -363,6 +384,7 @@ describe('access audit mock: the writes', () => {
     await deleteFederatedIssuer('acme', 'billing', 'gitlab')
     expect(await newest()).toMatchObject({ Action: 'FederatedIssuerDeleted', Target: { Id: 'gitlab' } })
     expect(JSON.stringify(await trail())).not.toContain('modulusofthekey')
+    expect(JSON.stringify(await trail())).not.toContain('anotherkeymodulus')
   })
 
   it('records shared certificates issued and revoked once, without the certificate', async () => {

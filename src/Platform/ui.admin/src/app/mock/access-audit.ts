@@ -78,7 +78,11 @@ export const machineAuthenticationValue = (policy: MachineAuthenticationPolicy |
 
 /** 16 hexadecimal digits of the key (the API takes the start of its SHA-256; the mock needs no real hash). */
 function keyThumbprint(recipient: ClientEncryptionRecipient): string {
-  const text = `${recipient.PublicKey?.Kty}.${recipient.PublicKey?.N}.${recipient.PublicKey?.E}`
+  return thumbprint(`${recipient.PublicKey?.Kty}.${recipient.PublicKey?.N}.${recipient.PublicKey?.E}`)
+}
+
+/** A stable 16-digit hex fingerprint of a text (not cryptographic: the mock only needs to tell texts apart). */
+function thumbprint(text: string): string {
   let high = 0x811c9dc5
   let low = 0x01000193
   for (const char of text) {
@@ -109,20 +113,41 @@ export const keyValuePolicyValue = (policy: KeyValuePolicy) =>
     })),
   })
 
-/** An issuer without its JWKS keys, only how many there are. */
+/** JSON with the members of every object by name, so a reordered or reformatted document reads the same. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(',')}]`
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .toSorted()
+      .map((name) => `${JSON.stringify(name)}:${canonical((value as Record<string, unknown>)[name])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+/**
+ * An issuer without its JWKS keys: how many there are, and a thumbprint of the set, so a key replaced by another is a
+ * change, as in the API.
+ */
 export function issuerValue(issuer: FederatedIssuer): string {
   let keys: number | undefined
+  let keysThumbprint: string | undefined
   try {
     const jwks = issuer.Jwks ? (JSON.parse(issuer.Jwks) as { keys?: unknown }) : undefined
     keys = Array.isArray(jwks?.keys) ? jwks.keys.length : undefined
+    keysThumbprint = jwks ? thumbprint(canonical(jwks)) : undefined
   } catch {
     keys = undefined
+    keysThumbprint = issuer.Jwks ? thumbprint(issuer.Jwks) : undefined
   }
   return JSON.stringify({
     Issuer: issuer.Issuer,
     KeySource: issuer.KeySource,
     JwksUri: issuer.JwksUri || undefined,
     JwksKeys: keys,
+    JwksThumbprint: keysThumbprint,
     MaxTokenLifetimeSeconds: issuer.MaxTokenLifetimeSeconds ?? undefined,
     RequiredClaims: issuer.RequiredClaims,
     Description: issuer.Description || undefined,

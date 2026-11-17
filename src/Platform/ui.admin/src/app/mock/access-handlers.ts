@@ -344,10 +344,20 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (from.invalid || to.invalid) {
         return errorResponse(400, 'A time filter is not a date and time.', 'InvalidQuery')
       }
+      // Keyset paging as in the API: the token names the last record of the page, and the next page starts after it in
+      // the order (newest first), so records written between two pages never shift a page.
       const token = url.searchParams.get('continuationToken')
-      const offset = token ? Number(token) : 0
-      if (!Number.isInteger(offset) || offset < 0) {
-        return errorResponse(400, 'The continuation token is not one of this trail.', 'InvalidQuery')
+      let after: { time: string; id: string } | undefined
+      if (token) {
+        try {
+          const [time, id] = JSON.parse(atob(token)) as [unknown, unknown]
+          if (typeof time !== 'string' || typeof id !== 'string') {
+            throw new Error('not a token')
+          }
+          after = { time, id }
+        } catch {
+          return errorResponse(400, 'The continuation token is not one of this trail.', 'InvalidQuery')
+        }
       }
       const records = queryAccessAudit(db, org, {
         project: keyProject ?? queryProject,
@@ -356,12 +366,19 @@ export const accessManagementHandlers: HttpHandler[] = [
         from: from.time,
         to: to.time,
       })
-      const page = records.slice(offset, offset + accessAuditPageSize)
-      const next = offset + accessAuditPageSize
+      const older = after
+        ? records.filter(
+            (entry) =>
+              (entry.Time ?? '') < after.time || ((entry.Time ?? '') === after.time && (entry.Id ?? '') < after.id),
+          )
+        : records
+      const page = older.slice(0, accessAuditPageSize)
+      const last = page.at(-1)
       return HttpResponse.json({
         Items: page,
         Count: page.length,
-        ContinuationToken: next < records.length ? String(next) : undefined,
+        ContinuationToken:
+          older.length > accessAuditPageSize && last ? btoa(JSON.stringify([last.Time ?? '', last.Id ?? ''])) : undefined,
       })
     }),
   ),
