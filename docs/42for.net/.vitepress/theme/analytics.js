@@ -151,8 +151,9 @@ export function startAnalytics(router) {
   }
 
   // Called on the first page and after every navigation (popstate too), but not for a click on a heading.
-  const previous = router.onAfterRouteChanged
-  router.onAfterRouteChanged = async (to) => {
+  // VitePress 1.6 calls onAfterRouteChange, or the deprecated onAfterRouteChanged when the first is unset: chain both.
+  const previous = router.onAfterRouteChange ?? router.onAfterRouteChanged
+  router.onAfterRouteChange = async (to) => {
     await previous?.(to)
     // VitePress sets the new title and corrects the URL in the next tick.
     await nextTick()
