@@ -74,6 +74,11 @@ public class AccessAuditHttp
             ContinuationToken = request.Query[Definitions.Parameters.ContinuationToken],
         };
 
+        if (query.From > query.To)
+        {
+            throw new InvalidInputException("The query parameter 'from' must not be later than 'to'.", ErrorCodes.InvalidQuery);
+        }
+
         var page = await _audit.QueryAsync(segments[0], query, request.FunctionContext.CancellationToken);
         return new OkObjectResult(page);
     }

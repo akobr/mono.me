@@ -47,6 +47,7 @@ public partial class CosmosAccessAuditLog : IAccessAuditLog
             definition,
             new QueryRequestOptions { PartitionKey = new PartitionKey(AccessPointEntity.Partition), MaxItemCount = take },
             take,
+            isMissingEmpty: false,
             cancellationToken);
 
         // The organization as the key prefix routes the query to its physical partitions; the predicate on
@@ -57,6 +58,7 @@ public partial class CosmosAccessAuditLog : IAccessAuditLog
             definition,
             repository.QueryOptions(maxItemCount: take),
             take,
+            isMissingEmpty: true,
             cancellationToken);
 
         var merged = (await coreRecords)
@@ -173,6 +175,7 @@ public partial class CosmosAccessAuditLog : IAccessAuditLog
         QueryDefinition definition,
         QueryRequestOptions options,
         int take,
+        bool isMissingEmpty,
         CancellationToken cancellationToken)
     {
         var records = new List<AccessAuditEntity>();
@@ -186,9 +189,10 @@ public partial class CosmosAccessAuditLog : IAccessAuditLog
                 records.AddRange(await iterator.ReadNextAsync(cancellationToken));
             }
         }
-        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        catch (CosmosException exception) when (isMissingEmpty && exception.StatusCode == HttpStatusCode.NotFound)
         {
-            // No container organizations yet: no records of machines, issuers or certificates.
+            // No container organizations yet: no records of machines, issuers or certificates. A missing core is an
+            // error, never an empty trail.
             return records;
         }
 

@@ -62,6 +62,23 @@ public class AccessAuditCoreRecordTests(Startup startup)
     }
 
     [Fact]
+    public async Task Grant_ByTheSystem_IsRefused_AndRecordsNothing()
+    {
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+
+        var added = await AddedAsync(pointKey, async () =>
+        {
+            // the account of the caller is checked, not the CreatedById of the body: System has no role anywhere
+            var grant = () => Access.GrantPermissionAsync(Permission(memberId, pointKey, AccountRole.Reader) with { CreatedById = OwnerId }, AccessCaller.System);
+            await grant.Should().ThrowAsync<AccessDeniedException>();
+        });
+
+        added.Should().BeEmpty();
+        (await Access.GetAccountRoleAsync(memberId, pointKey)).Should().Be(AccountRole.None);
+    }
+
+    [Fact]
     public async Task Grant_RaisingARole_RecordsTheOldAndTheNewRole()
     {
         var pointKey = await CreateProjectAsync();
@@ -323,6 +340,21 @@ public class AccessAuditCoreRecordTests(Startup startup)
     }
 
     [Fact]
+    public async Task KeyValuePolicy_TheAllowedLevelsInAnotherOrder_RecordNothing()
+    {
+        var pointKey = await CreateProjectAsync();
+        var store = Context.Services.GetRequiredService<IKeyValuePolicyStore>();
+
+        var added = await AddedAsync(pointKey, () => store.SetAsync(
+            Organization,
+            ProjectOf(pointKey),
+            new KeyValuePolicy { AllowedProtections = [KeyValueProtection.Standard, KeyValueProtection.Public], Version = 1 },
+            ViaMcp));
+
+        added.Should().BeEmpty("the defaults allow Public and Standard, in the other order");
+    }
+
+    [Fact]
     public async Task KeyValuePolicy_ThroughThePolicyService_RecordsTheKeyValueCaller()
     {
         var pointKey = await CreateProjectAsync();
@@ -439,6 +471,87 @@ public class AccessAuditCoreRecordTests(Startup startup)
     }
 
     [Fact]
+    public async Task CreateAccessPoint_TheOwnerDemotedBeforeTheBatch_IsRefused_AndTheDemotionStays()
+    {
+        var ownerId = $"acc-{Guid.NewGuid():N}";
+        var otherOwnerId = await CreateBareAccountAsync();
+        var organization = NewName("o");
+        var demoter = AccessCaller.Account(otherOwnerId);
+        await Access.CreateAccountAsync(
+            new AccountCreate { IdentityId = ownerId, UserName = $"{ownerId}@example.com", Name = "Owner", Organization = organization, Project = NewName("p") },
+            AccessCaller.Account(ownerId));
+        await Access.GrantPermissionAsync(Permission(otherOwnerId, organization, AccountRole.Owner), AccessCaller.Account(ownerId));
+        var pointKey = $"{organization}.{NewName("q")}";
+        var storage = new InterceptedRepositoryProvider(Repositories);
+        var access = new CosmosAccessService(storage, SerializerOptions);
+        var demoted = false;
+
+        // the other Owner demotes the creator between the ownership check and the batch of the creation
+        storage.CoreInterceptor.BeforeBatch = async batch =>
+        {
+            if (!demoted && batch.Contains(BatchOperationKind.Create, $"{AccessPointEntity.IdPrefix}{pointKey}"))
+            {
+                demoted = true;
+                await Access.SetMemberRoleAsync(organization, ownerId, AccountRole.Administrator, demoter);
+            }
+
+            return null;
+        };
+
+        var create = () => access.CreateAccessPointAsync(new AccessPointCreate { Organization = organization, Project = ProjectOf(pointKey), OwnerId = ownerId }, AccessCaller.Account(ownerId));
+
+        await create.Should().ThrowAsync<AccessDeniedException>("the check runs again on the organization that refused the batch");
+        storage.CoreInterceptor.Batches.Select(batch => batch.StatusCode).Should().Equal(HttpStatusCode.PreconditionFailed);
+        (await Access.GetAccessPointAsync(pointKey)).Should().BeNull();
+        (await Access.GetAccountAsync(ownerId))!.AccessMap.Should().Contain(organization, AccountRole.Administrator, "a stale read never writes Owner back");
+        (await ReadCoreAsync(pointKey)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Seeding_AnAccessPointChangedBetweenItsReadAndTheBatch_ReadsBothAgain()
+    {
+        var organization = NewName("o");
+        var pointKey = $"{organization}.{NewName("p")}";
+        var accountId = $"acc-{Guid.NewGuid():N}";
+        var core = Repositories.GetCore().Container;
+        var partitionKey = new PartitionKey(AccessPointEntity.Partition);
+        await Data.SeedAccountAccessAsync(core, accountId, "seed@example.com", "Seed", new Dictionary<string, AccountRole> { [pointKey] = AccountRole.Owner });
+
+        // the account lost the role, so the next seed writes the account and only guards the access point
+        var account = (await core.ReadItemAsync<AccountEntity>(accountId, partitionKey)).Resource;
+        await core.ReplaceItemAsync(account with { AccessMap = [] }, accountId, partitionKey);
+        var storage = new InterceptedRepositoryProvider(Repositories);
+        var changed = false;
+
+        // someone changes the access point after the seed read it and before its batch
+        storage.CoreInterceptor.BeforeBatch = async _ =>
+        {
+            if (!changed)
+            {
+                changed = true;
+                var point = (await core.ReadItemAsync<AccessPointEntity>($"{AccessPointEntity.IdPrefix}{pointKey}", partitionKey)).Resource;
+                await core.ReplaceItemAsync(point with { AccessMap = new() { [accountId] = AccountRole.Reader } }, point.Id, partitionKey);
+            }
+
+            return null;
+        };
+
+        var added = await AddedAsync(pointKey, () =>
+            Data.SeedAccountAccessAsync(storage.GetCore().Container, accountId, "seed@example.com", "Seed", new Dictionary<string, AccountRole> { [pointKey] = AccountRole.Owner }));
+
+        storage.CoreInterceptor.Batches.Select(batch => batch.StatusCode).Should().Equal(HttpStatusCode.PreconditionFailed, HttpStatusCode.OK);
+        added.Should().ContainSingle().Which.ShouldMatch(new ExpectedAccessAudit(AccessAuditAction.MemberRoleChanged, pointKey, AccessCaller.System)
+        {
+            Target = AccessAuditTarget.Account(accountId, "Seed"),
+            OldValue = "Reader",
+            NewValue = "Owner",
+            Detail = "Seeded by DbCreator.",
+        });
+        (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().Contain(accountId, AccountRole.Owner);
+        (await Access.GetAccountAsync(accountId))!.AccessMap.Should().Contain(pointKey, AccountRole.Owner);
+    }
+
+    [Fact]
     public async Task Seeding_RecordsEveryAccessPointItCreatesOrChanges_BySystem()
     {
         var organization = NewName("o");
@@ -495,7 +608,7 @@ public class AccessAuditCoreRecordTests(Startup startup)
         {
             Target = AccessAuditTarget.Account(accountId, "Seed"),
             NewValue = "Owner",
-            Detail = "Seeded by DbCreator.",
+            Detail = "Repaired by DbCreator: the account did not hold the role of the access point.",
         });
         (await core.ReadItemAsync<AccountEntity>(accountId, partitionKey)).Resource.AccessMap.Should().Contain(pointKey, AccountRole.Owner);
     }

@@ -86,6 +86,24 @@ public class AccessAuditHttpTests
         log.Calls.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task From_LaterThanTo_IsInvalidQuery_AndReadsNoLog()
+    {
+        var (http, log, _) = Create();
+
+        var exception = await Should.ThrowAsync<InvalidInputException>(() => http.GetAccessAudit(
+            Request(q =>
+            {
+                q["from"] = "2026-11-02T00:00:00Z";
+                q["to"] = "2026-11-01T00:00:00Z";
+            }),
+            Org));
+
+        exception.Message.ShouldBe("The query parameter 'from' must not be later than 'to'.");
+        ShouldBeBadRequest(exception, ErrorCodes.InvalidQuery);
+        log.Calls.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("MemberGranted", AccessAuditAction.MemberGranted)]
     [InlineData("membergranted", AccessAuditAction.MemberGranted)]

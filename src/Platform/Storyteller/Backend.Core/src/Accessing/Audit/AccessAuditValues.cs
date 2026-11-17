@@ -72,7 +72,8 @@ public static class AccessAuditValues
     {
         return Json(new
         {
-            policy.AllowedProtections,
+            // A set: the order the levels were sent in is no change.
+            AllowedProtections = policy.AllowedProtections.Distinct().Order().ToList(),
             policy.DefaultSecretProtection,
             policy.RequireMtlsForSecretDelivery,
             HsmBackend = policy.Hsm?.Backend,
@@ -135,8 +136,9 @@ public static class AccessAuditValues
         return Convert.ToHexString(hash, 0, 8).ToLower(CultureInfo.InvariantCulture);
     }
 
-    // A thumbprint of the key set in its compact form, so a key replaced by another (the same number of keys) is a change
-    // of the issuer, and a key set only formatted differently is none.
+    // A thumbprint of the key set in a canonical form (compact, the members of every object by name, arrays in their
+    // order), so a key replaced by another (the same number of keys) is a change of the issuer, and a key set only
+    // formatted or ordered differently is none.
     private static string? JwksThumbprint(string? jwks)
     {
         if (string.IsNullOrWhiteSpace(jwks))
@@ -147,12 +149,26 @@ public static class AccessAuditValues
         try
         {
             using var document = JsonDocument.Parse(jwks);
-            return Thumbprint(JsonSerializer.Serialize(document.RootElement));
+            return Thumbprint(Canonical(document.RootElement));
         }
         catch (JsonException)
         {
             return Thumbprint(jwks);
         }
+    }
+
+    private static string Canonical(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.Object => "{" + string.Join(
+                ",",
+                element.EnumerateObject()
+                    .OrderBy(member => member.Name, StringComparer.Ordinal)
+                    .Select(member => $"{JsonSerializer.Serialize(member.Name)}:{Canonical(member.Value)}")) + "}",
+            JsonValueKind.Array => "[" + string.Join(",", element.EnumerateArray().Select(Canonical)) + "]",
+            _ => element.GetRawText(),
+        };
     }
 
     private static int? CountJwksKeys(string? jwks)

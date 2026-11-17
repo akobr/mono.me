@@ -79,6 +79,10 @@ public static class ErrorCodes
     public const string ProtectionInUse = "ProtectionInUse";
     public const string KeyEncryptionUnavailable = "KeyEncryptionUnavailable";
     public const string CustomerKeyUnavailable = "CustomerKeyUnavailable";
+
+    // The identity provider replaced a machine's client secret, but its access audit record could not be stored: the
+    // secret is withheld, and a new reset gives one.
+    public const string AccessAuditUnavailable = "AccessAuditUnavailable";
     public const string CustomerKeyInvalid = "CustomerKeyInvalid";
     public const string ByokNotConfigured = "ByokNotConfigured";
     public const string MtlsRequired = "MtlsRequired";

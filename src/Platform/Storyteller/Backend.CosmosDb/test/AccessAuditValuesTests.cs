@@ -179,6 +179,31 @@ public class AccessAuditValuesTests
     }
 
     [Fact]
+    public void Issuer_TheSameKeysWithTheirMembersInAnotherOrder_AreNoChange()
+    {
+        var ordered = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"one\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"},{\"kty\":\"RSA\",\"kid\":\"two\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"}]}";
+        var reordered = "{\"keys\":[{\"e\":\"AQAB\",\"n\":\"" + Modulus + "\",\"kid\":\"one\",\"kty\":\"RSA\"},{\"kid\":\"two\",\"e\":\"AQAB\",\"kty\":\"RSA\",\"n\":\"" + Modulus + "\"}]}";
+        var swappedOrder = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"two\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"},{\"kty\":\"RSA\",\"kid\":\"one\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"}]}";
+        var issuer = new FederatedIssuer { Name = "k8s", Issuer = "https://k8s.example.com", KeySource = FederatedIssuerKeySource.Jwks, Jwks = ordered };
+
+        AccessAuditValues.Issuer(issuer with { Jwks = reordered }).Should().Be(AccessAuditValues.Issuer(issuer));
+
+        // the order of the keys themselves is kept: arrays are not sorted
+        AccessAuditValues.Issuer(issuer with { Jwks = swappedOrder }).Should().NotBe(AccessAuditValues.Issuer(issuer));
+    }
+
+    [Fact]
+    public void KeyValuePolicy_TheAllowedLevelsInAnotherOrder_AreNoChange()
+    {
+        var policy = new KeyValuePolicy { AllowedProtections = [KeyValueProtection.Public, KeyValueProtection.Standard] };
+
+        AccessAuditValues.KeyValuePolicy(policy with { AllowedProtections = [KeyValueProtection.Standard, KeyValueProtection.Public] })
+            .Should().Be(AccessAuditValues.KeyValuePolicy(policy));
+        AccessAuditValues.KeyValuePolicy(policy with { AllowedProtections = [KeyValueProtection.Public] })
+            .Should().NotBe(AccessAuditValues.KeyValuePolicy(policy));
+    }
+
+    [Fact]
     public void Certificate_IsItsLabelAndValidity_NeverThePfxOrItsPassword()
     {
         var certificate = new SharedCertificate
