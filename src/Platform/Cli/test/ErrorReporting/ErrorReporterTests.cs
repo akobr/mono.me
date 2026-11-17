@@ -208,6 +208,35 @@ public class ErrorReporterTests
     }
 
     [Fact]
+    public async Task ABareFileName_IsHiddenInItsFullForm()
+    {
+        var logger = new RecordingLogger();
+        var reporter = ErrorReporter.Create(logger, Settings(isOptedOut: true));
+        var full = Path.GetFullPath("plans.zip");
+
+        await reporter.ReportAsync(LogLevel.Error, "Unhandled exception", Run("story", "export", "-o", "plans.zip"), Thrown(() => new FileNotFoundException($"Could not find file '{full}'.")));
+
+        logger.Entries.Single().Exception.ShouldNotBeNull().ToString().ShouldContain("Could not find file '***'.");
+    }
+
+    // The SDK names an extra, a tag or a context by an Exception.Data key "sentry:…", which BeforeSend cannot rename.
+    [Fact]
+    public async Task TheNameOfASentryKeyOfExceptionData_IsNotSent()
+    {
+        var transport = new RecordingTransport();
+        var reporter = ErrorReporter.Create(null, Settings(), options => options.Transport = transport);
+        var exception = Thrown(() => new InvalidOperationException("boom", Thrown(() => new FormatException("inner"))));
+        exception.Data["sentry:acme-billing-secret"] = "x";
+        exception.InnerException!.Data["sentry:tag:globex-payroll"] = "y";
+
+        await reporter.ReportAsync(LogLevel.Error, "Unhandled exception", Run("story"), exception);
+
+        transport.Events.Count.ShouldBe(1);
+        transport.AllText.ShouldNotContain("acme-billing-secret");
+        transport.AllText.ShouldNotContain("globex-payroll");
+    }
+
+    [Fact]
     public void TheEvent_IsBuiltFromTheUsage()
     {
         var sentryEvent = ErrorReporter.CreateEvent(LogLevel.Error, "Unhandled exception", new CommandUsage("sform storyteller kv set", ["--secret"]), null);
