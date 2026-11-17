@@ -1,9 +1,21 @@
 import { defineConfig } from 'vitepress'
-import { withMermaid } from 'vitepress-plugin-mermaid'
 import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 
 // https://vitepress.dev/reference/site-config
-export default withMermaid({
+// A ```mermaid fence becomes the theme's Mermaid component (.vitepress/theme/Mermaid.vue), drawn in the browser.
+function mermaidFences(md) {
+  const fence = md.renderer.rules.fence
+  let count = 0
+  md.renderer.rules.fence = (tokens, index, options, env, self) => {
+    const token = tokens[index]
+    if (token.info.trim() === 'mermaid') {
+      return `<Mermaid id="mermaid-${count++}" graph="${encodeURIComponent(token.content)}" />`
+    }
+    return fence(tokens, index, options, env, self)
+  }
+}
+
+export default defineConfig({
   title: '42for.net',
   description: 'simple and clean .net',
   head: [
@@ -21,6 +33,7 @@ export default withMermaid({
   markdown: {
     config(md) {
       md.use(tabsMarkdownPlugin)
+      md.use(mermaidFences)
     }
   },
   themeConfig: {
@@ -136,11 +149,5 @@ export default withMermaid({
       message: 'Released under the MIT License.',
       copyright: 'Copyright © 2024 Ales Kobr'
     }
-  },
-  mermaid: {
-    // refer https://mermaid.js.org/config/setup/modules/mermaidAPI.html#mermaidapi-configuration-defaults for options
-  },
-  mermaidPlugin: {
-    class: "mermaid", // set additional css classes for parent container 
-  },
+  }
 })
