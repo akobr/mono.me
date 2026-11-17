@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -80,7 +81,7 @@ public sealed class StorageInterceptor
 
     internal async Task<ResponseMessage> ReadManyAsync(IReadOnlyList<string> ids, Func<Task<ResponseMessage>> read)
     {
-        _readsOfMany.Enqueue(ids);
+        _readsOfMany.Enqueue(ids.ToArray());
         var answer = BeforeReadMany is null ? null : await BeforeReadMany(ids);
         return answer ?? await read();
     }

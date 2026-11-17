@@ -49,7 +49,7 @@ public class CosmosAnnotationParentReadTests(Startup startup)
         var result = await service.DeleteAnnotationAsync(FullKeyOf(project, "cnt.shop.blue"), Actor);
 
         result.DeletedKeys.Should().Equal("exe.shop.billing.blue", "exe.shop.shipping.blue", "cnt.shop.blue");
-        storage.Interceptor.ReadsOfMany.Should().ContainSingle().Which.Should().BeEquivalentTo(parents);
+        ReadsOfParents(storage, parents).Should().ContainSingle().Which.Should().BeEquivalentTo(parents);
         storage.Interceptor.PointReads.Should().NotIntersectWith(parents);
 
         // each parent is written with the ETag of the read
@@ -83,7 +83,7 @@ public class CosmosAnnotationParentReadTests(Startup startup)
 
         result.Failed.Should().BeEmpty();
         result.Annotations.Select(annotation => annotation.AnnotationKey).Should().Equal("usg.shop.billing", "exe.shop.billing.blue", "exe.shop.billing.green");
-        storage.Interceptor.ReadsOfMany.Should().ContainSingle().Which.Should().BeEquivalentTo(parents);
+        ReadsOfParents(storage, parents).Should().ContainSingle().Which.Should().BeEquivalentTo(parents);
         storage.Interceptor.PointReads.Should().NotIntersectWith(parents);
         (await GetAsync<Context>(project, "cnt.shop.blue")).ResponsibilityNames.Should().Contain("billing");
         (await GetAsync<Context>(project, "cnt.shop.green")).ResponsibilityNames.Should().Contain("billing");
@@ -115,8 +115,9 @@ public class CosmosAnnotationParentReadTests(Startup startup)
         result.DeletedKeys.Should().Equal("exe.shop.billing.blue");
         storage.Interceptor.Batches.Where(batch => batch.Contains(BatchOperationKind.Replace, root)).Select(batch => batch.StatusCode)
             .Should().HaveCount(2).And.StartWith(HttpStatusCode.PreconditionFailed);
-        storage.Interceptor.ReadsOfMany.Should().HaveCount(2, "every attempt reads the parents")
-            .And.AllSatisfy(ids => ids.Should().BeEquivalentTo(Id("usg.shop.billing"), Id("cnt.shop.blue")));
+        string[] parents = [Id("usg.shop.billing"), Id("cnt.shop.blue")];
+        ReadsOfParents(storage, parents).Should().HaveCount(2, "every attempt reads the parents")
+            .And.AllSatisfy(ids => ids.Should().BeEquivalentTo(parents));
         (await GetAsync<Usage>(project, "usg.shop.billing")).ContextNames.Should().NotContain("blue");
         (await GetAsync<Context>(project, "cnt.shop.blue")).ResponsibilityNames.Should().NotContain("billing");
     }
@@ -148,14 +149,21 @@ public class CosmosAnnotationParentReadTests(Startup startup)
         result.Annotations.Select(annotation => annotation.AnnotationKey).Should().Equal("usg.shop.billing", "exe.shop.billing.blue");
         storage.Interceptor.Batches.Where(batch => batch.Contains(BatchOperationKind.Replace, usage)).Select(batch => batch.StatusCode)
             .Should().HaveCount(2).And.StartWith(HttpStatusCode.PreconditionFailed);
-        storage.Interceptor.ReadsOfMany.Should().HaveCount(2, "every attempt reads the parents")
-            .And.AllSatisfy(ids => ids.Should().BeEquivalentTo(Id("cnt.shop.blue")));
+        string[] parents = [Id("cnt.shop.blue")];
+        ReadsOfParents(storage, parents).Should().HaveCount(2, "every attempt reads the parents")
+            .And.AllSatisfy(ids => ids.Should().BeEquivalentTo(parents));
         (await GetAsync<Context>(project, "cnt.shop.blue")).ResponsibilityNames.Should().Contain("billing");
     }
 
     private static string Id(string key)
     {
         return $"{View}.{key}";
+    }
+
+    // the reads of many items that ask for any of the parents; other reads of many items of the operation don't count
+    private static List<IReadOnlyList<string>> ReadsOfParents(InterceptedRepositoryProvider storage, IReadOnlyCollection<string> parents)
+    {
+        return storage.Interceptor.ReadsOfMany.Where(ids => ids.Intersect(parents).Any()).ToList();
     }
 
     private static FullKey FullKeyOf(string project, string key)
