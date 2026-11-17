@@ -301,10 +301,18 @@ function addModules(b: ScopeBuilder) {
   b.unit('reporting', 'month-end', { unitType: 'time', definition: '0 3 1 * *', title: 'Month-end reports' })
 }
 
+// The pairs of the values store the modules bind (showcase/key-values.ts, only in the default view; elsewhere the
+// bindings stay as stored): the mail and the PDF renderer of invoicing, the Adyen account of payments and the
+// reminders of dunning. Top-level bindings only, so a view without the pairs still reads.
+const invoicingBindings = {
+  email: { host: '@smtp.host', sender: '@smtp.sender', password: '@(smtp.password, secret)' },
+  pdfRenderer: '@pdf.rendererUrl',
+}
+
 function moduleDocuments(b: ScopeBuilder, next: boolean) {
   // Product defaults of invoicing, tuned over a year and a half: the long history of the project.
   const invoicing = evolve(
-    { baseCurrency: 'EUR', retryPolicy: { attempts: 3, backoffSeconds: 30 }, features: ['pdf', 'email'] },
+    { baseCurrency: 'EUR', retryPolicy: { attempts: 3, backoffSeconds: 30 }, features: ['pdf', 'email'], ...invoicingBindings },
     18,
     (version) =>
       version === 4
@@ -324,7 +332,12 @@ function moduleDocuments(b: ScopeBuilder, next: boolean) {
     [
       { providers: ['adyen'], settlementDay: 'mon', captureDelayHours: 24 },
       { providers: ['adyen', 'stripe'], settlementDay: 'mon', captureDelayHours: 24 },
-      { providers: ['adyen', 'stripe'], settlementDay: 'mon', captureDelayHours: 0 },
+      {
+        providers: ['adyen', 'stripe'],
+        settlementDay: 'mon',
+        captureDelayHours: 0,
+        adyen: { merchantAccount: '@payments.adyen.merchantAccount', hmacKey: '@(payments.adyen.hmacKey, secret)' },
+      },
     ],
     { every: 40 },
   )
@@ -336,6 +349,7 @@ function moduleDocuments(b: ScopeBuilder, next: boolean) {
         { afterDays: 7, channel: 'email' },
         { afterDays: 21, channel: 'letter' },
       ],
+      maxReminders: '@dunning.maxReminders',
     },
   ])
   b.configure('unt.invoicing.nightly-export', { format: 'csv', target: 'sftp', includeDrafts: false })

@@ -8,5 +8,6 @@
       "afterDays": 21,
       "channel": "letter"
     }
-  ]
+  ],
+  "maxReminders": "@dunning.maxReminders"
 }
