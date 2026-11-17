@@ -35,10 +35,10 @@ public class DataSetSeederKeyValuesTests
 
     public DataSetSeederKeyValuesTests()
     {
-        _access.Setup(access => access.CreateAccountAsync(It.IsAny<AccountCreate>()))
-            .ReturnsAsync((AccountCreate model) => new Account { Id = model.IdentityId, UserName = model.UserName, Name = model.Name, AccessMap = new Dictionary<string, AccountRole>() });
-        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()))
-            .ReturnsAsync((AccessPointCreate model) => new AccessPoint { Key = $"{model.Organization}.{model.Project}", AccessMap = new Dictionary<string, AccountRole>() });
+        _access.Setup(access => access.CreateAccountAsync(It.IsAny<AccountCreate>(), It.IsAny<AccessCaller>()))
+            .ReturnsAsync((AccountCreate model, AccessCaller _) => new Account { Id = model.IdentityId, UserName = model.UserName, Name = model.Name, AccessMap = new Dictionary<string, AccountRole>() });
+        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()))
+            .ReturnsAsync((AccessPointCreate model, AccessCaller _) => new AccessPoint { Key = $"{model.Organization}.{model.Project}", AccessMap = new Dictionary<string, AccountRole>() });
         _views.Setup(views => views.GetViewsAsync(Organization, Project, false))
             .ReturnsAsync([new View { Name = "default", IsDefault = true }]);
     }

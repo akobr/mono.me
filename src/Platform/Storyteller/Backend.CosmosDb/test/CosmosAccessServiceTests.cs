@@ -540,9 +540,9 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync("The exhibition.");
         var memberId = $"acc-{Guid.NewGuid():N}";
-        await Access.CreateAccountAsync(new AccountCreate { IdentityId = memberId, UserName = $"{memberId}@example.com", Name = "Visitor" });
+        await Access.CreateAccountAsync(new AccountCreate { IdentityId = memberId, UserName = $"{memberId}@example.com", Name = "Visitor" }, AccessCaller.Account(memberId));
 
-        var joined = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader);
+        var joined = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader, AccessCaller.Account(memberId));
 
         joined.Should().Be(AccountRole.Reader);
         var account = await Access.GetAccountAsync(memberId);
@@ -554,7 +554,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointETag = await ReadETagAsync($"apt.{pointKey}");
         var accountETag = await ReadETagAsync(memberId);
 
-        var again = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader);
+        var again = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader, AccessCaller.Account(memberId));
 
         again.Should().Be(AccountRole.Reader);
         (await ReadETagAsync($"apt.{pointKey}")).Should().Be(pointETag);
