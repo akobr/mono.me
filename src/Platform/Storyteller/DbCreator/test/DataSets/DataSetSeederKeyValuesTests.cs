@@ -294,6 +294,50 @@ public class DataSetSeederKeyValuesTests
     }
 
     [Fact]
+    public async Task Seed_AFailedWriteWhoseListingFailsToo_ReportsTheFailureOfTheWrite()
+    {
+        AddSet(Pairs(("a", "Public", "1"), ("b", "Public", "2")));
+        _keyValues.WriteException = new RequestFailedException(403, "Forbidden by the vault.");
+        _keyValues.WrittenBeforeException = 1;
+        _keyValues.ActiveListException = new InvalidOperationException("The listing broke.");
+
+        var set = (await Seeder().SeedAsync(Request, TestContext.Current.CancellationToken)).Sets.Single();
+
+        // without the listing, every pair of the call is failed with the error of the write, not of the listing
+        set.Failures.Select(item => (item.KeyValueKey, item.Message)).ShouldBe(
+        [
+            ("a", "The key vault failed: Forbidden by the vault."),
+            ("b", "The key vault failed: Forbidden by the vault."),
+        ]);
+    }
+
+    [Fact]
+    public async Task Seed_DryRunOfSeveralSets_DecidesAPairAgainstWhatAnEarlierSetWouldCreate()
+    {
+        SetFiles.Add(
+            _fileSystem,
+            Path.Combine(Tool, DataSetCatalog.BuiltInFolderName, "base"),
+            ("set.json", Manifest),
+            ("key-values.json", Pairs(("a", "Public", "1"), ("b", "Public", "2"))));
+        AddSet(Pairs(("A", "Public", "1"), ("b", "Public", "3"), ("c", "Public", "4")));
+        _fileSystem.File.WriteAllText(
+            Path.Combine(Tool, DataSetCatalog.BuiltInFolderName, "pairs", "set.json"),
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite", "DependsOn": [ "base" ] }""");
+
+        var run = await Seeder().SeedAsync(Request with { Options = new DataSetSeedOptions { DryRun = true } }, TestContext.Current.CancellationToken);
+
+        // what the real run would find stored after the set base: a equal (Unchanged), b with another value (Skipped)
+        run.Sets.Select(set => set.Set.Name).ShouldBe(["base", "pairs"]);
+        run.Sets[0].KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = 2 });
+        var pairs = run.Sets[1];
+        pairs.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = 1, Unchanged = 1, Skipped = 1 });
+        pairs.Items.Single().ShouldSatisfyAllConditions(
+            item => item.KeyValueKey.ShouldBe("b"),
+            item => item.ErrorCode.ShouldBe(DataSetKeyValueSeeder.KeyValueExists));
+        _keyValues.Pairs.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Seed_ASetWithoutPairsCallsNoImport()
     {
         AddSet(null, ("annotations/rst.x.json", "{}"));

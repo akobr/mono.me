@@ -127,6 +127,7 @@ public sealed class DataSetSeeder
 
         // a dry run stores nothing, so each set starts from what the sets before it would have written
         var written = options.DryRun ? new ViewImportOverlay() : null;
+        var writtenPairs = options.DryRun ? new Dictionary<string, KeyValueDocumentItem>(StringComparer.Ordinal) : null;
 
         foreach (var set in plan.Sets)
         {
@@ -140,7 +141,7 @@ public sealed class DataSetSeeder
                 continue;
             }
 
-            var result = await SeedSetAsync(set, target, options, written, cancellationToken);
+            var result = await SeedSetAsync(set, target, options, written, writtenPairs, cancellationToken);
             results.Add(result);
 
             if (result.HasFailures)
@@ -160,7 +161,7 @@ public sealed class DataSetSeeder
     // without failures; a set whose record has its version and hash is not read further, unless Again.
     public Task<DataSetSeedResult> SeedSetAsync(DataSet set, DataSetTarget target, DataSetSeedOptions options, CancellationToken cancellationToken = default)
     {
-        return SeedSetAsync(set, target, options, null, cancellationToken);
+        return SeedSetAsync(set, target, options, null, null, cancellationToken);
     }
 
     private static bool IsAnnotation(ViewArchiveFile file)
@@ -377,12 +378,13 @@ public sealed class DataSetSeeder
     }
 
     // written: in a dry run of several sets, what the sets before this one would have written; this set's overlay
-    // starts from it, and adds to it what this set would write.
+    // starts from it, and adds to it what this set would write. writtenPairs: the same for the pairs, by normalized key.
     private async Task<DataSetSeedResult> SeedSetAsync(
         DataSet set,
         DataSetTarget target,
         DataSetSeedOptions options,
         ViewImportOverlay? written,
+        Dictionary<string, KeyValueDocumentItem>? writtenPairs,
         CancellationToken cancellationToken)
     {
         var started = _time.GetTimestamp();
@@ -441,7 +443,7 @@ public sealed class DataSetSeeder
         // the pairs before the configurations that bind them
         var keyValues = content.KeyValues is null
             ? null
-            : await _keyValues.SeedAsync(target, content.KeyValues, options.DryRun, items, cancellationToken);
+            : await _keyValues.SeedAsync(target, content.KeyValues, options.DryRun, items, writtenPairs, cancellationToken);
         await ImportAsync(target, content.Documents.Files.Where(file => !IsAnnotation(file)).ToList(), importOptions, overlay, documents, items, cancellationToken);
 
         if (written is not null)

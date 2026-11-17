@@ -22,6 +22,9 @@ internal sealed class FakeKeyValueService : IKeyValueService
 
     public int WrittenBeforeException { get; set; }
 
+    // thrown by a listing of the active pairs instead of listing
+    public Exception? ActiveListException { get; set; }
+
     // thrown by the next plan (a dry run) instead of planning
     public Exception? PlanException { get; set; }
 
@@ -111,6 +114,12 @@ internal sealed class FakeKeyValueService : IKeyValueService
     {
         Lists++;
         request.State.ShouldNotBe(KeyValueState.All);
+
+        if (request.State == KeyValueState.Active && ActiveListException is { } listException)
+        {
+            throw listException;
+        }
+
         var isDeleted = request.State == KeyValueState.Deleted;
         var skip = request.ContinuationToken is null ? 0 : int.Parse(request.ContinuationToken, System.Globalization.CultureInfo.InvariantCulture);
         var listed = Pairs.Values.Where(pair => pair.IsDeleted == isDeleted).OrderBy(pair => pair.Item.Key, StringComparer.Ordinal).ToList();

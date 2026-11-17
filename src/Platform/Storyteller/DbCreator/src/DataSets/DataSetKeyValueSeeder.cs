@@ -72,12 +72,15 @@ public sealed class DataSetKeyValueSeeder
 
     // The pairs into the target in chunks of the import, in the order of the file: each chunk planned with a dry run,
     // then (unless dryRun) its missing pairs written. Adds an item per outcome but Created and Unchanged to items.
+    // planned: in a dry run of several sets, the pairs the sets before this one would create, which nothing stored; a
+    // missing pair among them is decided against it, and this set's pairs that would be created join it.
     // Failures of a pair are outcomes; a failure of the storage ends the seed.
     public async Task<DataSetKeyValuesResult> SeedAsync(
         DataSetTarget target,
         DataSetKeyValues pairs,
         bool dryRun,
         List<DataSetSeedItem> items,
+        IDictionary<string, KeyValueDocumentItem>? planned = null,
         CancellationToken cancellationToken = default)
     {
         var outcomes = new PairOutcome?[pairs.Items.Count];
@@ -133,7 +136,22 @@ public sealed class DataSetKeyValueSeeder
             {
                 foreach (var index in missing)
                 {
+                    var item = pairs.Items[index];
+                    var key = KeyValueRules.Normalize(item.Key);
+
+                    if (planned is not null && planned.TryGetValue(key, out var earlier))
+                    {
+                        // an earlier set of the run would create it: what the real run then finds stored
+                        outcomes[index] = earlier.Protection == item.Protection
+                            && string.Equals(earlier.ContentType, item.ContentType, StringComparison.Ordinal)
+                            && string.Equals(earlier.Value, item.Value, StringComparison.Ordinal)
+                                ? new PairOutcome(ViewImportOutcome.Unchanged)
+                                : new PairOutcome(ViewImportOutcome.Skipped, KeyValueExists, "An earlier set of the run creates the pair with another value, level or content type; a seed never changes it.");
+                        continue;
+                    }
+
                     outcomes[index] = new PairOutcome(ViewImportOutcome.Created);
+                    planned?.TryAdd(key, item);
                 }
             }
             else if (missing.Count > 0)
@@ -169,6 +187,7 @@ public sealed class DataSetKeyValueSeeder
 
         var tries = aggregate.Flatten().InnerExceptions;
         return tries.Count > 0
+            // OperationCanceledException: a try that timed out; the import passes no token of the seed to the vault
             && tries.All(inner => inner is RequestFailedException or AuthenticationFailedException or IOException or OperationCanceledException);
     }
 
@@ -367,8 +386,19 @@ public sealed class DataSetKeyValueSeeder
             // the import commits in batches of 50 and encrypts per batch, so a failure of a later batch leaves the
             // earlier ones stored; the listing (no vault) tells them, as the pairs planned missing that are active now
             _logger.LogWarning(exception, "The write of {Count} pairs of {Target} failed.", missing.Count, target);
-            var active = await GetKeysAsync(target, KeyValueState.Active);
             var failed = Failed(exception);
+            HashSet<string> active;
+
+            try
+            {
+                active = await GetKeysAsync(target, KeyValueState.Active);
+            }
+            catch (Exception listing) when (listing is not OperationCanceledException)
+            {
+                // the failure of the write is the one to report; without the listing every pair of the call is failed
+                _logger.LogWarning(listing, "The active pairs of {Target} could not be listed after a failed write.", target);
+                active = [];
+            }
 
             foreach (var index in missing)
             {
