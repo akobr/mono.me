@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.43.11464
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -767,7 +767,7 @@ export const grantUserAccess = async (
 export const getGrantUserAccessMutationKey = () => ["grantUserAccess"] as const;
 
 export const getGrantUserAccessMutationOptions = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -808,14 +808,14 @@ export type GrantUserAccessMutationResult = NonNullable<
   Awaited<ReturnType<typeof grantUserAccess>>
 >;
 export type GrantUserAccessMutationBody = BodyType<Permission> | undefined;
-export type GrantUserAccessMutationError = ErrorType<void | ErrorResponse>;
+export type GrantUserAccessMutationError = ErrorType<ErrorResponse>;
 export type GrantUserAccessMutationVariables = { data?: BodyType<Permission> };
 
 /**
  * @deprecated
  */
 export const useGrantUserAccess = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -883,7 +883,7 @@ export const getRevokeUserAccessMutationKey = () =>
   ["revokeUserAccess"] as const;
 
 export const getRevokeUserAccessMutationOptions = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -924,14 +924,14 @@ export type RevokeUserAccessMutationResult = NonNullable<
   Awaited<ReturnType<typeof revokeUserAccess>>
 >;
 export type RevokeUserAccessMutationBody = BodyType<Permission> | undefined;
-export type RevokeUserAccessMutationError = ErrorType<void | ErrorResponse>;
+export type RevokeUserAccessMutationError = ErrorType<ErrorResponse>;
 export type RevokeUserAccessMutationVariables = { data?: BodyType<Permission> };
 
 /**
  * @deprecated
  */
 export const useRevokeUserAccess = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -1124,7 +1124,7 @@ export const getCreateMachineAccessMutationKey = () =>
   ["createMachineAccess"] as const;
 
 export const getCreateMachineAccessMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1166,7 +1166,7 @@ export type CreateMachineAccessMutationResult = NonNullable<
 >;
 export type CreateMachineAccessMutationBody =
   BodyType<MachineAccessCreate> | undefined;
-export type CreateMachineAccessMutationError = ErrorType<ErrorResponse | void>;
+export type CreateMachineAccessMutationError = ErrorType<ErrorResponse>;
 export type CreateMachineAccessMutationVariables = {
   organization: string;
   project: string;
@@ -1174,7 +1174,7 @@ export type CreateMachineAccessMutationVariables = {
 };
 
 export const useCreateMachineAccess = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -1353,7 +1353,7 @@ export const getResetMachineAccessMutationKey = () =>
   ["resetMachineAccess"] as const;
 
 export const getResetMachineAccessMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1394,7 +1394,7 @@ export type ResetMachineAccessMutationResult = NonNullable<
   Awaited<ReturnType<typeof resetMachineAccess>>
 >;
 
-export type ResetMachineAccessMutationError = ErrorType<ErrorResponse | void>;
+export type ResetMachineAccessMutationError = ErrorType<ErrorResponse>;
 export type ResetMachineAccessMutationVariables = {
   organization: string;
   project: string;
@@ -1402,7 +1402,7 @@ export type ResetMachineAccessMutationVariables = {
 };
 
 export const useResetMachineAccess = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -1843,7 +1843,7 @@ export const getGetAuthConfigurationUrl = () => {
 };
 
 /**
- * Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
+ * Anonymous. Tells clients which identity provider signs users in and with which public settings, whether the user token exchange is enabled, and the step-up of users (whether secrets, role changes and machine credentials need a recent sign-in, and its max age in seconds).
  */
 export const getAuthConfiguration = async (
   options?: Parameters<typeof storytellerFetch>[1],
@@ -2371,7 +2371,7 @@ export const getIssueSharedCertificateMutationKey = () =>
   ["issueSharedCertificate"] as const;
 
 export const getIssueSharedCertificateMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2413,8 +2413,7 @@ export type IssueSharedCertificateMutationResult = NonNullable<
 >;
 export type IssueSharedCertificateMutationBody =
   BodyType<SharedCertificateCreate> | undefined;
-export type IssueSharedCertificateMutationError =
-  ErrorType<ErrorResponse | void>;
+export type IssueSharedCertificateMutationError = ErrorType<ErrorResponse>;
 export type IssueSharedCertificateMutationVariables = {
   organization: string;
   project: string;
@@ -2422,7 +2421,7 @@ export type IssueSharedCertificateMutationVariables = {
 };
 
 export const useIssueSharedCertificate = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -3024,7 +3023,7 @@ export const getSetFederatedIssuerMutationKey = () =>
   ["setFederatedIssuer"] as const;
 
 export const getSetFederatedIssuerMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3072,7 +3071,7 @@ export type SetFederatedIssuerMutationResult = NonNullable<
 >;
 export type SetFederatedIssuerMutationBody =
   BodyType<FederatedIssuer> | undefined;
-export type SetFederatedIssuerMutationError = ErrorType<ErrorResponse | void>;
+export type SetFederatedIssuerMutationError = ErrorType<ErrorResponse>;
 export type SetFederatedIssuerMutationVariables = {
   organization: string;
   project: string;
@@ -3081,7 +3080,7 @@ export type SetFederatedIssuerMutationVariables = {
 };
 
 export const useSetFederatedIssuer = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -3266,7 +3265,7 @@ export const getSetMachineFederationRulesMutationKey = () =>
   ["setMachineFederationRules"] as const;
 
 export const getSetMachineFederationRulesMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3314,8 +3313,7 @@ export type SetMachineFederationRulesMutationResult = NonNullable<
 >;
 export type SetMachineFederationRulesMutationBody =
   BodyType<FederationRule[]> | undefined;
-export type SetMachineFederationRulesMutationError =
-  ErrorType<ErrorResponse | void>;
+export type SetMachineFederationRulesMutationError = ErrorType<ErrorResponse>;
 export type SetMachineFederationRulesMutationVariables = {
   organization: string;
   project: string;
@@ -3324,7 +3322,7 @@ export type SetMachineFederationRulesMutationVariables = {
 };
 
 export const useSetMachineFederationRules = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -3653,7 +3651,7 @@ export const getCreateInvitationMutationKey = () =>
   ["createInvitation"] as const;
 
 export const getCreateInvitationMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3695,14 +3693,14 @@ export type CreateInvitationMutationResult = NonNullable<
 >;
 export type CreateInvitationMutationBody =
   BodyType<InvitationCreate> | undefined;
-export type CreateInvitationMutationError = ErrorType<ErrorResponse | void>;
+export type CreateInvitationMutationError = ErrorType<ErrorResponse>;
 export type CreateInvitationMutationVariables = {
   key: string;
   data?: BodyType<InvitationCreate>;
 };
 
 export const useCreateInvitation = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -4294,7 +4292,7 @@ export const setMemberRole = async (
 export const getSetMemberRoleMutationKey = () => ["setMemberRole"] as const;
 
 export const getSetMemberRoleMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4335,7 +4333,7 @@ export type SetMemberRoleMutationResult = NonNullable<
   Awaited<ReturnType<typeof setMemberRole>>
 >;
 export type SetMemberRoleMutationBody = BodyType<MemberRoleUpdate> | undefined;
-export type SetMemberRoleMutationError = ErrorType<ErrorResponse | void>;
+export type SetMemberRoleMutationError = ErrorType<ErrorResponse>;
 export type SetMemberRoleMutationVariables = {
   key: string;
   accountId: string;
@@ -4343,7 +4341,7 @@ export type SetMemberRoleMutationVariables = {
 };
 
 export const useSetMemberRole = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -4385,7 +4383,7 @@ export const removeMember = async (
 export const getRemoveMemberMutationKey = () => ["removeMember"] as const;
 
 export const getRemoveMemberMutationOptions = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4426,11 +4424,11 @@ export type RemoveMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof removeMember>>
 >;
 
-export type RemoveMemberMutationError = ErrorType<void | ErrorResponse>;
+export type RemoveMemberMutationError = ErrorType<ErrorResponse>;
 export type RemoveMemberMutationVariables = { key: string; accountId: string };
 
 export const useRemoveMember = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {

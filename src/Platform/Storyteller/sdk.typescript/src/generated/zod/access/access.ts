@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.43.11464
  */
 import * as zod from "zod";
 
@@ -788,7 +788,7 @@ export const SetMachineAuthenticationResponse = zod.object({
 });
 
 /**
- * Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
+ * Anonymous. Tells clients which identity provider signs users in and with which public settings, whether the user token exchange is enabled, and the step-up of users (whether secrets, role changes and machine credentials need a recent sign-in, and its max age in seconds).
  */
 export const GetAuthConfigurationResponse = zod.object({
   Provider: zod.string().optional(),
@@ -800,6 +800,12 @@ export const GetAuthConfigurationResponse = zod.object({
   TokenExchange: zod
     .object({
       Enabled: zod.boolean().optional(),
+    })
+    .optional(),
+  StepUp: zod
+    .object({
+      Enabled: zod.boolean().optional(),
+      MaxAge: zod.int().optional(),
     })
     .optional(),
 });

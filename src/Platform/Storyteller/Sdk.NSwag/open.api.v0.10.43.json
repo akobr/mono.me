@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.40.6327"
+    "version": "0.10.43.11464"
   },
   "servers": [
     {
@@ -525,6 +525,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
@@ -544,9 +562,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -589,6 +604,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).",
             "content": {
@@ -608,9 +641,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -758,6 +788,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
@@ -787,9 +835,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -932,6 +977,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
@@ -991,9 +1054,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -4143,7 +4203,7 @@
         "tags": [
           "Access"
         ],
-        "description": "Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.",
+        "description": "Anonymous. Tells clients which identity provider signs users in and with which public settings, whether the user token exchange is enabled, and the step-up of users (whether secrets, role changes and machine credentials need a recent sign-in, and its max age in seconds).",
         "operationId": "GetAuthConfiguration",
         "responses": {
           "200": {
@@ -4502,6 +4562,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).",
             "content": {
@@ -4511,9 +4589,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -5582,7 +5657,7 @@
                 }
               },
               "X-2S-Secrets-Withheld": {
-                "description": "mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; the secrets then stay unbound, as their @ expressions. Absent otherwise.",
+                "description": "Why the caller's right to read secrets was withheld, one value: mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; actor-restricted when a user who may read secrets acts through an actor that may not reveal them (NoSecretReveal); step-up-required when a user who may read secrets signed in longer ago than Auth:StepUp:MaxAge (sign in again). The secrets then stay unbound, as their @ expressions. Absent otherwise.",
                 "schema": {
                   "type": "string"
                 }
@@ -5688,7 +5763,7 @@
                 }
               },
               "X-2S-Secrets-Withheld": {
-                "description": "mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; the secrets then stay unbound, as their @ expressions. Absent otherwise.",
+                "description": "Why the caller's right to read secrets was withheld, one value: mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; actor-restricted when a user who may read secrets acts through an actor that may not reveal them (NoSecretReveal); step-up-required when a user who may read secrets signed in longer ago than Auth:StepUp:MaxAge (sign in again). The secrets then stay unbound, as their @ expressions. Absent otherwise.",
                 "schema": {
                   "type": "string"
                 }
@@ -10389,6 +10464,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Replacing an existing trusted issuer is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
@@ -10408,9 +10501,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -10594,6 +10684,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
@@ -10613,9 +10721,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -10859,6 +10964,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
@@ -10878,9 +11001,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -12006,6 +12126,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).",
             "content": {
@@ -12025,9 +12163,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -12131,6 +12266,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).",
             "content": {
@@ -12150,9 +12303,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -12529,6 +12679,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -12538,9 +12706,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -12701,6 +12866,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -12710,9 +12893,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -12849,6 +13029,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -12861,9 +13059,6 @@
           },
           "204": {
             "description": "Deleted."
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -13227,6 +13422,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -13236,9 +13449,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -13514,6 +13724,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -13523,9 +13751,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -13671,6 +13896,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -13680,9 +13923,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -13838,6 +14078,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -13847,9 +14105,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -13972,6 +14227,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -13981,9 +14254,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -14151,6 +14421,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -14160,9 +14448,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
           }
         },
         "security": [
@@ -14581,6 +14866,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
@@ -14600,9 +14903,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -14664,6 +14964,24 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "With StepUpRequired: Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).",
             "content": {
@@ -14686,9 +15004,6 @@
           },
           "204": {
             "description": "The member was removed."
-          },
-          "401": {
-            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
           }
         },
         "security": [
@@ -17809,6 +18124,9 @@
           },
           "TokenExchange": {
             "$ref": "#/components/schemas/TokenExchangeConfiguration"
+          },
+          "StepUp": {
+            "$ref": "#/components/schemas/StepUpConfiguration"
           }
         }
       },
@@ -20017,6 +20335,18 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          }
+        }
+      },
+      "StepUpConfiguration": {
+        "type": "object",
+        "properties": {
+          "Enabled": {
+            "type": "boolean"
+          },
+          "MaxAge": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.43.11464
  */
 
 export * from "./accessPoint";
@@ -246,6 +246,7 @@ export * from "./setTemplateBody";
 export * from "./sharedCertificate";
 export * from "./sharedCertificateCreate";
 export * from "./startViewImportParams";
+export * from "./stepUpConfiguration";
 export * from "./subject";
 export * from "./subjectAnnotationType";
 export * from "./tokenExchangeConfiguration";
