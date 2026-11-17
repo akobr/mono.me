@@ -126,9 +126,21 @@ public class KeyValuePolicySetCommand : KeyValueCommandBase
     }
 }
 
-[Command(CommandNames.BYOK_SETUP, Description = "What the customer needs to bring their own key: the application to consent to and the role to grant.")]
+[Command(CommandNames.BYOK_SETUP, Description = "How to bring your own key (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValueByokSetupCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv policy byok-setup --help', as it is: the empty first line separates it from
+    // them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        What the customer needs to bring their own key (byok): the application to
+        consent to, the role to grant its service principal on the key, and the
+        commands that set and verify the key.
+
+        A user needs the Administrator role on the project. A machine cannot read the
+        setup, whatever its scopes.
+        """;
+
     public KeyValueByokSetupCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {
@@ -149,9 +161,21 @@ public class KeyValueByokSetupCommand : KeyValueCommandBase
     }
 }
 
-[Command(CommandNames.BYOK_VERIFY, Description = "Verify the customer key set in the policy (enabled, RSA 2048+, wrap and unwrap allowed, a round trip works).")]
+[Command(CommandNames.BYOK_VERIFY, Description = "Verify the customer key (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValueByokVerifyCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv policy byok-verify --help', as it is: the empty first line separates it from
+    // them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The customer key set in the policy is checked: enabled, RSA 2048+, wrap and
+        unwrap allowed, and a round trip works. The result shows its health, its
+        version and the time of the check.
+
+        A user needs the Administrator role on the project. A machine cannot verify the
+        key, whatever its scopes.
+        """;
+
     public KeyValueByokVerifyCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {
@@ -169,9 +193,21 @@ public class KeyValueByokVerifyCommand : KeyValueCommandBase
     }
 }
 
-[Command(CommandNames.ROTATE, Description = "Rotate the project's standard or hsm key-encryption key now and start the re-wrap of the stored values.")]
+[Command(CommandNames.ROTATE, Description = "Rotate a key-encryption key (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValueRotateCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv policy rotate --help', as it is: the empty first line separates it from
+    // them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The project's standard or hsm key-encryption key (--protection) is rotated now,
+        and the re-wrap of the stored values starts; 'sform story kv policy' shows its
+        progress. The customer rotates a byok key in their own vault.
+
+        A user needs the Administrator role on the project. A machine cannot rotate a
+        key, whatever its scopes.
+        """;
+
     public KeyValueRotateCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {

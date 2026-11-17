@@ -32,9 +32,21 @@ public class KeyValueRecipientsCommand : KeyValueCommandBase
     }
 }
 
-[Command(CommandNames.ADD, Description = "Register a recipient: a name and an RSA public key (3072 bits or more) as a PEM or JWK file, or inline.")]
+[Command(CommandNames.ADD, Description = "Register a recipient (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValueRecipientAddCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv recipients add --help', as it is: the empty first line separates it from
+    // them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        A recipient is a name (--name) and an RSA public key (3072 bits or more) as a
+        PEM or JWK file, or inline (--public-key). Existing hyok values are not
+        encrypted for it until 'sform story kv reencrypt' encrypts them again.
+
+        A user needs the Administrator role on the project. A machine cannot change the
+        recipients, whatever its scopes.
+        """;
+
     private readonly IFileSystem _fileSystem;
 
     public KeyValueRecipientAddCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, IFileSystem fileSystem)
@@ -72,7 +84,7 @@ public class KeyValueRecipientAddCommand : KeyValueCommandBase
     }
 }
 
-[Command(CommandNames.ENABLE, Description = "Enable a recipient.")]
+[Command(CommandNames.ENABLE, Description = "Enable a recipient (for administrators).")]
 public class KeyValueRecipientEnableCommand : KeyValueRecipientStateCommand
 {
     public KeyValueRecipientEnableCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
@@ -81,9 +93,20 @@ public class KeyValueRecipientEnableCommand : KeyValueRecipientStateCommand
     }
 }
 
-[Command(CommandNames.DISABLE, Description = "Disable a recipient; new values are not encrypted for it.")]
+[Command(CommandNames.DISABLE, Description = "Disable a recipient (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValueRecipientDisableCommand : KeyValueRecipientStateCommand
 {
+    // After the options of 'sform story kv recipients disable --help', as it is: the empty first line separates it
+    // from them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        New values are not encrypted for a disabled recipient, until 'sform story kv
+        recipients enable' enables it again.
+
+        A user needs the Administrator role on the project. A machine cannot change the
+        recipients, whatever its scopes.
+        """;
+
     public KeyValueRecipientDisableCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues, enabled: false)
     {
@@ -112,9 +135,21 @@ public abstract class KeyValueRecipientStateCommand : KeyValueCommandBase
     }
 }
 
-[Command(CommandNames.REMOVE, CommandNames.DELETE, Description = "Remove a recipient. Values already encrypted for it stay readable with its private key until they are encrypted again.")]
+[Command(CommandNames.REMOVE, CommandNames.DELETE, Description = "Remove a recipient (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValueRecipientRemoveCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv recipients remove --help', as it is: the empty first line separates it
+    // from them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        Values already encrypted for it stay readable with its private key until they
+        are encrypted again ('sform story kv reencrypt'). The removal asks for a
+        confirmation; -y skips it.
+
+        A user needs the Administrator role on the project. A machine cannot change the
+        recipients, whatever its scopes.
+        """;
+
     public KeyValueRecipientRemoveCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {

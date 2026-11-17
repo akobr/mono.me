@@ -14,9 +14,24 @@ namespace _42.Platform.Cli.Commands.KeyValues;
 
 // Adding a recipient does not give it access to existing hyok values: someone with an existing recipient's private key
 // decrypts them here and encrypts them again for the current recipients, one new version per key.
-[Command(CommandNames.REENCRYPT, Description = "Encrypt client-encrypted (hyok) values again for the current recipients, with an existing recipient's private key.")]
+[Command(CommandNames.REENCRYPT, Description = "Re-encrypt hyok data (for contributors with secrets).", ExtendedHelpText = HelpDetail)]
 public class KeyValueReencryptCommand : KeyValueBulkCommandBase
 {
+    // After the options of 'sform story kv reencrypt --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The client-encrypted (hyok) values of the keys, given as arguments or by
+        --prefix (an empty prefix means every hyok key), are decrypted here with an
+        existing recipient's private key (--private-key and --kid) and encrypted again
+        for the current recipients, the enabled ones, as a new version each. A new
+        recipient can read the existing values only after this.
+
+        A user needs the ContributorWithSecrets role on the project. A machine needs no
+        role but the scopes Configuration.Read, Configuration.Write, Secrets.Read and
+        Secrets.Write, and a certificate (mTLS) when the policy requires it.
+        """;
+
     private readonly IFileSystem _fileSystem;
 
     public KeyValueReencryptCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, IFileSystem fileSystem)
