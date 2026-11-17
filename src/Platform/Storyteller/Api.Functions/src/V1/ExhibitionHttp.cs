@@ -106,7 +106,7 @@ public class ExhibitionHttp
         // second call joins and creates nothing.
         var accountId = request.GetRegistrationAccountId(_authOptions.Provider);
         await EnsureAccountAsync(request, accountId);
-        await JoinAsync(accountId, request.FunctionContext.CancellationToken);
+        await JoinAsync(accountId, request.GetAccessCaller(), request.FunctionContext.CancellationToken);
 
         // The account with the membership.
         var account = await _accessService.GetAccountAsync(accountId);
@@ -172,7 +172,7 @@ public class ExhibitionHttp
 
         try
         {
-            await _accessService.CreateAccountAsync(new AccountCreate { IdentityId = accountId, UserName = userName, Name = name });
+            await _accessService.CreateAccountAsync(new AccountCreate { IdentityId = accountId, UserName = userName, Name = name }, request.GetAccessCaller());
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -202,13 +202,13 @@ public class ExhibitionHttp
     // Idempotent, and a higher role stays. Every newcomer writes the same document, and the service gives up after its
     // second attempt, which is sized for an administrator's change: its Conflict is tried again, each time after a short
     // random delay, and goes out as the 409 after the last attempt.
-    private async Task JoinAsync(string accountId, CancellationToken cancellationToken)
+    private async Task JoinAsync(string accountId, AccessCaller caller, CancellationToken cancellationToken)
     {
         for (var retry = 0; ; retry++)
         {
             try
             {
-                await _accessService.JoinAccessPointAsync(_options.ProjectKey, accountId, AccountRole.Reader);
+                await _accessService.JoinAccessPointAsync(_options.ProjectKey, accountId, AccountRole.Reader, caller, "Joined the exhibition.");
                 return;
             }
             catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.Conflict && retry < JoinRetries)
