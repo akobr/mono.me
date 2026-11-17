@@ -9,5 +9,8 @@
 		"dev": "vitepress dev",
 		"build": "vitepress build",
 		"preview": "vitepress preview"
+	},
+	"dependencies": {
+		"posthog-js": "^1.450.0"
 	}
 }
