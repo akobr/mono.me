@@ -39,7 +39,7 @@ public class MachineAuthSetCommand : BaseContextCommand
         _accessApi = accessApi;
     }
 
-    [Option("-k|--credential-kind", CommandOptionType.MultipleValue, Description = "A credential kind to enable (for administrators). One of " + CredentialKinds.Names + "; repeat the option or separate the kinds by commas.")]
+    [Option("-k|--credential-kind", CommandOptionType.MultipleValue, Description = "An enabled credential kind (for administrators). One of " + CredentialKinds.Names + "; repeat the option or separate the kinds by commas. The kinds given replace the enabled ones.")]
     public string[]? CredentialKind { get; set; }
 
     [Option("-d|--default-kind", CommandOptionType.SingleValue, Description = "The kind a new machine gets when it names none. One of the enabled kinds; the first one by default.")]

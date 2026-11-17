@@ -29,7 +29,7 @@ public class MachineDeleteCommand : BaseContextCommand
         _accessApi = accessApi;
     }
 
-    [Argument(0, Description = "An id of an machine access.")]
+    [Argument(0, Description = "The id of a machine access.")]
     public string MachineId { get; set; } = string.Empty;
 
     protected override async Task<int> ExecuteAsync()

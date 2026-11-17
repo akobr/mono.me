@@ -63,8 +63,8 @@ public partial class RoleNoteTests
 
         descriptions.Count.ShouldBeGreaterThan(100);
 
-        // The 11 notes of 424-222, those of story export and import, and the 20 of 424-275.
-        notes.ShouldBeGreaterThanOrEqualTo(33);
+        // The 11 notes of 424-222, those of story export and import, and the 21 of 424-275.
+        notes.ShouldBeGreaterThanOrEqualTo(34);
         wrong.ShouldBeEmpty();
     }
 
@@ -160,6 +160,7 @@ public partial class RoleNoteTests
     [InlineData("account machine delete")]
     [InlineData("account machine machine-auth")]
     [InlineData("account machine rules")]
+    [InlineData("account points create")]
     public void Help_StartsWithTheDescription_AndEndsWithTheDetail_AfterTheOptions(string path)
     {
         var command = HelpTexts.Command<PlatformCommand>(path);
@@ -198,7 +199,8 @@ public partial class RoleNoteTests
     }
 
     // A note names only the lowest role; where another role passes too, or a machine can, the last paragraph of the
-    // detail says which role each case needs, and what a machine needs.
+    // detail says which role each case needs, and what a machine needs. points create has no note, as a new
+    // organization needs no role, but its detail gives the rule.
     [Theory]
     [InlineData("story kv protect", "A user needs the ContributorWithSecrets role on the project. A machine needs no role but the scopes Configuration.Write, KeyValue.Manage and Secrets.Write, and a certificate (mTLS) when the policy requires it.")]
     [InlineData("story kv reencrypt", "A user needs the ContributorWithSecrets role on the project. A machine needs no role but the scopes Configuration.Read, Configuration.Write, Secrets.Read and Secrets.Write, and a certificate (mTLS) when the policy requires it.")]
@@ -208,6 +210,7 @@ public partial class RoleNoteTests
     [InlineData("account machine delete", "A user needs the Contributor role on the project; for a machine with a secrets scope the ContributorWithSecrets role, and with a management scope the Administrator role. A machine cannot delete a machine access, whatever its scopes.")]
     [InlineData("account machine machine-auth", "A user needs the Contributor role on the project to show the policy, and the Administrator role to set it. A machine cannot show or set it, whatever its scopes.")]
     [InlineData("account machine rules", "A user needs the Contributor role on the project; to replace the rules of a machine with a secrets scope the ContributorWithSecrets role, and with a management scope the Administrator role. A machine cannot show or replace the rules, whatever its scopes.")]
+    [InlineData("account points create", "A new organization is created with the project, and you become the Owner of both. A project in an existing organization needs the Owner role on the organization. A machine cannot create a project, whatever its scopes.")]
     public void Detail_EndsWithTheRoles_InFullSentences(string path, string roles)
     {
         var detail = HelpTexts.Command<PlatformCommand>(path).ExtendedHelpText!.ReplaceLineEndings("\n");
@@ -266,7 +269,8 @@ public partial class RoleNoteTests
     [InlineData(
         "account machine machine-auth",
         "credential-kind",
-        "A credential kind to enable (for administrators). One of ApiKey, Certificate, CertificateAndApiKey, ClientCredentials, or Federated; repeat the option or separate the kinds by commas.")]
+        "An enabled credential kind (for administrators). One of ApiKey, Certificate, CertificateAndApiKey, ClientCredentials, or Federated; repeat the option or separate the kinds by commas. The kinds given replace the enabled ones.")]
+    [InlineData("story kv set", "secret", "A secret (for contributors with secrets). It gets the project's default secret level.")]
     public void Option_EndsItsFirstSentenceWithTheNote(string path, string longName, string description)
     {
         var option = HelpTexts.Command<PlatformCommand>(path).Options.Single(option => option.LongName == longName);

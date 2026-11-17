@@ -12,9 +12,18 @@ using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.AccessPoints;
 
-[Command(CommandNames.CREATE, Description = "Create a new project (access point).")]
+[Command(CommandNames.CREATE, Description = "Create a new project (access point).", ExtendedHelpText = HelpDetail)]
 public class AccessPointCreateCommand : BaseCommand
 {
+    // After the options of 'sform account points create --help', as it is: the empty first line separates it from
+    // them, and no line is longer than 79 characters. No note: a new organization needs no role.
+    internal const string HelpDetail = """
+
+        A new organization is created with the project, and you become the Owner of
+        both. A project in an existing organization needs the Owner role on the
+        organization. A machine cannot create a project, whatever its scopes.
+        """;
+
     private readonly IAccessApiClient _accessApi;
     private readonly IUserSettingsStore _settings;
 
