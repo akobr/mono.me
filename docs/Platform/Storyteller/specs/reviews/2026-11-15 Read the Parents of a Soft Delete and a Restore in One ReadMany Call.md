@@ -72,7 +72,7 @@ Both operations write the parents' arrays in the relations wave, after the tree'
 - **Delete:** when a parent changes between the read and the relations wave (`412`), `RetryAsync` runs the delete again. The second attempt finds the root deleted and returns the existing deletion with empty `DeletedKeys`, so the parent keeps the names of the deleted children.
 - **Restore:** the same happens to the names a restore adds, and to the root marks of deleted children. A second attempt finds the key active and writes nothing.
 
-A create handles the same case through `CompleteParentRelationsWithRetriesAsync`. A delete and a restore could complete their parents the same way, under fresh ETags, once their tree has committed. This is left for its own issue.
+A create handles the same case through `CompleteParentRelationsWithRetriesAsync`. A delete and a restore could complete their parents the same way, under fresh ETags, once their tree has committed. This is left for its own issue: [424-281](https://linear.app/424fun/issue/424-281/complete-the-parent-arrays-when-a-delete-or-a-restore-loses-its).
 
 ## Test run
 

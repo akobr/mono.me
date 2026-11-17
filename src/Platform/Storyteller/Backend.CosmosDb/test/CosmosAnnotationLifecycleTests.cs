@@ -122,10 +122,10 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
 
         if (isExpired)
         {
-            // the usage's ttl ran out before the delete
-            using (await Container.DeleteItemStreamAsync(usageId, OrganizationKeys.Key(TestConstants.Organization, usagePartition)))
-            {
-            }
+            // the usage's ttl ran out before the delete; an expiry also removes its cnf and adt items, which the read of
+            // the parents doesn't ask for
+            using var expired = await Container.DeleteItemStreamAsync(usageId, OrganizationKeys.Key(TestConstants.Organization, usagePartition));
+            expired.StatusCode.Should().Be(HttpStatusCode.NoContent);
         }
 
         var result = await Annotations.DeleteAnnotationAsync(Key(executionKey));

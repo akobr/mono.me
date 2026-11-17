@@ -285,7 +285,7 @@ public partial class CosmosAnnotationService
         var relations = new Dictionary<string, AnnotationNode>(StringComparer.Ordinal);
         var updates = new Dictionary<string, AnnotationEntity>(StringComparer.Ordinal);
 
-        // every parent in one read of many items (a missing one is Missing), written with the ETag of this read
+        // the parents in reads of many items (one per 1,000 keys; a missing one is Missing), written with the ETag of the read
         var parents = await store.ReadNodesAsync(
             removals.Select(group => FullKey.Create(group.First().Parent, fullKey)),
             withAudit: false);
