@@ -11,9 +11,23 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 // Without options it shows the policy. With them it sets the whole policy: the enabled kinds,
 // the default kind (the first enabled kind unless --default-kind says otherwise) and the default
 // certificate lifetime (the deployment default when not given).
-[Command(CommandNames.MACHINE_AUTH, Description = "Show or set the machine authentication policy of a project.")]
+[Command(CommandNames.MACHINE_AUTH, Description = "Show or set the authentication policy (for contributors).", ExtendedHelpText = HelpDetail)]
 public class MachineAuthSetCommand : BaseContextCommand
 {
+    // After the options of 'sform account machine machine-auth --help', as it is: the empty first line separates it
+    // from them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        Without options the machine authentication policy of the project is shown.
+        With -k it is set as a whole: the enabled credential kinds (-k), the default
+        kind (-d, else the first kind given) and the default certificate lifetime (-l,
+        else the deployment's default).
+
+        A user needs the Contributor role on the project to show the policy, and the
+        Administrator role to set it. A machine cannot show or set it, whatever its
+        scopes.
+        """;
+
     private readonly IAccessApiClient _accessApi;
 
     public MachineAuthSetCommand(
@@ -25,7 +39,7 @@ public class MachineAuthSetCommand : BaseContextCommand
         _accessApi = accessApi;
     }
 
-    [Option("-k|--credential-kind", CommandOptionType.MultipleValue, Description = "A credential kind the machines of the project may use: " + CredentialKinds.Names + ". Repeat the option or separate the kinds by commas.")]
+    [Option("-k|--credential-kind", CommandOptionType.MultipleValue, Description = "A credential kind to enable (for administrators). One of " + CredentialKinds.Names + "; repeat the option or separate the kinds by commas.")]
     public string[]? CredentialKind { get; set; }
 
     [Option("-d|--default-kind", CommandOptionType.SingleValue, Description = "The kind a new machine gets when it names none. One of the enabled kinds; the first one by default.")]

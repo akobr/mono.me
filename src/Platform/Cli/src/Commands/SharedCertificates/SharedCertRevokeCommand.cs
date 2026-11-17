@@ -5,7 +5,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.SharedCertificates;
 
-[Command(CommandNames.REVOKE, CommandNames.DELETE, Description = "Revoke a shared certificate.")]
+[Command(CommandNames.REVOKE, CommandNames.DELETE, Description = "Revoke a shared certificate (for administrators).")]
 public class SharedCertRevokeCommand : BaseContextCommand
 {
     private readonly IAccessApiClient _accessApi;

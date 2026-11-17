@@ -13,9 +13,17 @@ using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.AccessPoints;
 
-[Command(CommandNames.REVOKE, Description = "Revoke access to point to another user.")]
+[Command(CommandNames.REVOKE, Description = "Revoke access to point to another user (for administrators).", ExtendedHelpText = HelpDetail)]
 public class AccessPointRevokeCommand : BaseCommand
 {
+    // After the options of 'sform account points revoke --help', as it is: the empty first line separates it from
+    // them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        A user needs the Administrator role on the access point, and the Owner role to
+        revoke the Owner role. A machine cannot revoke access, whatever its scopes.
+        """;
+
     private readonly IAccessApiClient _accessApi;
     private readonly AccessDefaultOptions _accessDefault;
 

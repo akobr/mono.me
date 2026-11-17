@@ -9,7 +9,7 @@ namespace _42.Platform.Cli.Commands.SharedCertificates;
 [Subcommand(
     typeof(SharedCertIssueCommand),
     typeof(SharedCertRevokeCommand))]
-[Command(CommandNames.SHARED_CERT, CommandNames.CERTIFICATE, Description = "List and manage shared certificates for a project.")]
+[Command(CommandNames.SHARED_CERT, CommandNames.CERTIFICATE, Description = "List and manage shared certificates (for administrators).")]
 public class SharedCertListCommand : BaseContextCommand
 {
     private readonly IAccessApiClient _accessApi;
