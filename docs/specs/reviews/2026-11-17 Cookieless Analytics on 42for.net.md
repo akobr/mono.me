@@ -6,8 +6,8 @@ This review covers the implementation of [Cookieless Analytics on 42for.net](../
 
 - **What changed.** Google Analytics is gone from the docs site. It now counts page views in PostHog's EU cloud with `persistence: 'memory'`. It sets no cookie and leaves no key in `localStorage` or `sessionStorage`.
 - **Who is counted.** Only visitors of the published site, and never when Do Not Track or Global Privacy Control is on.
-- **Commits:** `94c5fddac` (the spec), `0c2afc37b` (the implementation), `399c76f59` (fixes from the review).
-- **Not on this branch.** The privacy policy text (section 5) and the deletion of the Google Analytics property (section 6). The drafts are untracked, and the property waits for page views to arrive.
+- **Commits:** `94c5fddac` (the spec), `0c2afc37b` (the implementation), `399c76f59` (fixes from the review). Follow-ups on the same branch: `505b40cdc` (YouTube videos on click), `bd3afe1b6` (one lockfile), `0ebd0cfa4` (privacy policy wording), `df553f140` (VitePress 2 and Mermaid 11); see section 9.
+- **Not on this branch.** Applying the privacy policy text (section 5; the wording is in `docs/Platform/Storyteller/legal/424-280 Wording for the privacy policy.md`) and the deletion of the Google Analytics property (section 6). The drafts are untracked, and the property waits for page views to arrive.
 
 ## What Was Done
 
@@ -144,8 +144,22 @@ Refuted as not material:
 - the wording "after the first render": it is now "in parallel and never awaited";
 - the location and retention details of the website row: added to section 5 anyway.
 
+### 9. Follow-ups done on this branch
+
+Asked for after the PR opened; each is its own commit.
+
+1. **YouTube videos on click** (`505b40cdc`). The five `www.youtube.com` iframes of `cli/mrepo.md` are replaced by the theme's `YouTubeVideo` component. It shows a placeholder drawn on the site, with the title and a note that YouTube's cookies apply once the video starts. A click inserts the `youtube-nocookie.com` player with autoplay. Nothing is requested from YouTube or Google before the click, so the site as a whole sets no cookies. The titles were written from the page's headings.
+2. **One lockfile** (`bd3afe1b6`). `pnpm-lock.yaml` is removed: the deployment installs from `package-lock.json`, and nothing used the pnpm file. `package-lock.json` was regenerated to the versions the pnpm file already had (VitePress 1.6.4). VitePress 1.6 renamed the router hook to `onAfterRouteChange`, and the analytics now set that name and chain an existing handler.
+3. **Privacy policy wording** (`0ebd0cfa4`). `docs/Platform/Storyteller/legal/424-280 Wording for the privacy policy.md` gives the current and the new text of every change to `privacy-policy.md` and `README.md` of the untracked drafts. It supersedes the corrected text in section 5: the videos now load only on click, so YouTube is mentioned only as what happens once a visitor starts one.
+4. **VitePress 2 and Mermaid 11** (`df553f140`).
+   - **Versions:** VitePress 2.0.0-alpha.21 (Vite 8.3, Rolldown), `vitepress-plugin-tabs` 0.9.1, Mermaid 11.17. VitePress 2 is still an alpha; it is the only VitePress on Vite 6 or newer.
+   - **Mermaid:** `vitepress-plugin-mermaid` supports VitePress 1 only. It is replaced by a markdown-it fence rule in `config.mjs` and the theme's `Mermaid` component. Mermaid loads on demand, draws with `securityLevel: 'strict'`, and redraws when the theme switches between light and dark. The wrapper keeps the class `mermaid` that `public/tooltips.js` uses.
+   - **Audit:** `katex` is overridden to ^0.19.1, which fixes its advisory, and esbuild's advisory went away with Vite 8. A high-severity ReDoS in `picomatch` remains: Vite 8 uses it only at build time, and no version is fixed yet.
+   - **Node:** Vite 8 needs Node ^20.19 or >=22.12; Oryx uses 22.23.
+   - **Verified** in Chromium: every diagram renders, including each tab of the overview, and the overview's popups open. Dark mode redraws the diagrams, with no console errors. The analytics and video checks of section 7 pass unchanged.
+
 ### Out of scope, for follow-ups
 
-- **The YouTube embeds in `cli/mrepo.md`.** Replace them with click-to-load facades or links. Then the whole site sets no cookies.
 - **VitePress's theme key.** Set `appearance` so that nothing is written before the visitor picks a theme, if the lawyer asks for it.
-- **The lockfile drift.** The dependency PRs bump `pnpm-lock.yaml`, but the deployment installs from `package-lock.json`, which still pins VitePress rc.35.
+- **VitePress 2 stable.** Move from the alpha to the release when it comes out.
+- **picomatch.** Update once a fixed version exists.
