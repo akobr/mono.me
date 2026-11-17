@@ -37,7 +37,7 @@ After the four phases of the spec [Require a Recent Sign-in for Secrets, Roles a
 
 ### Still open
 
-- Turning MFA on in the production WorkOS environment (the owner, in the dashboard).
+- MFA in the production WorkOS environment: set to `Required` on 2026-11-17 with the owner's approval; the ISO 27001 notes outside the repository still have to record it, and the runbook's MFA check (phase 12) confirms that a Magic Auth sign-in asks for the second factor.
 - The staging check of whether a device-code approval in a signed-in browser counts as an active authentication.
 - Guarding the two policies, and re-signing in the automation tests' cached sessions on a deployed target.
 - 424-262 (refusing WorkOS impersonation tokens on the API routes) is not merged; this branch only makes such a token never count as recent.
