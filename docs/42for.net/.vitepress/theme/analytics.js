@@ -13,8 +13,17 @@ const productionHosts = ['42for.net', 'www.42for.net']
 // The values posthog-js treats as "on" (isYesLike), strings in any case.
 const yesLike = [true, 1, '1', 'true', 'yes']
 
+// Event properties with a URL, and with a path, of the page or of the one before (the admin UI's list).
+const urlProperties = /^\$(?:current_url|referrer|session_entry_url|session_entry_referrer|initial_current_url|initial_referrer)$/
+const pathProperties = /^\$(?:pathname|session_entry_pathname|initial_pathname|prev_pageview_pathname)$/
+
+// Campaign parameters, ad click ids and the search keyword, which PostHog takes from the query of the entry URL and of
+// the referrer and sends as $session_entry_<name> and $initial_<name>, even with save_campaign_params off.
+const queryValueProperty =
+  /^(?:\$session_entry_|\$initial_)?(?:utm_\w+|gclid|gclsrc|dclid|gbraid|wbraid|fbclid|msclkid|twclid|li_fat_id|igshid|ttclid|rdt_cid|epik|qclid|sccid|oppref|bfcid|irclid|_kx|gad_source|mc_cid|ph_keyword)$/
+
 let posthog
-let lastPath
+let lastPage
 
 /** Do Not Track or Global Privacy Control, read like posthog-js's respect_dnt. */
 function privacySignal() {
@@ -23,14 +32,62 @@ function privacySignal() {
   )
 }
 
-/** One $pageview per page: a click on a heading, or back and forward between headings, keeps the pathname. */
-function capturePageview() {
-  const path = window.location.pathname
-  if (!posthog || path === lastPath) {
+/** The page of a path, as VitePress resolves it (normalizeHref, cleanUrls off): /x, /x.html and /x/index.html are one. */
+function pageOf(pathname) {
+  const path = pathname.replace(/(^|\/)index(\.html)?$/, '$1')
+  return path.endsWith('/') || path.endsWith('.html') ? path : `${path}.html`
+}
+
+/** A URL of the site as its origin and page, without query and hash; another site's URL as its origin only. */
+function scrubUrl(value) {
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value)) {
+    return value // '$direct', or no URL at all
+  }
+
+  try {
+    const url = new URL(value)
+    return url.origin === window.location.origin ? `${url.origin}${pageOf(url.pathname)}` : url.origin
+  } catch {
+    return undefined
+  }
+}
+
+function scrubProperties(properties) {
+  if (!properties) {
     return
   }
 
-  lastPath = path
+  for (const key of Object.keys(properties)) {
+    const value = properties[key]
+    if (queryValueProperty.test(key)) {
+      delete properties[key]
+    } else if (urlProperties.test(key)) {
+      properties[key] = scrubUrl(value)
+    } else if (pathProperties.test(key) && typeof value === 'string' && value.startsWith('/')) {
+      properties[key] = pageOf(value)
+    }
+  }
+}
+
+/**
+ * PostHog's before_send: a docs page needs no query, and a query can carry an ad click id or a newsletter's subscriber
+ * id. Every URL becomes its page (or another site's origin), every path its page, and the campaign parameters go.
+ */
+function scrubEvent(event) {
+  scrubProperties(event.properties)
+  scrubProperties(event.$set)
+  scrubProperties(event.$set_once)
+  return event
+}
+
+/** One $pageview per page: a click on a heading, back and forward between headings, or /x after /x.html send none. */
+function capturePageview() {
+  const page = pageOf(window.location.pathname)
+  if (!posthog || page === lastPage) {
+    return
+  }
+
+  lastPage = page
   try {
     posthog.capture('$pageview')
   } catch (error) {
@@ -50,8 +107,9 @@ function startPostHog(instance) {
     capture_pageleave: false,
     disable_capture_url_hashes: true,
     autocapture: false,
-    // Campaign parameters would read document.cookie on every event.
+    // Campaign parameters would read document.cookie on every event; scrubEvent drops those PostHog still sends.
     save_campaign_params: false,
+    before_send: scrubEvent,
     // fetch without credentials: a beacon would carry the visitor's cookies of posthog.com.
     disable_beacon: true,
     disableDeviceModel: true,
@@ -79,7 +137,8 @@ function startPostHog(instance) {
 
 /**
  * Starts the analytics in the browser of a visitor of the published site, unless Do Not Track or Global Privacy Control
- * is on. The PostHog chunk is loaded only then, after the first render, and a failure leaves the analytics off.
+ * is on. Only then is the PostHog chunk requested, in parallel and never awaited, so it never delays the first render;
+ * a failure leaves the analytics off.
  */
 export function startAnalytics(router) {
   // A constant in the SSR build: the server bundle drops the rest, and the build never runs posthog-js.
