@@ -52,14 +52,15 @@ public sealed class CommandLineTests : IDisposable
             "user_01owner",
             "--dry-run",
             "--force",
-            "--again");
+            "--again",
+            "--public-pairs-only");
 
         var request = command.CreateRequest();
 
         request.Sets.ShouldBe(["large", "core"]);
         request.Paths.ShouldBe(["one", "two"]);
         (request.Organization, request.Project, request.View, request.Owner).ShouldBe(("acme", "billing", "preview", "user_01owner"));
-        (request.Options.DryRun, request.Options.Force, request.Options.Again).ShouldBe((true, true, true));
+        (request.Options.DryRun, request.Options.Force, request.Options.Again, request.Options.PublicPairsOnly).ShouldBe((true, true, true, true));
     }
 
     [Fact]

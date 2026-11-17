@@ -117,6 +117,20 @@ public class SeedCommandTests
     }
 
     [Fact]
+    public async Task Seed_PublicPairsOnly_SeedsASetWithStandardPairsWithoutAVault()
+    {
+        _fixture.AddSet("base", Manifest, ("key-values.json", """{ "Items": [ { "Key": "smtp.host", "Protection": "Public", "Value": "x" }, { "Key": "smtp.password", "Protection": "Standard", "Value": "demo" } ] }"""));
+
+        (await Command(sets: ["base"]).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+
+        var command = Command(sets: ["base"]);
+        command.IsPublicPairsOnly = true;
+        (await command.OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
+        _fixture.KeyValues.Pairs.Keys.ShouldBe(["smtp.host"]);
+        _fixture.Records.Saves.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Seed_PublicPairs_SeedWithoutAVault_AndAFailedPairExitsWithFour()
     {
         _fixture.AddSet("base", Manifest, ("key-values.json", """{ "Items": [ { "Key": "smtp.host", "Protection": "Public", "Value": "smtp.example" } ] }"""));
@@ -157,13 +171,14 @@ public class SeedCommandTests
             dryRun: true);
         command.IsForced = true;
         command.IsAgain = true;
+        command.IsPublicPairsOnly = true;
 
         var request = command.CreateRequest();
 
         request.Sets.ShouldBe(["large", "core"]);
         request.Paths.ShouldBe(["one", "two"]);
         (request.Organization, request.Project, request.View, request.Owner).ShouldBe(("acme", "billing", "preview", "user_01owner"));
-        (request.Options.DryRun, request.Options.Force, request.Options.Again).ShouldBe((true, true, true));
+        (request.Options.DryRun, request.Options.Force, request.Options.Again, request.Options.PublicPairsOnly).ShouldBe((true, true, true, true));
         request.Options.AnnotationProgress.ShouldBeNull();
 
         // nothing given: the sets of the folders, the targets of the manifests, the base account

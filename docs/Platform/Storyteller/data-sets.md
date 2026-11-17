@@ -171,7 +171,7 @@ The key/value pairs of the set's view, in the format of the key/value [export an
 | Level | In a set |
 | --- | --- |
 | `Public` | Always |
-| `Standard` | Only when DbCreator has a Standard vault (below). Without one, a set with `Standard` pairs is wrong input (exit `2`) before anything is written, with a message that says what to configure; also when it is seeded already, because the plan decides from the files alone. Built-in sets and `--path` sets alike |
+| `Standard` | Only when DbCreator has a Standard vault (below). Without one, a set with `Standard` pairs is wrong input (exit `2`) before anything is written, with a message that says what to configure; also when it is seeded already, because the plan decides from the files alone. Built-in sets and `--path` sets alike. With `--public-pairs-only` the set is not refused: its `Standard` pairs are `Skipped` with `PublicPairsOnly` (also with a vault) and the set is not recorded, so a later seed with a vault adds them |
 | `Hsm`, `Byok`, `Hyok` | Refused (exit `2`): they need per-organization keys, a customer's tenant or the project's recipients, which a seed cannot set up |
 
 The policy of an existing project decides too: a level it does not allow fails its pair when the set is seeded (`ProtectionNotAllowed`, exit `4`), and the other pairs are written. The default policy, which a project the seed creates gets, allows `Public` and `Standard`.
@@ -326,7 +326,7 @@ The build of the database (see [What DbCreator does](#what-dbcreator-does)). Aft
 
 ```
 2sInitDb seed [<set>…] [--path <folder>]… [--organization <organization>] [--project <project>] [--view <view>]
-              [--owner <account-id>] [--dry-run] [--force] [--again]
+              [--owner <account-id>] [--dry-run] [--force] [--again] [--public-pairs-only]
 ```
 
 | Argument or option | Default | Meaning |
@@ -340,6 +340,7 @@ The build of the database (see [What DbCreator does](#what-dbcreator-does)). Aft
 | `--dry-run` | Off | Decide every outcome and write nothing of the target and the sets. The database and the containers are still ensured |
 | `--force` | Off | Store schemas and configurations that break each other, with a warning |
 | `--again` | Off | Seed a set that is seeded already in its version and with its files |
+| `--public-pairs-only` | Off | Seed the `Public` pairs of `key-values.json` only: the `Standard` ones are `Skipped` with `PublicPairsOnly` and never sent, also with a vault, so a set with them seeds without a vault (instead of exit `2`). A set with a skipped pair is not recorded: a later seed with a vault adds its `Standard` pairs (and finds the rest `Unchanged`). The exit code stays `0` |
 
 A seed:
 
@@ -382,7 +383,7 @@ Lists the built-in sets and those of the `--path` folders: the name, the version
 | `0` | Success, also for a set seeded already, and with warnings or skipped documents |
 | `-1` (`255` on Linux and macOS) | The command line cannot be parsed: an unknown command, option or argument, a missing value, a single value given twice |
 | `1` | The tool crashed, for example when the database cannot be reached or the bulk writer runs out of retries; the log file has the details |
-| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a `key-values.json` that cannot be seeded (it does not parse, more than 10,000 pairs, an item that breaks a rule of the import, a level `Hsm`, `Byok` or `Hyok`, an item without a value), `Standard` pairs without a Standard vault, a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner, an existing project whose Administrator or Owner is not the owner, an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the ownership of the organization and the project are known only after the database and its containers are ensured |
+| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a `key-values.json` that cannot be seeded (it does not parse, more than 10,000 pairs, an item that breaks a rule of the import, a level `Hsm`, `Byok` or `Hyok`, an item without a value), `Standard` pairs without a Standard vault (unless `--public-pairs-only`), a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner, an existing project whose Administrator or Owner is not the owner, an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the ownership of the organization and the project are known only after the database and its containers are ensured |
 | `3` | The database has the containers of the earlier layout (one per organization); nothing was written |
 | `4` | A document, an annotation or a pair of a set failed (also in a dry run that would fail), or a set was not seeded because a set it depends on failed |
 | `40` | The seed was stopped (Ctrl+C, or the host shut down). The set that was running is not recorded, so a run again seeds what is missing |

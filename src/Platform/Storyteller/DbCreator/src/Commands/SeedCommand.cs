@@ -49,6 +49,9 @@ public class SeedCommand
     [Option("--again", CommandOptionType.NoValue, Description = "Seed a set that is seeded already in its version and with its files.")]
     public bool IsAgain { get; set; }
 
+    [Option("--public-pairs-only", CommandOptionType.NoValue, Description = "Seed the Public key/value pairs only: Standard pairs are skipped, so a set with them seeds without a vault, and is not recorded.")]
+    public bool IsPublicPairsOnly { get; set; }
+
     public DataSetSeedRequest CreateRequest()
     {
         return new DataSetSeedRequest
@@ -64,6 +67,7 @@ public class SeedCommand
                 DryRun = IsDryRun,
                 Force = IsForced,
                 Again = IsAgain,
+                PublicPairsOnly = IsPublicPairsOnly,
             },
         };
     }

@@ -338,6 +338,34 @@ public class DataSetSeederKeyValuesTests
     }
 
     [Fact]
+    public async Task Seed_PublicPairsOnly_SkipsTheStandardPairs_AndASeedWithAVaultAddsThemLater()
+    {
+        AddSet(Pairs(("a", "Public", "1"), ("b", "Standard", "2"), ("c", "Public", "3")));
+        var publicOnly = Request with { Options = new DataSetSeedOptions { PublicPairsOnly = true } };
+
+        // no vault: the plan does not refuse the set, and the Standard pair is never sent
+        var run = await Seeder().SeedAsync(publicOnly, TestContext.Current.CancellationToken);
+
+        _keyValues.Imports.Select(call => (call.Options.DryRun, string.Join(",", call.Keys))).ShouldBe([(true, "a,c"), (false, "a,c")]);
+        var set = run.Sets.Single();
+        set.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = 2, Skipped = 1 });
+        var skipped = set.Items.ShouldHaveSingleItem();
+        (skipped.KeyValueKey, skipped.Outcome, skipped.ErrorCode).ShouldBe(("b", ViewImportOutcome.Skipped, DataSetKeyValueSeeder.PublicPairsOnly));
+
+        // no failure, but not recorded: the set is not complete
+        set.HasFailures.ShouldBeFalse();
+        ExitCodes.Of(run).ShouldBe(ExitCodes.SUCCESS);
+        set.IsRecorded.ShouldBeFalse();
+
+        // a seed with a vault adds the Standard pair, and records the set
+        _providers.Add(StandardProvider());
+        var later = (await Seeder().SeedAsync(Request, TestContext.Current.CancellationToken)).Sets.Single();
+        later.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = 1, Unchanged = 2 });
+        later.IsRecorded.ShouldBeTrue();
+        _keyValues.Pairs.Keys.ShouldBe(["a", "b", "c"], ignoreOrder: true);
+    }
+
+    [Fact]
     public async Task Seed_ASetWithoutPairsCallsNoImport()
     {
         AddSet(null, ("annotations/rst.x.json", "{}"));

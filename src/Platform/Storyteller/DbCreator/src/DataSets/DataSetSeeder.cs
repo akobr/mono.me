@@ -93,7 +93,7 @@ public sealed class DataSetSeeder
 
             if (DataSetKeyValues.Read(_fileSystem, set.Folder) is { } pairs)
             {
-                _keyValues.EnsureSeedable(set, pairs);
+                _keyValues.EnsureSeedable(set, pairs, request.Options.PublicPairsOnly);
             }
         }
 
@@ -443,7 +443,7 @@ public sealed class DataSetSeeder
         // the pairs before the configurations that bind them
         var keyValues = content.KeyValues is null
             ? null
-            : await _keyValues.SeedAsync(target, content.KeyValues, options.DryRun, items, writtenPairs, cancellationToken);
+            : await _keyValues.SeedAsync(target, content.KeyValues, options.DryRun, options.PublicPairsOnly, items, writtenPairs, cancellationToken);
         await ImportAsync(target, content.Documents.Files.Where(file => !IsAnnotation(file)).ToList(), importOptions, overlay, documents, items, cancellationToken);
 
         if (written is not null)
@@ -453,7 +453,9 @@ public sealed class DataSetSeeder
 
         var isRecorded = false;
 
-        if (!options.DryRun && items.All(item => item.Outcome != ViewImportOutcome.Failed))
+        // a set whose Standard pairs --public-pairs-only skipped is not complete, so a seed with a vault adds them
+        if (!options.DryRun
+            && items.All(item => item.Outcome != ViewImportOutcome.Failed && item.ErrorCode != DataSetKeyValueSeeder.PublicPairsOnly))
         {
             await _records.SaveAsync(CreateRecord(set, target, hash, documents, lines, keyValues, _time.GetUtcNow()), cancellationToken);
             isRecorded = true;
