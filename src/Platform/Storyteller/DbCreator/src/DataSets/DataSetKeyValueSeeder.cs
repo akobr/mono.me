@@ -25,6 +25,9 @@ public sealed class DataSetKeyValueSeeder
     public const string KeyValueExists = "KeyValueExists";
     public const string KeyValueDeleted = "KeyValueDeleted";
 
+    // A pair of another level than Public in a seed with DataSetSeedOptions.PublicPairsOnly; the set is not recorded.
+    public const string PublicPairsOnly = "PublicPairsOnly";
+
     // The most items one import takes (CosmosKeyValueService).
     public const int ChunkSize = 1_000;
 
@@ -53,11 +56,11 @@ public sealed class DataSetKeyValueSeeder
 
     // DataSetException for pairs of a level the tool cannot encrypt: Standard without a Standard vault. The other
     // levels a seed refuses are refused when the file is read (DataSetKeyValues).
-    public void EnsureSeedable(DataSet set, DataSetKeyValues pairs)
+    public void EnsureSeedable(DataSet set, DataSetKeyValues pairs, bool publicPairsOnly = false)
     {
         var standard = pairs.Count(KeyValueProtection.Standard);
 
-        if (standard == 0 || IsConfigured(KeyValueProtection.Standard))
+        if (standard == 0 || publicPairsOnly || IsConfigured(KeyValueProtection.Standard))
         {
             return;
         }
@@ -67,11 +70,12 @@ public sealed class DataSetKeyValueSeeder
             $"The set '{set.Name}' has {standard} Standard {(standard == 1 ? "pair" : "pairs")} in {DataSetKeyValues.FileName}, and DbCreator has no Standard vault to encrypt them; nothing was written. "
             + $"Set AzureKeyVaults__{vault} to the URI of the API's Standard vault, for an identity with the roles the API's identity has on it (Key Vault Crypto Officer and Key Vault Crypto Service Encryption User): "
             + "a Release build (the dotnet tool) signs in with a managed identity or AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET; "
-            + "a Debug build (dotnet run) also takes Lowkey Vault, with KeyValues__Protection__Emulator=true.");
+            + "a Debug build (dotnet run) also takes Lowkey Vault, with KeyValues__Protection__Emulator=true. "
+            + "Or seed its Public pairs only with --public-pairs-only.");
     }
 
     // The pairs into the target in chunks of the import, in the order of the file: each chunk planned with a dry run,
-    // then (unless dryRun) its missing pairs written. Adds an item per outcome but Created and Unchanged to items.
+    // then (unless dryRun) its missing pairs written; with publicPairsOnly the other levels are Skipped and not sent. Adds an item per outcome but Created and Unchanged to items.
     // planned: in a dry run of several sets, the pairs the sets before this one would create, which nothing stored; a
     // missing pair among them is decided against it, and this set's pairs that would be created join it.
     // Failures of a pair are outcomes; a failure of the storage ends the seed.
@@ -79,6 +83,7 @@ public sealed class DataSetKeyValueSeeder
         DataSetTarget target,
         DataSetKeyValues pairs,
         bool dryRun,
+        bool publicPairsOnly,
         List<DataSetSeedItem> items,
         IDictionary<string, KeyValueDocumentItem>? planned = null,
         CancellationToken cancellationToken = default)
@@ -86,11 +91,26 @@ public sealed class DataSetKeyValueSeeder
         var outcomes = new PairOutcome?[pairs.Items.Count];
         var caller = KeyValueCaller.System();
         HashSet<string>? deleted = null;
+        var included = new List<int>(pairs.Items.Count);
 
-        for (var start = 0; start < pairs.Items.Count; start += ChunkSize)
+        for (var index = 0; index < pairs.Items.Count; index++)
+        {
+            if (publicPairsOnly && pairs.Items[index].Protection != KeyValueProtection.Public)
+            {
+                outcomes[index] = new PairOutcome(
+                    ViewImportOutcome.Skipped,
+                    PublicPairsOnly,
+                    $"A {pairs.Items[index].Protection} pair is not seeded with --public-pairs-only; a seed with a Standard vault adds it.");
+            }
+            else
+            {
+                included.Add(index);
+            }
+        }
+
+        foreach (var chunk in included.Chunk(ChunkSize))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var chunk = Enumerable.Range(start, Math.Min(ChunkSize, pairs.Items.Count - start)).ToList();
             var missing = new List<int>();
 
             foreach (var (index, action) in await PlanAsync(target, pairs, chunk, outcomes, caller))

@@ -30,6 +30,11 @@ public static class DataSetOutput
             Console.WriteLine("Dry run: nothing is written, every outcome is what a seed would do.", Color.Yellow);
         }
 
+        if (options.PublicPairsOnly)
+        {
+            Console.WriteLine("Public pairs only: the Standard pairs of key-values.json are skipped, and a set with them is not recorded.", Color.Yellow);
+        }
+
         Console.WriteLine(
             $"Seeding {Sets(plan.Sets.Select(set => set.Name).ToList())} into '{plan.Target}' for the owner {plan.Owner.Name} (#{plan.Owner.Id}).");
     }
@@ -297,7 +302,13 @@ public static class DataSetOutput
 
         var elapsed = Elapsed(result.Elapsed);
         Console.WriteLine(
-            isDryRun ? $"  Checked in {elapsed}." : result.IsRecorded ? $"  Seeded and recorded in {elapsed}." : $"  Seeded in {elapsed}, not recorded.",
+            isDryRun
+                ? $"  Checked in {elapsed}."
+                : result.IsRecorded
+                    ? $"  Seeded and recorded in {elapsed}."
+                    : result.Items.Any(item => item.ErrorCode == DataSetKeyValueSeeder.PublicPairsOnly) && !result.HasFailures
+                        ? $"  Seeded in {elapsed}, not recorded: its Standard pairs were skipped (--public-pairs-only); a seed with a Standard vault adds them."
+                        : $"  Seeded in {elapsed}, not recorded.",
             Muted);
     }
 
