@@ -117,6 +117,9 @@ public sealed class AuthKitImpersonationAuthenticationTests : IDisposable
         {
             ["sub"] = "user_01",
             ["email"] = "ada@example.com",
+
+            // The machine organization, so the machine validator of a shared issuer reaches its user-or-machine check.
+            ["org_id"] = MachineOrganization,
             ["act"] = new Dictionary<string, object> { ["sub"] = "admin@example.com" },
         };
     }

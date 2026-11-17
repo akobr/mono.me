@@ -101,7 +101,7 @@ public class AuthKitBearerTokenValidator : IBearerTokenValidator
         {
             _logger.LogWarning(
                 "An AuthKit user token of {Subject} is refused: it names an actor (act.sub {Actor}), a WorkOS impersonation",
-                subject,
+                AuthKitTokenSource.Sanitize(subject),
                 AuthKitTokenSource.DescribeActor(result.SecurityToken));
             return null;
         }

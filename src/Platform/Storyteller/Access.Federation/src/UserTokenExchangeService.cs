@@ -135,7 +135,8 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
             return UserTokenExchangeResult.Failure(OAuthTokenExchange.Errors.InvalidGrant, UserTokenExchangeResult.NoAccountDescription);
         }
 
-        // The provider's current user name against the stored one (log only, AccountUserNameCheck).
+        // The provider's current user name against the stored one (log only, AccountUserNameCheck). Before the replay
+        // limit on purpose: a refused or replayed attempt with another name is evidence too.
         AccountUserNameCheck.LogIfChanged(_logger, account, subject.Claims, "token-exchange");
 
         // 5. The replay limit, per actor and subject token. The client gets the generic text of a refused subject token;

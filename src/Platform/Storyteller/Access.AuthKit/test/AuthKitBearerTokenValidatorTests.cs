@@ -369,6 +369,25 @@ public class AuthKitBearerTokenValidatorTests
         actor.Any(char.IsControl).ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task Validate_SubjectForTheLog_IsCutAndHasNoControlCharacters()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(new Dictionary<string, object>
+        {
+            ["sub"] = "user_01\n" + new string('x', 400),
+            ["act"] = new Dictionary<string, object> { ["sub"] = "admin@example.com" },
+        });
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldBeNull();
+        var subject = LoggedValue(fixture.Logger.Entries.ShouldHaveSingleItem(), "Subject").ShouldBeOfType<string>();
+        subject.Length.ShouldBe(AuthKitTokenSource.MaxLoggedLength);
+        subject.ShouldStartWith("user_01?x");
+        subject.Any(char.IsControl).ShouldBeFalse();
+    }
+
     // A token that does not pass names nobody: refused as before, and not logged as an impersonation.
     [Fact]
     public async Task Validate_ImpersonationTokenWithAnUnknownKey_IsRefusedWithoutALog()

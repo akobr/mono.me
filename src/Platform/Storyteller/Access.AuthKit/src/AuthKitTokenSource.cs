@@ -95,6 +95,19 @@ internal sealed class AuthKitTokenSource
         return found && actor is not null ? Sanitize(actor) : NoActorSubject;
     }
 
+    // A value of a validated token for a log: cut to MaxLoggedLength, control characters replaced.
+    public static string Sanitize(string value)
+    {
+        var text = value.Length > MaxLoggedLength ? value[..MaxLoggedLength] : value;
+        return string.Create(text.Length, text, static (span, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                span[index] = char.IsControl(source[index]) ? '?' : source[index];
+            }
+        });
+    }
+
     // Null when the token is not valid for this source.
     public async Task<List<Claim>?> ValidateAsync(string rawToken, CancellationToken cancellationToken)
     {
@@ -154,17 +167,5 @@ internal sealed class AuthKitTokenSource
         }
 
         return result;
-    }
-
-    private static string Sanitize(string value)
-    {
-        var text = value.Length > MaxLoggedLength ? value[..MaxLoggedLength] : value;
-        return string.Create(text.Length, text, static (span, source) =>
-        {
-            for (var index = 0; index < source.Length; index++)
-            {
-                span[index] = char.IsControl(source[index]) ? '?' : source[index];
-            }
-        });
     }
 }
