@@ -2,6 +2,7 @@ import DefaultTheme from 'vitepress/theme'
 import _42Layout from './_42Layout.vue'
 import { enhanceAppWithTabs } from 'vitepress-plugin-tabs/client'
 import { startAnalytics } from './analytics'
+import YouTubeVideo from './YouTubeVideo.vue'
 import './_42styles.css'
 
 export default {
@@ -9,6 +10,7 @@ export default {
     Layout: _42Layout,
     enhanceApp({ app, router }) {
       enhanceAppWithTabs(app)
+      app.component('YouTubeVideo', YouTubeVideo)
       startAnalytics(router)
     }
   }

@@ -2,9 +2,7 @@
 
 Here is a short taste of what the mrepo CLI interface can do.
 
-<iframe style="width: 100%; max-width: 560px; height: 315px; margin: auto;" src="https://www.youtube.com/embed/HtQ6UTA5d9w?si=0MOG6cKDUOvjI8zH" 
-title="YouTube video player" frameborder="0" 
-allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+<YouTubeVideo id="HtQ6UTA5d9w" title="mrepo: introduction" />
 
 ::: tip
 For a more detailed description, please visit [the technical documentation of the tool](https://github.com/akobr/mono.me/blob/main/docs/Monorepo/mrepo-cli.md). 
@@ -18,17 +16,13 @@ A new mono-repository can be created just by calling a single command in any emp
 mrepo new
 ```
 
-<iframe style="width: 100%; max-width: 560px; height: 315px; margin: auto;" src="https://www.youtube.com/embed/og5a7Zs6IHU?si=ykA9OThQmqRJ5wmM" 
-title="YouTube video player" frameborder="0" 
-allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+<YouTubeVideo id="og5a7Zs6IHU" title="mrepo: create a new mono-repository" />
 
 ## Create new content inside
 
 Creating the new content is simple, and it will help set up the correct structure.
 
-<iframe style="width: 100%; max-width: 560px; height: 315px; margin: auto;" src="https://www.youtube.com/embed/Z2LTVxDoZVc?si=DUqKPjyCbLXbt4N-" 
-title="YouTube video player" frameborder="0" 
-allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+<YouTubeVideo id="Z2LTVxDoZVc" title="mrepo: create new content inside" />
 
 ## Get information
 
@@ -42,9 +36,7 @@ By calling a single command from any place in the repository. The MsBuild will b
 mrepo build [--clean|restore|build|test|pack|run]
 ```
 
-<iframe style="width: 100%; max-width: 560px; height: 315px; margin: auto;" src="https://www.youtube.com/embed/dYmqYdOqNs8?si=TfuHJYJ8azafL8a-" 
-title="YouTube video player" frameborder="0" 
-allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+<YouTubeVideo id="dYmqYdOqNs8" title="mrepo: build any subtree" />
 
 ## Prepare release + notes
 
@@ -57,6 +49,4 @@ mrepo release
 mrepo release tag
 ```
 
-<iframe style="width: 100%; max-width: 560px; height: 315px; margin: auto;" src="https://www.youtube.com/embed/gJ6Vk2Hny5w?si=4TcWWWCX0y0H42MC" 
-title="YouTube video player" frameborder="0" 
-allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+<YouTubeVideo id="gJ6Vk2Hny5w" title="mrepo: prepare a release and its notes" />
