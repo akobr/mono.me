@@ -597,7 +597,7 @@ The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with
 | Storage key off | `az storage account show -n "$SA" --query allowSharedKeyAccess` | `false` |
 | Locks | `az lock list -g "$RG" -o table` | the Cosmos DB account and the vault |
 | Uptime | Sentry | the monitor is green |
-| Who can sign in | WorkOS dashboard as an Admin, every environment | impersonation off; the named members with their roles, each with MFA (or SSO enforced); recorded in the ISO 27001 supplier notes |
+| Who can sign in | WorkOS dashboard as an Admin, every environment | impersonation off; the named members with their roles, each with MFA, or SSO enforced through an identity provider whose MFA is checked to be enforced (SSO alone is not enough); recorded in the ISO 27001 supplier notes |
 | API errors | an invalid message on the queue `configuration-transfers` ([error reporting](../Storyteller/error-reporting.md#check-it-in-production)) | one event in `2s-api` with the transaction `queue ProcessViewTransfer`, the environment `production` and the API's release |
 
 ## 18. Costs to expect

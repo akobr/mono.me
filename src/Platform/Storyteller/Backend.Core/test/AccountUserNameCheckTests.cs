@@ -104,6 +104,9 @@ public class AccountUserNameCheckTests
         AccountUserNameCheck.GetUserName([new Claim(ClaimTypes.Upn, "c"), new Claim("unique_name", "b")]).ShouldBe("b");
         AccountUserNameCheck.GetUserName([new Claim(ClaimTypes.Upn, "c")]).ShouldBe("c");
         AccountUserNameCheck.GetUserName([new Claim("email", "d")]).ShouldBeNull();
+
+        // A blank first claim wins as at registration: no name, so no evidence.
+        AccountUserNameCheck.GetUserName([new Claim("preferred_username", " "), new Claim(ClaimTypes.Upn, "c")]).ShouldBe(string.Empty);
         AccountUserNameCheck.UserNameClaimTypes.ShouldBe(["preferred_username", "unique_name", ClaimTypes.Upn]);
     }
 
