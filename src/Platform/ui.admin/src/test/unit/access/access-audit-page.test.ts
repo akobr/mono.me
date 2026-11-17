@@ -186,10 +186,20 @@ describe('organization Audit page', () => {
 
     const select = selectOf(view, 'Project filter')!
     expect((select.props('items') as { value: string }[]).map((item) => item.value)).toEqual([
-      'all',
+      '*',
       'billing',
       'shipping',
     ])
+  })
+
+  it('filters by a project named "all", which the sentinel of every project cannot be', async () => {
+    const view = await mountAudit({ ...accessMap, 'acme.all': 'Owner' })
+    await vi.waitFor(() => expect(rows().length).toBeGreaterThan(0))
+    requests.length = 0
+
+    await choose(view, 'Project filter', 'all')
+
+    await vi.waitFor(() => expect(requests.at(-1)?.searchParams.get('project')).toBe('all'))
   })
 
   it('appends the next page with Load more, with the same filters, and stops after the last page', async () => {
@@ -249,6 +259,35 @@ describe('organization Audit page', () => {
     await settle()
     await choose(view, 'Action filter', 'MemberRemoved')
     await vi.waitFor(() => expect(rowWith('Member filtered')).toBeTruthy())
+    release()
+    await settle(6)
+
+    expect(rows()).toHaveLength(1)
+    expect(rowWith('Member late')).toBeUndefined()
+  })
+
+  it('drops a next page that arrives after the first page was read again', async () => {
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    let firstPages = 0
+    server.use(
+      http.get('*/api/v1/access/points/:key/audit', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('continuationToken')) {
+          await held
+          return HttpResponse.json({ Items: [entry('late')], Count: 1 })
+        }
+        firstPages++
+        return HttpResponse.json({ Items: [entry(`first${firstPages}`)], ContinuationToken: 'next', Count: 1 })
+      }),
+    )
+    const view = await mountAudit()
+    await vi.waitFor(() => expect(button('Load more')).toBeTruthy())
+
+    button('Load more')!.click()
+    await settle()
+    // a change elsewhere refreshes the trail while the next page of the old first page is still loading
+    await view.queryClient.invalidateQueries({ queryKey: ['v1', 'access', 'points'] })
+    await vi.waitFor(() => expect(rowWith('Member first2')).toBeTruthy())
     release()
     await settle(6)
 

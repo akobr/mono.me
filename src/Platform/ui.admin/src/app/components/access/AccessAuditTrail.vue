@@ -25,9 +25,12 @@ const session = useSessionStore()
 const toast = useToast()
 const canAdmin = useCan('manageAccess', 'org')
 
-// 'all' stands for every project or action: a Select item must not have an empty-string value.
-const project = ref('all')
-const action = ref('all')
+// The sentinels stand for every project or action: a Select item must not have an empty-string value, and '*' is in no
+// project name, so a project called "all" stays selectable.
+const allProjects = '*'
+const allActions = '*'
+const project = ref(allProjects)
+const action = ref(allActions)
 const target = ref('')
 // the request follows the typing after a pause, not every key
 const targetFilter = refDebounced(target, 300)
@@ -35,8 +38,8 @@ const from = ref('')
 const to = ref('')
 
 const params = computed<GetAccessAuditParams>(() => ({
-  project: project.value === 'all' ? undefined : project.value,
-  action: action.value === 'all' ? undefined : action.value,
+  project: project.value === allProjects ? undefined : project.value,
+  action: action.value === allActions ? undefined : action.value,
   target: targetFilter.value.trim() || undefined,
   from: from.value ? new Date(from.value).toISOString() : undefined,
   // the end date is inclusive: up to the start of the next day
@@ -62,6 +65,8 @@ watch([params, () => context.org], () => {
 watch(
   () => first.data.value,
   (page) => {
+    // a new first page (a refetch after a change) starts over: a page of more still loading followed the old one
+    generation++
     more.value = []
     nextToken.value = page?.ContinuationToken
   },
@@ -116,17 +121,17 @@ const projectItems = computed(() => {
       names.add(key.slice(prefix.length))
     }
   }
-  if (project.value !== 'all') {
+  if (project.value !== allProjects) {
     names.add(project.value)
   }
   return [
-    { label: 'Every project', value: 'all' },
+    { label: 'Every project', value: allProjects },
     ...[...names].toSorted().map((name) => ({ label: name, value: name })),
   ]
 })
 
 const actionItems = [
-  { label: 'Every action', value: 'all' },
+  { label: 'Every action', value: allActions },
   ...accessAuditActions.map((entry) => ({ label: accessAuditActionLabel(entry), value: entry })),
 ]
 </script>
