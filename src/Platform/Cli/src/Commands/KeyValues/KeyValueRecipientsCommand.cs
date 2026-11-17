@@ -143,8 +143,9 @@ public class KeyValueRecipientRemoveCommand : KeyValueCommandBase
     internal const string HelpDetail = """
 
         Values already encrypted for it stay readable with its private key until they
-        are encrypted again without it ('sform story kv reencrypt'). The removal asks
-        for a confirmation; -y skips it.
+        are encrypted again without it ('sform story kv reencrypt'), which writes new
+        versions: older versions stay readable with it until they expire. The removal
+        asks for a confirmation; -y skips it.
 
         A user needs the Administrator role on the project. A machine cannot change the
         recipients, whatever its scopes.
