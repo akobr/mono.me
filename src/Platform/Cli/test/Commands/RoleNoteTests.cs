@@ -62,8 +62,9 @@ public partial class RoleNoteTests
         }
 
         descriptions.Count.ShouldBeGreaterThan(100);
-        // The 11 notes of 424-222 and those of story export and import.
-        notes.ShouldBeGreaterThanOrEqualTo(13);
+
+        // The 11 notes of 424-222, those of story export and import, and the 20 of 424-275.
+        notes.ShouldBeGreaterThanOrEqualTo(33);
         wrong.ShouldBeEmpty();
     }
 
@@ -94,6 +95,25 @@ public partial class RoleNoteTests
     [InlineData("account machine issuer set", "Create or replace a trusted issuer (for administrators).")]
     [InlineData("account machine issuer delete", "Delete a trusted issuer (for administrators).")]
     [InlineData("account points get", "Get an access point with its users (for administrators).")]
+    [InlineData("story kv protect", "Re-protect keys (for contributors with secrets).")]
+    [InlineData("story kv reencrypt", "Re-encrypt hyok data (for contributors with secrets).")]
+    [InlineData("story kv policy byok-setup", "How to bring your own key (for administrators).")]
+    [InlineData("story kv policy byok-verify", "Verify the customer key (for administrators).")]
+    [InlineData("story kv policy rotate", "Rotate a key-encryption key (for administrators).")]
+    [InlineData("story kv recipients add", "Register a recipient (for administrators).")]
+    [InlineData("story kv recipients enable", "Enable a recipient (for administrators).")]
+    [InlineData("story kv recipients disable", "Disable a recipient (for administrators).")]
+    [InlineData("story kv recipients remove", "Remove a recipient (for administrators).")]
+    [InlineData("account points grant", "Grant access to point to another user (for administrators).")]
+    [InlineData("account points revoke", "Revoke access to point to another user (for administrators).")]
+    [InlineData("account shared-cert", "List and manage shared certificates (for administrators).")]
+    [InlineData("account shared-cert issue", "Issue a new shared certificate (for administrators).")]
+    [InlineData("account shared-cert revoke", "Revoke a shared certificate (for administrators).")]
+    [InlineData("account machine create", "Create new machine access (for contributors).")]
+    [InlineData("account machine reset", "Reset secret for a machine access (for contributors).")]
+    [InlineData("account machine delete", "Delete a machine access (for contributors).")]
+    [InlineData("account machine machine-auth", "Show or set the authentication policy (for contributors).")]
+    [InlineData("account machine rules", "Show or replace the federation rules (for contributors).")]
     public void ParentList_GivesTheCommandOneLine(string path, string description)
     {
         var command = HelpTexts.Command<PlatformCommand>(path);
@@ -126,6 +146,20 @@ public partial class RoleNoteTests
     [InlineData("story kv policy set")]
     [InlineData("account machine issuer set")]
     [InlineData("account machine issuer delete")]
+    [InlineData("story kv protect")]
+    [InlineData("story kv reencrypt")]
+    [InlineData("story kv policy byok-setup")]
+    [InlineData("story kv policy byok-verify")]
+    [InlineData("story kv policy rotate")]
+    [InlineData("story kv recipients add")]
+    [InlineData("story kv recipients disable")]
+    [InlineData("story kv recipients remove")]
+    [InlineData("account points grant")]
+    [InlineData("account points revoke")]
+    [InlineData("account machine reset")]
+    [InlineData("account machine delete")]
+    [InlineData("account machine machine-auth")]
+    [InlineData("account machine rules")]
     public void Help_StartsWithTheDescription_AndEndsWithTheDetail_AfterTheOptions(string path)
     {
         var command = HelpTexts.Command<PlatformCommand>(path);
@@ -150,11 +184,48 @@ public partial class RoleNoteTests
     [InlineData("story kv policy set", "A machine cannot change the policy, whatever its scopes.")]
     [InlineData("account machine issuer set", "A machine cannot change the trusted issuers, whatever its scopes.")]
     [InlineData("account machine issuer delete", "A machine cannot delete a trusted issuer, whatever its scopes.")]
+    [InlineData("story kv policy byok-setup", "A machine cannot read the setup, whatever its scopes.")]
+    [InlineData("story kv policy byok-verify", "A machine cannot verify the key, whatever its scopes.")]
+    [InlineData("story kv policy rotate", "A machine cannot rotate a key, whatever its scopes.")]
+    [InlineData("story kv recipients add", "A machine cannot change the recipients, whatever its scopes.")]
+    [InlineData("story kv recipients disable", "A machine cannot change the recipients, whatever its scopes.")]
+    [InlineData("story kv recipients remove", "A machine cannot change the recipients, whatever its scopes.")]
     public void Detail_EndsWithTheRole_AndThatAMachineCannot(string path, string machine)
     {
         var detail = HelpTexts.Unwrap(HelpTexts.Command<PlatformCommand>(path).ExtendedHelpText);
 
         detail.ShouldEndWith($"A user needs the Administrator role on the project. {machine}", Case.Sensitive);
+    }
+
+    // A note names only the lowest role; where another role passes too, or a machine can, the last paragraph of the
+    // detail says which role each case needs, and what a machine needs.
+    [Theory]
+    [InlineData("story kv protect", "A user needs the ContributorWithSecrets role on the project. A machine needs no role but the scopes Configuration.Write, KeyValue.Manage and Secrets.Write, and a certificate (mTLS) when the policy requires it.")]
+    [InlineData("story kv reencrypt", "A user needs the ContributorWithSecrets role on the project. A machine needs no role but the scopes Configuration.Read, Configuration.Write, Secrets.Read and Secrets.Write, and a certificate (mTLS) when the policy requires it.")]
+    [InlineData("account points grant", "A user needs the Administrator role on the access point, and the Owner role to grant the Owner role. A machine cannot grant access, whatever its scopes.")]
+    [InlineData("account points revoke", "A user needs the Administrator role on the access point, and the Owner role to revoke the Owner role. A machine cannot revoke access, whatever its scopes.")]
+    [InlineData("account machine reset", "A user needs the Contributor role on the project; for a machine with a secrets scope the ContributorWithSecrets role, and with a management scope the Administrator role. A machine cannot reset a secret, whatever its scopes.")]
+    [InlineData("account machine delete", "A user needs the Contributor role on the project; for a machine with a secrets scope the ContributorWithSecrets role, and with a management scope the Administrator role. A machine cannot delete a machine access, whatever its scopes.")]
+    [InlineData("account machine machine-auth", "A user needs the Contributor role on the project to show the policy, and the Administrator role to set it. A machine cannot show or set it, whatever its scopes.")]
+    [InlineData("account machine rules", "A user needs the Contributor role on the project; to replace the rules of a machine with a secrets scope the ContributorWithSecrets role, and with a management scope the Administrator role. A machine cannot show or replace the rules, whatever its scopes.")]
+    public void Detail_EndsWithTheRoles_InFullSentences(string path, string roles)
+    {
+        var detail = HelpTexts.Command<PlatformCommand>(path).ExtendedHelpText!.ReplaceLineEndings("\n");
+        var paragraphs = detail.Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+
+        HelpTexts.Unwrap(paragraphs[^1]).ShouldBe(roles);
+    }
+
+    // A group has a note only when it and every command below it need the same role.
+    [Theory]
+    [InlineData("account shared-cert", "(for administrators)")]
+    public void GroupNote_IsTheNoteOfEveryCommandBelowIt(string path, string note)
+    {
+        var group = HelpTexts.Command<PlatformCommand>(path);
+
+        group.Description.ShouldEndWith($"{note}.", Case.Sensitive);
+        group.Commands.ShouldNotBeEmpty();
+        group.Commands.ShouldAllBe(command => command.Description!.EndsWith($"{note}.", StringComparison.Ordinal));
     }
 
     // What the descriptions said before they moved after the options.
@@ -165,6 +236,16 @@ public partial class RoleNoteTests
     [InlineData("story kv policy set", "Only the members given change; the others keep their value.", "--allow lists every allowed level and replaces the stored list")]
     [InlineData("account machine issuer set", "Settings not given are cleared, and the issuer URL (--issuer) of an existing issuer cannot change.", "unless --jwks-uri or --jwks-file gives them.")]
     [InlineData("account machine issuer delete", "The issuer is deleted even while federation rules reference it", "Those rules stop matching within a minute")]
+    [InlineData("story kv protect", "move to the server-side level", "(standard, hsm or byok) as a new version each")]
+    [InlineData("story kv reencrypt", "The client-encrypted (hyok) values", "an existing recipient's private key", "encrypted again for the current recipients")]
+    [InlineData("story kv policy byok-setup", "What the customer needs to bring their own key", "the application to consent to", "the role to grant")]
+    [InlineData("story kv policy byok-verify", "The customer key set in the policy", "enabled, RSA 2048+, wrap and unwrap allowed, and a round trip works")]
+    [InlineData("story kv policy rotate", "The project's standard or hsm key-encryption key", "rotated now, and the re-wrap of the stored values starts")]
+    [InlineData("story kv recipients add", "a name (--name) and an RSA public key (3072 bits or more) as a PEM or JWK file, or inline")]
+    [InlineData("story kv recipients disable", "New values are not encrypted for a disabled recipient")]
+    [InlineData("story kv recipients remove", "Values already encrypted for it stay readable with its private key until they are encrypted again")]
+    [InlineData("account machine machine-auth", "the machine authentication policy of the project")]
+    [InlineData("account machine rules", "the rules of the federated machine")]
     public void Detail_KeepsWhatTheDescriptionSaid(string path, params string[] parts)
     {
         var detail = HelpTexts.Unwrap(HelpTexts.Command<PlatformCommand>(path).ExtendedHelpText);
@@ -182,6 +263,10 @@ public partial class RoleNoteTests
         "account machine create",
         "manage",
         "A management scope to grant (for administrators). One of ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage; repeat it or separate the values with commas. Never part of -r or -w.")]
+    [InlineData(
+        "account machine machine-auth",
+        "credential-kind",
+        "A credential kind to enable (for administrators). One of ApiKey, Certificate, CertificateAndApiKey, ClientCredentials, or Federated; repeat the option or separate the kinds by commas.")]
     public void Option_EndsItsFirstSentenceWithTheNote(string path, string longName, string description)
     {
         var option = HelpTexts.Command<PlatformCommand>(path).Options.Single(option => option.LongName == longName);
