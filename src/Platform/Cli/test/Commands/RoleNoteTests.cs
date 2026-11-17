@@ -270,7 +270,7 @@ public partial class RoleNoteTests
         "account machine machine-auth",
         "credential-kind",
         "An enabled credential kind (for administrators). One of ApiKey, Certificate, CertificateAndApiKey, ClientCredentials, or Federated; repeat the option or separate the kinds by commas. The kinds given replace the enabled ones.")]
-    [InlineData("story kv set", "secret", "A secret (for contributors with secrets). It gets the project's default secret level.")]
+    [InlineData("story kv set", "secret", "A secret (for contributors with secrets). It gets the project's default secret level unless --protection is given.")]
     public void Option_EndsItsFirstSentenceWithTheNote(string path, string longName, string description)
     {
         var option = HelpTexts.Command<PlatformCommand>(path).Options.Single(option => option.LongName == longName);
