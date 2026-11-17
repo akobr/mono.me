@@ -49,6 +49,27 @@ public class ReportScrubberTests
         scrubbed.ShouldContain(ReportScrubber.Filtered);
     }
 
+    // A bracket inside a string of a secret member does not end its value: the whole object or array goes.
+    [Theory]
+    [InlineData("{\"value\":{\"a\":\"x}s3cr3t-rest\",\"b\":[1,{\"c\":\"]\"}]},\"key\":\"db\"}", "{\"value\":\"[Filtered]\",\"key\":\"db\"}")]
+    [InlineData("{\"secret\":[\"a]\",\"s3cr3t-rest\"],\"key\":\"db\"}", "{\"secret\":\"[Filtered]\",\"key\":\"db\"}")]
+    [InlineData("body: {\\\"value\\\":{\\\"a\\\":\\\"x}s3cr3t-rest\\\"},\\\"key\\\":\\\"db\\\"}", "body: {\\\"value\\\":\\\"[Filtered]\\\",\\\"key\\\":\\\"db\\\"}")]
+    [InlineData("body: {\\\"secret\\\":[\\\"a]\\\",\\\"s3cr3t-rest\\\"]}", "body: {\\\"secret\\\":\\\"[Filtered]\\\"}")]
+    public void ScrubSecrets_ANestedSecretMember_GoesWhole(string text, string expected)
+    {
+        ReportScrubber.ScrubSecrets(text, NoValues).ShouldBe(expected);
+    }
+
+    // In JSON inside a string an escaped quote (\\\") does not end a string.
+    [Theory]
+    [InlineData(@"body: {\""value\"":{\""a\"":\""x\\\""}s3cr3t-rest\""},\""key\"":\""db\""}")]
+    [InlineData(@"body: {\""secret\"":[\""a\\\""]\"",\""s3cr3t-rest\""]}")]
+    [InlineData(@"body: {\""value\"":\""x\\\"" s3cr3t-rest\"",\""key\"":\""db\""}")]
+    public void ScrubSecrets_AnEscapedQuoteInJsonInsideAString_DoesNotEndTheValue(string text)
+    {
+        ReportScrubber.ScrubSecrets(text, NoValues).ShouldNotContain("s3cr3t");
+    }
+
     [Fact]
     public void ScrubSecrets_KeepsNamesAndProse()
     {

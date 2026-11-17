@@ -60,9 +60,15 @@ internal static class ReportScrubber
         + "|access_token|refresh_token|id_token|subject_token|actor_token|client_assertion|code_verifier|ApiKey|api_key|sig"
         + "|InstrumentationKey";
 
-    // An object or array value with nested ones, whole (balancing groups count the brackets).
-    private const string NestedObject = @"\{(?>[^{}]+|\{(?<o>)|\}(?<-o>))*(?(o)(?!))\}";
-    private const string NestedArray = @"\[(?>[^\[\]]+|\[(?<a>)|\](?<-a>))*(?(a)(?!))\]";
+    // An object or array value with nested ones, whole (balancing groups count the brackets). A string is one token, so a
+    // bracket inside it ("x}y") does not end the value; the escaped forms take the strings of JSON inside a string (\"…\").
+    private const string NestedObject = @"\{(?>""(?:[^""\\]|\\.)*""|[^{}""]+|\{(?<o>)|\}(?<-o>))*(?(o)(?!))\}";
+    private const string NestedArray = @"\[(?>""(?:[^""\\]|\\.)*""|[^\[\]""]+|\[(?<a>)|\](?<-a>))*(?(a)(?!))\]";
+
+    // A string of JSON inside a string: \"…\", in which \\\" is an escaped quote and \\\\ an escaped backslash.
+    private const string EscapedString = @"\\""(?>\\\\\\\\|\\\\\\""|\\{1,2}[^\\""]|[^\\])*\\""";
+    private const string EscapedNestedObject = @"\{(?>" + EscapedString + @"|[^{}\\]+|\\(?!"")|\{(?<o>)|\}(?<-o>))*(?(o)(?!))\}";
+    private const string EscapedNestedArray = @"\[(?>" + EscapedString + @"|[^\[\]\\]+|\\(?!"")|\[(?<a>)|\](?<-a>))*(?(a)(?!))\]";
 
     private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(250);
 
@@ -105,7 +111,7 @@ internal static class ReportScrubber
 
         // secret JSON members, plain and JSON-escaped inside a string, with any value
         (Create($@"""({SecretJsonNames})""(\s*:\s*)(?:""(?:[^""\\]|\\.)*""|{NestedObject}|{NestedArray}|[^,}}\]\s]+)", RegexOptions.IgnoreCase), $"\"$1\"$2\"{Filtered}\""),
-        (Create($@"\\""({SecretJsonNames})\\""(\s*:\s*)(?:\\""(?:(?!\\"").)*\\""|{NestedObject}|{NestedArray}|[^,}}\]\s\\]+)", RegexOptions.IgnoreCase), $"\\\"$1\\\"$2\\\"{Filtered}\\\""),
+        (Create($@"\\""({SecretJsonNames})\\""(\s*:\s*)(?:{EscapedString}|{EscapedNestedObject}|{EscapedNestedArray}|[^,}}\]\s\\]+)", RegexOptions.IgnoreCase), $"\\\"$1\\\"$2\\\"{Filtered}\\\""),
     ];
 
     // Quoted text, for Sentry only: what a .NET message quotes is the input ("Could not find file '…'", "'…' is not a
@@ -246,7 +252,8 @@ internal static class ReportScrubber
             sentryEvent.UnsetTag(tag);
         }
 
-        // The SDK cannot remove an extra; an Exception.Data key "sentry:…" would add one.
+        // The SDK cannot remove an extra; ErrorReporter removes the Exception.Data keys "sentry:…" that would add one, and
+        // what is left keeps only its name.
         foreach (var key in sentryEvent.Extra.Keys.ToList())
         {
             sentryEvent.SetExtra(key, Filtered);

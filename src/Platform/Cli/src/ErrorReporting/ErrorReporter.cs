@@ -115,6 +115,8 @@ internal sealed class ErrorReporter
 
     internal static SentryEvent CreateEvent(LogLevel level, string what, CommandUsage usage, Exception? exception)
     {
+        RemoveSentryData(exception);
+
         var sentryEvent = new SentryEvent(exception)
         {
             Level = level switch
@@ -140,6 +142,40 @@ internal sealed class ErrorReporter
         };
 
         return sentryEvent;
+    }
+
+    // The SDK turns an Exception.Data key "sentry:…" into an extra, a tag or a context named by the key, which BeforeSend
+    // cannot rename: the keys go before the capture, from the whole chain. The exception is not used after its report.
+    private static void RemoveSentryData(Exception? exception)
+    {
+        if (exception is null)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var key in exception.Data.Keys.OfType<string>().Where(key => key.StartsWith("sentry:", StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                exception.Data.Remove(key);
+            }
+        }
+        catch (Exception)
+        {
+            // A read-only Data: BeforeSend still masks the values.
+        }
+
+        if (exception is AggregateException aggregate)
+        {
+            foreach (var inner in aggregate.InnerExceptions)
+            {
+                RemoveSentryData(inner);
+            }
+        }
+        else
+        {
+            RemoveSentryData(exception.InnerException);
+        }
     }
 
     private static IEnumerable<string?> ReportTimeValues(ErrorReportingSettings settings)
@@ -193,8 +229,8 @@ internal sealed class ErrorReporter
         }
     }
 
-    // Each value with its parts, and a value that names a file also in its full form and with the other separator:
-    // ../ops/db.env typed on Windows is C:\work\ops\db.env in the message of System.IO.
+    // Each value with its parts, and in its full form as a path and with the other separator: ../ops/db.env typed on Windows
+    // is C:\work\ops\db.env in the message of System.IO.
     private IReadOnlyList<string> Expand(IEnumerable<string?> values)
     {
         var expanded = new List<string>();
@@ -203,14 +239,13 @@ internal sealed class ErrorReporter
         {
             expanded.AddRange(CommandLineValues.WithParts(value));
 
-            if (value.IndexOfAny(['/', '\\']) < 0 && value[0] != '.')
+            if (value.IndexOfAny(['/', '\\']) >= 0)
             {
-                continue;
+                expanded.Add(value.Replace('/', '\\'));
+                expanded.Add(value.Replace('\\', '/'));
             }
 
-            expanded.Add(value.Replace('/', '\\'));
-            expanded.Add(value.Replace('\\', '/'));
-
+            // A bare file name too (-o out.zip): System.IO names it by its full path.
             try
             {
                 expanded.Add(_fileSystem.Path.GetFullPath(value));
