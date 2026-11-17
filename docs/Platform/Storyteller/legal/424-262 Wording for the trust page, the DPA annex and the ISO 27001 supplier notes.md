@@ -16,7 +16,7 @@ Sign-in to the 2S Platform is provided by **WorkOS, Inc.** (USA). WorkOS verifie
 
 - **No impersonation.** WorkOS's user impersonation feature is turned off. The 2S API also refuses every impersonated session, so it can't be used even if the feature were turned on.
 - **A locked-down dashboard.** Only named members can use the WorkOS dashboard, and each of them uses multi-factor authentication.
-- **Email changes are logged.** If you open the admin application or sign in through the MCP server with an email other than the one the 2S Platform has stored for you, the 2S API logs it. This needs the sign-in to carry your email, and other calls of the API are not compared. Changes on administrator and owner accounts are logged separately.
+- **Email changes are logged.** When your account is read (the admin application does it when it opens, the CLI in its account commands, and any client can call it directly) or you sign in through the MCP server with an email other than the one the 2S Platform has stored for you, the 2S API logs it. This needs the sign-in to carry your email; other calls of the API are not compared. Changes on administrator and owner accounts are logged separately.
 
 ### The risk that remains
 
@@ -51,7 +51,7 @@ A deployment uses one identity provider. In a dedicated deployment the admin web
 
 1. WorkOS's user impersonation is turned off in every environment. The 2S API refuses impersonated sessions, which carry an `act` claim, with HTTP 401. It logs each refusal of a token that is otherwise valid; a token already refused for another reason, such as an expired one, is not logged as an impersonation.
 2. Access to the WorkOS dashboard is limited to named members, each with multi-factor authentication. Where SSO is used instead, its identity provider must enforce MFA. The membership is reviewed at each production verification.
-3. When the email in a sign-in differs from the one stored on the account, the 2S API logs it. It does this only when the admin application opens and at MCP sign-in, and only when the sign-in carries the email and the account has a stored email of its own (not for an account a seed created before its person signed in, nor for a delegated request). Changes on administrator and owner accounts are logged separately.
+3. When the email in a sign-in differs from the one stored on the account, the 2S API logs it. It does this only when the account is read directly (`GET v1/access/account`: the admin application when it opens, the CLI's account commands, or any direct call) and at MCP sign-in, and only when the sign-in carries the email and the account has a stored email of its own (not for an account a seed created before its person signed in, nor for a delegated request). Changes on administrator and owner accounts are logged separately.
 4. These logs, including the email addresses involved, are kept in Azure Application Insights in the EU for 30 days. They are not reported as events to the error-reporting service (Sentry, EU). They can reach it as breadcrumbs of an error event of the same request, with email addresses removed before they are sent.
 
 ### Residual risk
