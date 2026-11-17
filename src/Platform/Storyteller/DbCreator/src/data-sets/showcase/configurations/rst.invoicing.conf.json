@@ -9,5 +9,11 @@
     "email",
     "credit-notes",
     "e-invoice"
-  ]
+  ],
+  "email": {
+    "host": "@smtp.host",
+    "sender": "@smtp.sender",
+    "password": "@(smtp.password, secret)"
+  },
+  "pdfRenderer": "@pdf.rendererUrl"
 }

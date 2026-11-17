@@ -60,6 +60,21 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
         var pairs = DataSetKeyValues.Read(new FileSystem(), result.Set.Folder).ShouldNotBeNull();
         pairs.Count(KeyValueProtection.Standard).ShouldBeGreaterThan(0);
         result.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = pairs.Items.Count });
+
+        // the modules bind them: a resolved read gives the values, the Standard ones too
+        var configurations = services.GetRequiredService<IConfigurationService>();
+        var target = new DataSetTarget(organization, "invoicing-suite", "default");
+        var invoicing = (await configurations.GetResolvedConfigurationWithSecretsAsync(Key(target, "rst.invoicing"))).ShouldNotBeNull();
+        var payments = (await configurations.GetResolvedConfigurationWithSecretsAsync(Key(target, "rst.payments"))).ShouldNotBeNull();
+        var dunning = (await configurations.GetResolvedConfigurationWithSecretsAsync(Key(target, "rst.dunning"))).ShouldNotBeNull();
+        var values = pairs.Items.ToDictionary(item => item.Key, item => item.Value!);
+        invoicing.Content.SelectToken("email.host")!.ToString().ShouldBe(values["smtp.host"]);
+        invoicing.Content.SelectToken("email.sender")!.ToString().ShouldBe(values["smtp.sender"]);
+        invoicing.Content.SelectToken("email.password")!.ToString().ShouldBe(values["smtp.password"]);
+        invoicing.Content.SelectToken("pdfRenderer")!.ToString().ShouldBe(values["pdf.rendererUrl"]);
+        payments.Content.SelectToken("adyen.merchantAccount")!.ToString().ShouldBe(values["payments.adyen.merchantAccount"]);
+        payments.Content.SelectToken("adyen.hmacKey")!.ToString().ShouldBe(values["payments.adyen.hmacKey"]);
+        dunning.Content.SelectToken("maxReminders")!.ToString().ShouldBe(values["dunning.maxReminders"]);
     }
 
     [Fact]

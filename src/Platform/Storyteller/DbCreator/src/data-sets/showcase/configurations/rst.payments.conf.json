@@ -4,5 +4,9 @@
     "stripe"
   ],
   "settlementDay": "mon",
-  "captureDelayHours": 0
+  "captureDelayHours": 0,
+  "adyen": {
+    "merchantAccount": "@payments.adyen.merchantAccount",
+    "hmacKey": "@(payments.adyen.hmacKey, secret)"
+  }
 }
