@@ -35,7 +35,7 @@ public class KeyValueSetCommand : KeyValueCommandBase
     [Option("--protection", CommandOptionType.SingleValue, Description = "The level: public, standard, hsm, byok or hyok. Required for a new key; an update keeps the level when missing.")]
     public string? Protection { get; set; }
 
-    [Option("--secret", CommandOptionType.NoValue, Description = "A secret (for contributors with secrets). It gets the project's default secret level.")]
+    [Option("--secret", CommandOptionType.NoValue, Description = "A secret (for contributors with secrets). It gets the project's default secret level unless --protection is given.")]
     public bool Secret { get; set; }
 
     [Option("--stdin", CommandOptionType.NoValue, Description = "Read the value from the standard input.")]
