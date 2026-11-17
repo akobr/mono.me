@@ -14,7 +14,7 @@ using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
 
-[Command(CommandNames.CREATE, CommandNames.SET, Description = "Create new machine access.")]
+[Command(CommandNames.CREATE, CommandNames.SET, Description = "Create new machine access (for contributors).")]
 public class MachineCreateCommand : BaseContextCommand
 {
     private readonly IAccessApiClient _accessApi;

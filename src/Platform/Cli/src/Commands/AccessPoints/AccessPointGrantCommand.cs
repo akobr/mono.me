@@ -13,9 +13,17 @@ using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.AccessPoints;
 
-[Command(CommandNames.GRANT, Description = "Grant access to point to another user.")]
+[Command(CommandNames.GRANT, Description = "Grant access to point to another user (for administrators).", ExtendedHelpText = HelpDetail)]
 public class AccessPointGrantCommand : BaseCommand
 {
+    // After the options of 'sform account points grant --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        A user needs the Administrator role on the access point, and the Owner role to
+        grant the Owner role. A machine cannot grant access, whatever its scopes.
+        """;
+
     private readonly IAccessApiClient _accessApi;
     private readonly AccessDefaultOptions _accessDefault;
 

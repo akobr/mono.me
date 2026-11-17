@@ -7,7 +7,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.SharedCertificates;
 
-[Command(CommandNames.ISSUE, CommandNames.CREATE, Description = "Issue a new shared certificate for a project.")]
+[Command(CommandNames.ISSUE, CommandNames.CREATE, Description = "Issue a new shared certificate (for administrators).")]
 public class SharedCertIssueCommand : BaseContextCommand
 {
     private readonly IAccessApiClient _accessApi;

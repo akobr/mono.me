@@ -10,9 +10,23 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 
 // Without rule options it shows the rules of the machine. With them it replaces every rule: one rule from
 // --issuer, --audience, --subject and --claim, or the rules of --rules-file.
-[Command(CommandNames.RULES, Description = "Show or replace the federation rules of a federated machine.")]
+[Command(CommandNames.RULES, Description = "Show or replace the federation rules (for contributors).", ExtendedHelpText = HelpDetail)]
 public class MachineRulesCommand : FederationCommandBase
 {
+    // After the options of 'sform account machine rules --help', as it is: the empty first line separates it from
+    // them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        Without rule options the rules of the federated machine are shown. With
+        --issuer, --audience, --subject and --claim, or with --rules-file, every rule
+        is replaced; the new rules apply to new token exchanges.
+
+        A user needs the Contributor role on the project; to replace the rules of a
+        machine with a secrets scope the ContributorWithSecrets role, and with a
+        management scope the Administrator role. A machine cannot show or replace the
+        rules, whatever its scopes.
+        """;
+
     private readonly IFileSystem _fileSystem;
 
     public MachineRulesCommand(
