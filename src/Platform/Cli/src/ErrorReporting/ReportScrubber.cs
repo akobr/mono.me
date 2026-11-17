@@ -135,6 +135,9 @@ internal static class ReportScrubber
 
     private static readonly Regex AdjacentMasks = Create(@"(?:\*\*\*|\[Filtered\])(?:\*\*\*|\[Filtered\])+");
 
+    // Any mask, the longest form first.
+    private static readonly Regex AnyMask = Create(@"\\""\[Filtered\]\\""|""\[Filtered\]""|\[Filtered\]|\*\*\*");
+
     // A URL keeps its scheme, host and port; the user information, the path and the query go.
     private static readonly Regex Url = Create(@"\b([A-Za-z][A-Za-z0-9+.-]*://)(?:[^\s/@'""<>]*@)?([^\s/?#'""<>@]+)([^\s'""<>]*)");
 
@@ -321,6 +324,29 @@ internal static class ReportScrubber
             }
         }
 
+        return ScrubInteriors(text, value);
+    }
+
+    // A value two shapes covered at both ends (an e-mail, then a path): the text between their masks, when the value holds it
+    // and it has a letter or a digit, is masked too.
+    private static string ScrubInteriors(string text, string value)
+    {
+        var masks = AnyMask.Matches(text);
+
+        for (var index = masks.Count - 1; index > 0; index--)
+        {
+            var start = masks[index - 1].Index + masks[index - 1].Length;
+            var gap = text[start..masks[index].Index];
+
+            if (gap.Length > 0
+                && gap.Length < value.Length
+                && gap.Any(char.IsLetterOrDigit)
+                && value.Contains(gap, StringComparison.OrdinalIgnoreCase))
+            {
+                text = $"{text[..start]}{Mask}{text[masks[index].Index..]}";
+            }
+        }
+
         return text;
     }
 
@@ -425,6 +451,7 @@ internal static class ReportScrubber
 
     private static Regex Create(string pattern, RegexOptions options = RegexOptions.None)
     {
-        return new Regex(pattern, options | RegexOptions.CultureInvariant | RegexOptions.Compiled, MatchTimeout);
+        // Not compiled: the patterns run on a few failures of a short run, and compiling them would delay the first one.
+        return new Regex(pattern, options | RegexOptions.CultureInvariant, MatchTimeout);
     }
 }

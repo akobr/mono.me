@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
@@ -102,11 +103,16 @@ internal sealed record ErrorReportingSettings
                 if (variable is { Key: string name, Value: string value })
                 {
                     variables.TryAdd(name, value);
+
+                    // Every secret, also the second of two names that differ only in case.
+                    if (SecretVariables.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    {
+                        secrets.Add(value);
+                    }
                 }
             }
 
             context.AddRange(ContextVariables.Select(name => variables.GetValueOrDefault(name)));
-            secrets.AddRange(SecretVariables.Select(name => variables.GetValueOrDefault(name)));
 
             // The machine an API key names, before the credential loads; a certificate is known only once it did.
             if (MachineApiKey.TryParse(variables.GetValueOrDefault(StorytellerVariables.API_KEY)) is { } apiKey)
@@ -118,7 +124,7 @@ internal sealed record ErrorReportingSettings
                 .Where(variable => variable.Key.StartsWith(SformVariables.CONFIGURATION_PREFIX, StringComparison.OrdinalIgnoreCase)
                     && variable.Key.Contains("__", StringComparison.Ordinal))
                 .Select(variable => variable.Value.Trim())
-                .Where(value => value.Length >= 4 && !SwitchValues.Contains(value) && !double.TryParse(value, out _)));
+                .Where(value => value.Length >= 4 && !SwitchValues.Contains(value) && !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)));
         }
         catch (Exception)
         {

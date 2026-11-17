@@ -29,6 +29,7 @@ public class ErrorReportingSettingsTests
             ["STORYTELLER_API_KEY"] = TestApiKeys.Create("globex", "payroll", "m7"),
             ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = "github-request-token-value",
             ["STORYTELLER_TOKEN_SCOPE"] = "api://contoso-storyteller/.default",
+            ["storyteller_client_secret"] = "lower-case-s3cret",
             ["http_proxy"] = "http://proxy.example:3128",
             ["HTTP_PROXY"] = "http://proxy.example:3128",
             ["PATH"] = @"C:\Windows",
@@ -55,7 +56,7 @@ public class ErrorReportingSettingsTests
         settings.ContextValues.ShouldNotContain("file");
         settings.ContextValues.ShouldNotContain("true");
         settings.ContextValues.ShouldNotContain("access_token");
-        settings.SecretValues.ShouldBe(["cl1ent-s3cret", "p4ss", variables["STORYTELLER_API_KEY"] as string, "github-request-token-value"], ignoreOrder: true);
+        settings.SecretValues.ShouldBe(["cl1ent-s3cret", "lower-case-s3cret", "p4ss", variables["STORYTELLER_API_KEY"] as string, "github-request-token-value"], ignoreOrder: true);
         settings.Dsn.ShouldBe("https://public@o1.ingest.de.sentry.io/1");
         settings.Release.ShouldBe("42.Platform.Cli@1.2.3");
     }
