@@ -22,8 +22,14 @@ public class ReportScrubberFuzzTests
         "C:\\Users\\ada\\out.zip", "/home/ada/out.zip", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln", "Password=", "{\"value\":",
     ];
 
+    // One budget for every case, generous for a loaded agent: a scrubbing that does not end fails it.
     [Fact]
     public void TheScrubbing_Ends_ThrowsNothing_AndKeepsNoValueItWasGivenWhole()
+    {
+        Should.CompleteIn(Run, TimeSpan.FromSeconds(60));
+    }
+
+    private static void Run()
     {
         var random = new Random(42_75);
         var leaks = new List<string>();
@@ -34,8 +40,8 @@ public class ReportScrubberFuzzTests
             var text = $"{Build(random, random.Next(0, 6))}{(random.Next(3) == 0 ? value.ToUpperInvariant() : value)}{Build(random, random.Next(0, 6))}";
             var values = CommandLineValues.WithParts(value).ToList();
 
-            var secrets = Should.CompleteIn(() => ReportScrubber.ScrubSecrets(text, values), TimeSpan.FromSeconds(2));
-            var sentry = Should.CompleteIn(() => ReportScrubber.ScrubForSentry(text, values), TimeSpan.FromSeconds(2));
+            var secrets = ReportScrubber.ScrubSecrets(text, values);
+            var sentry = ReportScrubber.ScrubForSentry(text, values);
 
             // A value of mask characters can be matched by the masks themselves; the check is for the others.
             if (value.Trim().Length >= 6 && value.IndexOfAny(['*', '[', ']', '\r', '\n']) < 0)

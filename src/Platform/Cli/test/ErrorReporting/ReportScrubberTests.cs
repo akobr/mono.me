@@ -147,6 +147,19 @@ public class ReportScrubberTests
         ReportScrubber.ScrubSecrets(text, [value]).ShouldNotContain(value[^4..]);
     }
 
+    // Two shapes covered the start and the end of a value: what the value holds between their masks goes too.
+    [Fact]
+    public void TheInteriorOfAValueTwoShapesCovered_GoesToo()
+    {
+        const string secret = "Password=hunter22xyz Q7 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln";
+        const string owner = @"ada@acme.example Q7 C:\x\y";
+
+        ReportScrubber.ScrubSecrets($"login {secret} failed", [secret]).ShouldBe("login *** failed");
+        ReportScrubber.ScrubForSentry($"login {secret} failed", [secret]).ShouldBe("login *** failed");
+        ReportScrubber.ScrubForSentry($"Owner {owner} failed", [owner]).ShouldBe("Owner *** failed");
+        ReportScrubber.ScrubForSentry("Owner ada@acme.example of C:\\x\\y failed", ["other"]).ShouldBe("Owner *** of *** failed");
+    }
+
     [Fact]
     public void ScrubForSentry_AShapeThatCutAValueAtABracket_LeavesNothingOfIt()
     {

@@ -89,7 +89,7 @@ internal sealed class ErrorReporter
 
         options.SetBeforeBreadcrumb((_, _) => null);
         options.SetBeforeSendTransaction((_, _) => null);
-        options.SetBeforeSend((sentryEvent, _) => ReportScrubber.ScrubEvent(sentryEvent, values, settings.InstallationId));
+        options.SetBeforeSend((sentryEvent, _) => ScrubOrDrop(sentryEvent, values, settings.InstallationId));
 
         if (!string.IsNullOrEmpty(settings.InstallationId))
         {
@@ -97,6 +97,20 @@ internal sealed class ErrorReporter
         }
 
         return options;
+    }
+
+    // An event that cannot be scrubbed (a rule that timed out) is dropped here, not left to how the SDK treats a callback
+    // that throws.
+    internal static SentryEvent? ScrubOrDrop(SentryEvent sentryEvent, IReadOnlyCollection<string> values, string? installationId)
+    {
+        try
+        {
+            return ReportScrubber.ScrubEvent(sentryEvent, values, installationId);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     internal static SentryEvent CreateEvent(LogLevel level, string what, CommandUsage usage, Exception? exception)

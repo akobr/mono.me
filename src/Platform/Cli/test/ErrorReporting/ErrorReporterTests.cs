@@ -192,6 +192,21 @@ public class ErrorReporterTests
         logged.ShouldNotContain("eyJeyJ");
     }
 
+    // A rule that times out on a message drops the event by the reporter's own hand.
+    [Fact]
+    public async Task AnEventThatCannotBeScrubbed_IsNotSent()
+    {
+        var transport = new RecordingTransport();
+        var reporter = ErrorReporter.Create(null, Settings(), options => options.Transport = transport);
+        var exception = Thrown(() => new InvalidOperationException(string.Concat(Enumerable.Repeat("eyJ", 200_000))));
+
+        await reporter.ReportAsync(LogLevel.Error, "Unhandled exception", Run("story"), exception);
+
+        transport.Events.ShouldBeEmpty();
+        ErrorReporter.ScrubOrDrop(new SentryEvent { SentryExceptions = [new Sentry.Protocol.SentryException { Value = string.Concat(Enumerable.Repeat("eyJ", 200_000)) }] }, [], null)
+            .ShouldBeNull();
+    }
+
     [Fact]
     public void TheEvent_IsBuiltFromTheUsage()
     {

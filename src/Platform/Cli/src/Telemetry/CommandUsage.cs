@@ -49,7 +49,8 @@ internal sealed partial record CommandUsage(string Command, IReadOnlyList<string
         return Options.Count == 0 ? Command : $"{Command} {string.Join(' ', Options)}";
     }
 
-    // Values holds the tokens given; with none, it holds the DefaultValue, which a parse of the model leaves behind.
+    // Values holds the tokens given; with none, it holds the DefaultValue, which a parse of the model leaves behind. An option
+    // given with exactly its default value looks the same and is left out of the usage; it never adds a value.
     internal static bool IsGiven(CommandOption option)
     {
         var values = option.Values;
