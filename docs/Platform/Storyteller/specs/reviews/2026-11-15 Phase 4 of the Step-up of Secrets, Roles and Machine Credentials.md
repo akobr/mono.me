@@ -4,7 +4,7 @@ Linear: [424-264](https://linear.app/424fun/issue/424-264/require-recent-sign-in
 
 ## Overview
 
-This review covers Phase 4 (the documents and the deployment, sections 16-18) of the spec [Require a Recent Sign-in for Secrets, Roles and Machine Credentials](../2026-11-15%20Require%20a%20Recent%20Sign-in%20for%20Secrets,%20Roles%20and%20Machine%20Credentials.md), commit `4871da3f9`. Both Bicep entry points and both parameter files build with `az bicep` 0.49.2 without errors or warnings (with the dummy owner values of the CI workflow), and the VitePress site builds without dead links. MFA in the production WorkOS environment is still `Off`: the documents require it, and the owner switches it in the dashboard.
+This review covers Phase 4 (the documents and the deployment, sections 16-18) of the spec [Require a Recent Sign-in for Secrets, Roles and Machine Credentials](../2026-11-15%20Require%20a%20Recent%20Sign-in%20for%20Secrets,%20Roles%20and%20Machine%20Credentials.md), commit `4871da3f9`. Both Bicep entry points and both parameter files build with `az bicep` 0.49.2 without errors or warnings (with the dummy owner values of the CI workflow), and the VitePress site builds without dead links. MFA in the production WorkOS environment was `Off` when this phase was done; with the owner's approval it was set to `Required` on 2026-11-17 (staging unchanged).
 
 ## What Was Done
 
