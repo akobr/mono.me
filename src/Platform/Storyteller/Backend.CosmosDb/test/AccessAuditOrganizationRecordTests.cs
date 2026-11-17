@@ -129,7 +129,8 @@ public class AccessAuditOrganizationRecordTests(Startup startup)
         var added = await AddedAsync(AccessPartition(project), async () =>
         {
             var reset = () => machines.ResetMachineAccessAsync(Organization, project, machine.Id, ViaMcp);
-            (await reset.Should().ThrowAsync<CosmosException>()).Which.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+            // the old secret is gone at the identity provider and the new one is withheld: the caller is told to reset again
+            (await reset.Should().ThrowAsync<ServiceUnavailableException>()).Which.ErrorCode.Should().Be(ErrorCodes.AccessAuditUnavailable);
         });
 
         added.Should().BeEmpty();

@@ -83,6 +83,11 @@ public class Data
                     batch.ReplaceItem(pointId, point with { AccessMap = pointMap }, new TransactionalBatchItemRequestOptions { IfMatchEtag = pointETag });
                 }
             }
+            else
+            {
+                // Unchanged, but guarded: the role was decided on this version, so a change of it fails the batch.
+                batch.ReplaceItem(pointId, point!, new TransactionalBatchItemRequestOptions { IfMatchEtag = pointETag });
+            }
 
             if (accountRole != role)
             {
@@ -97,6 +102,10 @@ public class Data
                     batch.ReplaceItem(accountId, account with { AccessMap = accountMap }, new TransactionalBatchItemRequestOptions { IfMatchEtag = accountETag });
                 }
             }
+            else
+            {
+                batch.ReplaceItem(accountId, account!, new TransactionalBatchItemRequestOptions { IfMatchEtag = accountETag });
+            }
 
             var oldRole = pointRole != role ? pointRole : accountRole;
             var action = point is null
@@ -108,7 +117,9 @@ public class Data
                 Target = AccessAuditTarget.Account(accountId, accountName),
                 OldValue = AccessAuditValues.Role(oldRole),
                 NewValue = AccessAuditValues.Role(role),
-                Detail = "Seeded by DbCreator.",
+                Detail = pointRole == role
+                    ? "Repaired by DbCreator: the account did not hold the role of the access point."
+                    : accountRole == role ? "Repaired by DbCreator: the access point did not hold the role of the account." : "Seeded by DbCreator.",
             }));
 
             using var response = await batch.ExecuteAsync();

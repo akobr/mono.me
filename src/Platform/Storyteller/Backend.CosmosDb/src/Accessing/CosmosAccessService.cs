@@ -626,7 +626,15 @@ public class CosmosAccessService : IAccessService
                 throw new NotFoundException(deletedMessage);
             }
 
-            batch.ThrowIfFailed($"Recording the reset of the machine access {appId}");
+            if (!batch.IsSuccessStatusCode)
+            {
+                // The old secret no longer works and the new one is withheld, so the caller is told to reset again
+                // rather than given a bare 5xx.
+                throw new ServiceUnavailableException(
+                    $"The client secret of the machine access {appId} was replaced, but the reset could not be recorded ({(int)batch.StatusCode}), so the new secret is withheld. Reset the machine again.",
+                    ErrorCodes.AccessAuditUnavailable,
+                    batch.RetryAfter);
+            }
         }
 
         // The copy read above is stale (the new hash, a concurrent renewal), so the record comes back fresh. An API key
@@ -943,7 +951,13 @@ public class CosmosAccessService : IAccessService
 
         for (var attempt = 1; ; attempt++)
         {
-            var organizationAccessPoint = await GetAccessPointAsync(model.Organization);
+            // The organization as the ownership check reads it: an existing one joins the batch, guarded by this ETag, so
+            // a demotion between this read and the batch fails the batch and the check runs again on fresh data.
+            var (organizationEntity, organizationETag) = await repository.Container.TryReadItemWithETagAsync(
+                $"{AccessPointEntity.IdPrefix}{model.Organization}",
+                partitionKey,
+                stream => stream.DeserializeSystemTextJson<AccessPointEntity>(_serializerOptions));
+            var organizationAccessPoint = organizationEntity?.ToAccessPoint();
 
             // Only new names are checked: projects of an organization created before the rules can still be added.
             // A dotted name is never an organization, even when it matches an existing project.
@@ -992,6 +1006,10 @@ public class CosmosAccessService : IAccessService
                     NewValue = AccessAuditValues.Role(AccountRole.Owner),
                 }));
             }
+            else
+            {
+                batch.ReplaceItem(organizationEntity!.Id, organizationEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = organizationETag });
+            }
 
             var accessPointEntity = new AccessPointEntity
             {
@@ -1009,14 +1027,16 @@ public class CosmosAccessService : IAccessService
 
             if (account is not null)
             {
-                account = account with
+                // The owner of a new organization gets it; an existing organization's role stays as its access point
+                // has it (the guard above), so a stale read never writes Owner back.
+                var accessMap = new Dictionary<string, AccountRole>(account.AccessMap) { [accessPointKey] = AccountRole.Owner };
+
+                if (organizationAccessPoint is null)
                 {
-                    AccessMap = new Dictionary<string, AccountRole>(account.AccessMap)
-                    {
-                        [model.Organization] = AccountRole.Owner,
-                        [accessPointKey] = AccountRole.Owner,
-                    },
-                };
+                    accessMap[model.Organization] = AccountRole.Owner;
+                }
+
+                account = account with { AccessMap = accessMap };
 
                 if (newAccount is not null)
                 {
