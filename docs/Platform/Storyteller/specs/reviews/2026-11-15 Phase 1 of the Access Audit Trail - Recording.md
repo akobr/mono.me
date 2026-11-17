@@ -61,6 +61,20 @@ An adversarial review of the branch (four lenses, each finding checked by a skep
 2. **An issuer's delete could record a stale version.** It deleted without the ETag of its read, so a replace landing in between was deleted under the old value. The delete now carries the ETag and reads again once (`ConflictException` after that). Test: `TrustedIssuers_ADeleteRacingAnUpdate_RecordsTheVersionItDeleted`.
 3. **The base seeding wrote the account outside the recorded batch.** `Data.SeedAccountAccessAsync` merged the account first, alone, so a failure between it and the access point's batch left a role on the account (which the role checks read) without a record. Each membership is now one batch of the access point, the account and the record (`MergeMembershipAsync`); a role only one of the two documents holds is repaired and recorded. An account without roles is still merged alone. Test: `Seeding_WritesTheAccountInTheBatchOfItsRecord_AndRepairsARoleOnlyTheAccessPointHolds`; `InitDbCommandTests` expects the account in the batch.
 
+## PR review
+
+The reviews of PR #202 (CodeRabbit, and a review by Grok) led to these changes:
+
+1. **Project creation guards the organization.** The organization's access point, which the ownership check reads, joins the batch of the creation as an unchanged replace with its ETag; an existing organization's role on the owner's account is no longer written. A demotion between the check and the batch fails the batch, the check runs again and refuses, and a stale read never writes `Owner` back. Test: `CreateAccessPoint_TheOwnerDemotedBeforeTheBatch_IsRefused_AndTheDemotionStays`.
+2. **The base seeding guards both documents.** A document that already holds the role joins the batch as an unchanged replace with its ETag, so a change of it after the read fails the batch and both are read again; a repair of one side says so in `Detail`. Test: `Seeding_AnAccessPointChangedBetweenItsReadAndTheBatch_ReadsBothAgain`.
+3. **Values are compared canonically.** The JWKS thumbprint is taken over the key set with the members of every object by name (arrays keep their order), and the allowed levels of the key/value policy are a set, so a reordered document is no change. Tests in `AccessAuditValuesTests` and `KeyValuePolicy_TheAllowedLevelsInAnotherOrder_RecordNothing`.
+4. **A failed record of a client-secret reset** answers `503` `AccessAuditUnavailable` (new error code) that tells the caller to reset again, instead of a bare failed batch.
+5. **The read side**: `from` later than `to` is `400 InvalidQuery`; a missing `core` container is an error, no longer an empty trail (only a missing `organizations` reads as no records).
+6. **The C# SDK** writes the times of a query in the round-trip format (`/ParameterDateTimeFormat:o`): the default `s` dropped the offset and the fractions of a second, which also affected the key/value audit's `from` and `to`.
+7. A test pins that `AccessCaller.System` cannot grant (the caller is authorized, not `CreatedById`). The docs give the size range of records, say that the continuation token is not tied to the filters, and note the order of records written by instances with different clocks.
+
+Not changed: a composite index on core for the trail's query (the trail is small next to the partition; to measure on a real account first), a warning when an API-key reset is recorded outside the hash's batch (the documented path of a hash store that is not Cosmos DB), and cancellation tokens on the new batches (the store interfaces take none).
+
 ## Notes
 
 - A database deployed before this change gets TTL on `core` only when DbCreator runs again; until then the records do not expire.
