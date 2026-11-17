@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.45.34964
  */
 
 export type ViewArchiveContent =

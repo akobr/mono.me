@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.45.34964
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -22,6 +22,7 @@ import { computed, toValue, unref } from "vue";
 import type { MaybeRefOrGetter } from "vue";
 
 import type {
+  AccessAuditResponse,
   AccessPoint,
   AccessPointCreate,
   AccessPointMember,
@@ -35,6 +36,7 @@ import type {
   Exhibition,
   FederatedIssuer,
   FederationRule,
+  GetAccessAuditParams,
   Invitation,
   InvitationCreate,
   MachineAccess,
@@ -57,6 +59,132 @@ import { storytellerFetch } from "../../../lib/fetcher";
 import type { ErrorType, BodyType } from "../../../lib/fetcher";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getGetAccessAuditUrl = (
+  key: string,
+  params?: GetAccessAuditParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/access/points/${encodeURIComponent(String(key))}/audit?${stringifiedParams}`
+    : `/v1/access/points/${encodeURIComponent(String(key))}/audit`;
+};
+
+/**
+ * The access audit trail, newest first: every change of members, access points, machines, the machine authentication and key/value policies, trusted issuers and shared certificates, with the actor (and Via, the actor that acted for the person), the target, the value before and after, and the correlation id. Never a secret. With an organization key, the whole trail of the organization for its Owners and Administrators; with organization.project, the records of the project for its Owners and Administrators. Users only.
+ */
+export const getAccessAudit = async (
+  key: string,
+  params?: GetAccessAuditParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AccessAuditResponse> => {
+  return storytellerFetch<AccessAuditResponse>(
+    getGetAccessAuditUrl(key, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAccessAuditQueryKey = (
+  key: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetAccessAuditParams>,
+) => {
+  return [
+    "v1",
+    "access",
+    "points",
+    key,
+    "audit",
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAccessAuditQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccessAudit>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  key: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetAccessAuditParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAccessAudit>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetAccessAuditQueryKey(key, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccessAudit>>> = ({
+    signal,
+  }) =>
+    getAccessAudit(toValue(key), toValue(params), {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () => toValue(key) !== null && toValue(key) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccessAudit>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetAccessAuditQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccessAudit>>
+>;
+export type GetAccessAuditQueryError = ErrorType<ErrorResponse | void>;
+
+export function useGetAccessAudit<
+  TData = Awaited<ReturnType<typeof getAccessAudit>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  key: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetAccessAuditParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAccessAudit>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetAccessAuditQueryOptions(key, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
 
 export const getGetAccountUrl = () => {
   return `/v1/access/account`;

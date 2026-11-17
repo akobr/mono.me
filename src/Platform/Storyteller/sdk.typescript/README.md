@@ -89,7 +89,7 @@ npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 npm run prepare:local  # npm ci and npm run build, each only when its inputs changed (--force: always)
 ```
 
-To generate from a specific document: `SPEC=../open.api.v0.10.40.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.40.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.40.6327` → `0.10.40`).
+To generate from a specific document: `SPEC=../open.api.v0.10.45.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.45.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.45.6327` → `0.10.45`).
 
 Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer) corrects the document:
 
@@ -121,6 +121,10 @@ Notes:
 - Node 22.18 or newer (Orval 8). Node 24 LTS is pinned in `src/.nvmrc`.
 - TypeScript is held at 6.0, because tsup's declaration build and typedoc (an Orval peer) do not support TypeScript 7 yet.
 - npm 10.9.2 can crash with `Cannot read properties of null (reading 'edgesOut')` when it resolves this dependency set without a lockfile. `npm ci` from the committed `package-lock.json` is not affected; newer npm versions are not affected either.
+
+## Access audit
+
+`getAccessAudit(key, params)` of the `access` tag reads the access audit trail of an organization (`key` = `acme`) or a project (`acme.billing`): every change of members, access points, machines, the project's policies, trusted issuers and shared certificates, newest first, 100 per page, filtered by `project`, `action`, `target`, `from` and `to`. `useGetAccessAudit` is its composable under `./vue-query`. Each page but the last carries `ContinuationToken`, so `paginate` and `collectAll` of `lib/paging.ts` read the trail page by page. What is recorded is in `docs/Platform/Storyteller/access-audit.md`.
 
 ## Key/value pairs
 

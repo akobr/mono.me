@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.45.34964
  */
 import { faker } from "@faker-js/faker";
 
@@ -12,6 +12,7 @@ import type { RequestHandlerOptions } from "msw";
 
 import { AccountRole, MachineCredentialKind, MachineScope } from "../../model";
 import type {
+  AccessAuditResponse,
   AccessPoint,
   AccessPointMember,
   Account,
@@ -29,6 +30,114 @@ import type {
   SharedCertificate,
   UserTokenResponse,
 } from "../../model";
+
+export const getGetAccessAuditResponseMock = (
+  overrideResponse: Partial<Extract<AccessAuditResponse, object>> = {},
+): AccessAuditResponse => ({
+  Items: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Id: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Time: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      Action: faker.helpers.arrayElement([
+        "MemberGranted",
+        "MemberRevoked",
+        "MemberRoleChanged",
+        "MemberRemoved",
+        "MemberJoined",
+        "AccessPointCreated",
+        "AccessPointUpdated",
+        "MachineCreated",
+        "MachineReset",
+        "MachineDeleted",
+        "MachineFederationRulesChanged",
+        "MachineAuthenticationPolicyChanged",
+        "KeyValuePolicyChanged",
+        "FederatedIssuerCreated",
+        "FederatedIssuerUpdated",
+        "FederatedIssuerDeleted",
+        "SharedCertificateIssued",
+        "SharedCertificateRevoked",
+      ] as const),
+      Actor: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      AccessPointKey: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Target: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "Issuer",
+            "Certificate",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      OldValue: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      NewValue: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Detail: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      CorrelationId: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+    })),
+    undefined,
+  ]),
+  ContinuationToken: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Count: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  ...overrideResponse,
+});
 
 export const getGetAccountResponseMock = (
   overrideResponse: Partial<Extract<Account, object>> = {},
@@ -1768,6 +1877,30 @@ export const getExchangeUserTokenResponseMock = (
   ...overrideResponse,
 });
 
+export const getGetAccessAuditMockHandler = (
+  overrideResponse?:
+    | AccessAuditResponse
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<AccessAuditResponse> | AccessAuditResponse),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/access/points/:key/audit",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetAccessAuditResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetAccountMockHandler = (
   overrideResponse?:
     | Account
@@ -2788,6 +2921,7 @@ export const getExchangeUserTokenMockHandler = (
   );
 };
 export const getAccessMock = () => [
+  getGetAccessAuditMockHandler(),
   getGetAccountMockHandler(),
   getCreateAccountMockHandler(),
   getGetAccessPointsMockHandler(),
