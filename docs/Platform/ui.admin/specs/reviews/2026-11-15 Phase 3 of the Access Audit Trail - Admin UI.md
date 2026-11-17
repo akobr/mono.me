@@ -27,6 +27,10 @@ This review covers phase 3 of the spec [Append-Only Access Audit Trail](../../..
 
 `src/Platform/ui.admin/README.md` (the summary, the mock, the e2e list, `ph-no-capture`, Roles and an "Access audit" bullet of the architecture) and `docs/42for.net/platform/admin-ui.md` (an "Audit (organization)" row).
 
+## PR review
+
+From the reviews of PR #202: the sentinel of "every project" and "every action" is `*`, which no project name can be, so a project called `all` can be filtered; a new first page (a refetch after a change) starts a new generation, so a page of Load more still loading for the old one is dropped; the mock pages by the last record of the page (time and id) instead of an offset, so records written between pages shift nothing; and the mock's issuer value has a thumbprint of the key set, so a replaced key is a change, as in the API. The page notes the default retention, its setting and the DbCreator run of older deployments.
+
 ## Notes
 
 - The API's `project` narrows to one project but cannot ask for the organization's own records alone, so the Project filter has no "organization only".

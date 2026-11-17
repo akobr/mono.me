@@ -301,4 +301,5 @@ The `404` of the two [exhibition](#exhibition) routes has no body, and so no `Er
 | `409` | `ViewExists` | The view is already registered, or is `default`. |
 | `409` | `AccessPointExists` | The project already exists. |
 | `409` | `Conflict` | The membership, the invitation, or the project whose description is set changed concurrently twice; repeat the request. The join of the [exhibition](#exhibition) answers it only after it tried again three times. |
+| `503` | `AccessAuditUnavailable` | The identity provider replaced the client secret of a machine, but the [access audit](access-audit.md) record of the reset could not be stored; the new secret is withheld, reset the machine again. |
 | `413` | `BodyTooLarge` | The body is larger than its route reads: 64 KiB for a view, 8 KiB for an account, a new project, a project update, a member role or an invitation. |
