@@ -39,6 +39,8 @@ beforeEach(() => {
     signIn: vi.fn(async () => {}),
     signOut: vi.fn(async () => {}),
     consumeReturnTo: () => undefined,
+    getAuthTime: async () => Date.now(),
+    getStepUpReturn: () => undefined,
   }
   setBootState({ status: 'ready', auth })
   resetDb('new-user')
