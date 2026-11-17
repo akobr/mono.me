@@ -78,9 +78,23 @@ public class KeyValuePurgeCommand : KeyValueBulkCommandBase
     }
 }
 
-[Command(CommandNames.PROTECT, Description = "Move keys to another server-side level (standard, hsm or byok) as a new version each.")]
+[Command(CommandNames.PROTECT, Description = "Re-protect keys (for contributors with secrets).", ExtendedHelpText = HelpDetail)]
 public class KeyValueProtectCommand : KeyValueBulkCommandBase
 {
+    // After the options of 'sform story kv protect --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The keys, given as arguments or by --prefix (an empty prefix means every key),
+        move to the server-side level of --protection (standard, hsm or byok) as a new
+        version each; older versions keep their level until they expire. Public and
+        hyok need a new value from 'sform story kv set'.
+
+        A user needs the ContributorWithSecrets role on the project. A machine needs no
+        role but the scopes Configuration.Write, KeyValue.Manage and Secrets.Write, and
+        a certificate (mTLS) when the policy requires it.
+        """;
+
     public KeyValueProtectCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {
