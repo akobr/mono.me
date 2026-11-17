@@ -3,9 +3,14 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.45.34964
  */
 
+export * from "./accessAuditEntry";
+export * from "./accessAuditEntryAction";
+export * from "./accessAuditResponse";
+export * from "./accessAuditTarget";
+export * from "./accessAuditTargetKind";
 export * from "./accessPoint";
 export * from "./accessPointAccessMap";
 export * from "./accessPointCreate";
@@ -118,6 +123,7 @@ export * from "./federatedIssuerKeySource";
 export * from "./federatedIssuerRequiredClaims";
 export * from "./federationRule";
 export * from "./federationRuleClaims";
+export * from "./getAccessAuditParams";
 export * from "./getAnnotationParams";
 export * from "./getAnnotationSchemaVersionDiffCustomParams";
 export * from "./getAnnotationSchemaVersionDiffParams";

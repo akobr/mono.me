@@ -3,9 +3,116 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.45.34964
  */
 import * as zod from "zod";
+
+/**
+ * The access audit trail, newest first: every change of members, access points, machines, the machine authentication and key/value policies, trusted issuers and shared certificates, with the actor (and Via, the actor that acted for the person), the target, the value before and after, and the correlation id. Never a secret. With an organization key, the whole trail of the organization for its Owners and Administrators; with organization.project, the records of the project for its Owners and Administrators. Users only.
+ */
+export const GetAccessAuditParams = zod.object({
+  key: zod
+    .string()
+    .describe(
+      "The key of the access point: organization, or organization.project.",
+    ),
+});
+
+export const GetAccessAuditQueryParams = zod.object({
+  project: zod
+    .string()
+    .optional()
+    .describe(
+      "Only the records of this project; the organization's own records (its members) are left out. With a project key, only that project.",
+    ),
+  action: zod
+    .string()
+    .optional()
+    .describe(
+      "Only this action (MemberGranted, MemberRevoked, MemberRoleChanged, MemberRemoved, MemberJoined, AccessPointCreated, AccessPointUpdated, MachineCreated, MachineReset, MachineDeleted, MachineFederationRulesChanged, MachineAuthenticationPolicyChanged, KeyValuePolicyChanged, FederatedIssuerCreated, FederatedIssuerUpdated, FederatedIssuerDeleted, SharedCertificateIssued, SharedCertificateRevoked).",
+    ),
+  target: zod
+    .string()
+    .optional()
+    .describe(
+      "Only the records of this target: an account id, a machine id, a trusted issuer's name or a shared certificate's thumbprint.",
+    ),
+  from: zod.iso
+    .datetime({ offset: true })
+    .optional()
+    .describe("Only records at or after this time."),
+  to: zod.iso
+    .datetime({ offset: true })
+    .optional()
+    .describe("Only records at or before this time."),
+  continuationToken: zod
+    .string()
+    .optional()
+    .describe("The continuation token for multi-page queries."),
+});
+
+export const getAccessAuditResponseItemsItemActionDefault = `MemberGranted`;
+export const getAccessAuditResponseItemsItemActorKindDefault = `Account`;
+export const getAccessAuditResponseItemsItemTargetKindDefault = `Account`;
+
+export const GetAccessAuditResponse = zod.object({
+  Items: zod
+    .array(
+      zod.object({
+        Id: zod.string().optional(),
+        Time: zod.iso.datetime({ offset: true }).optional(),
+        Action: zod
+          .enum([
+            "MemberGranted",
+            "MemberRevoked",
+            "MemberRoleChanged",
+            "MemberRemoved",
+            "MemberJoined",
+            "AccessPointCreated",
+            "AccessPointUpdated",
+            "MachineCreated",
+            "MachineReset",
+            "MachineDeleted",
+            "MachineFederationRulesChanged",
+            "MachineAuthenticationPolicyChanged",
+            "KeyValuePolicyChanged",
+            "FederatedIssuerCreated",
+            "FederatedIssuerUpdated",
+            "FederatedIssuerDeleted",
+            "SharedCertificateIssued",
+            "SharedCertificateRevoked",
+          ])
+          .default(getAccessAuditResponseItemsItemActionDefault),
+        Actor: zod
+          .object({
+            Kind: zod
+              .enum(["Account", "Machine", "System"])
+              .default(getAccessAuditResponseItemsItemActorKindDefault),
+            Id: zod.string().optional(),
+            Name: zod.string().optional(),
+            Via: zod.string().optional(),
+          })
+          .optional(),
+        AccessPointKey: zod.string().optional(),
+        Target: zod
+          .object({
+            Kind: zod
+              .enum(["Account", "Machine", "Issuer", "Certificate"])
+              .default(getAccessAuditResponseItemsItemTargetKindDefault),
+            Id: zod.string().optional(),
+            Name: zod.string().optional(),
+          })
+          .optional(),
+        OldValue: zod.string().optional(),
+        NewValue: zod.string().optional(),
+        Detail: zod.string().optional(),
+        CorrelationId: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  ContinuationToken: zod.string().optional(),
+  Count: zod.int().optional(),
+});
 
 export const GetAccountResponse = zod.object({
   Id: zod.string().optional(),

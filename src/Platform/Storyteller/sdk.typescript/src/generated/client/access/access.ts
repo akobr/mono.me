@@ -3,9 +3,10 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.40.6327
+ * OpenAPI spec version: 0.10.45.34964
  */
 import type {
+  AccessAuditResponse,
   AccessPoint,
   AccessPointCreate,
   AccessPointMember,
@@ -18,6 +19,7 @@ import type {
   Exhibition,
   FederatedIssuer,
   FederationRule,
+  GetAccessAuditParams,
   Invitation,
   InvitationCreate,
   MachineAccess,
@@ -36,6 +38,42 @@ import type {
 } from "../../model";
 
 import { storytellerFetch } from "../../../lib/fetcher";
+
+export const getGetAccessAuditUrl = (
+  key: string,
+  params?: GetAccessAuditParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/access/points/${encodeURIComponent(String(key))}/audit?${stringifiedParams}`
+    : `/v1/access/points/${encodeURIComponent(String(key))}/audit`;
+};
+
+/**
+ * The access audit trail, newest first: every change of members, access points, machines, the machine authentication and key/value policies, trusted issuers and shared certificates, with the actor (and Via, the actor that acted for the person), the target, the value before and after, and the correlation id. Never a secret. With an organization key, the whole trail of the organization for its Owners and Administrators; with organization.project, the records of the project for its Owners and Administrators. Users only.
+ */
+export const getAccessAudit = async (
+  key: string,
+  params?: GetAccessAuditParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AccessAuditResponse> => {
+  return storytellerFetch<AccessAuditResponse>(
+    getGetAccessAuditUrl(key, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
 
 export const getGetAccountUrl = () => {
   return `/v1/access/account`;
