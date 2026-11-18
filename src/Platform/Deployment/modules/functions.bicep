@@ -40,8 +40,11 @@ param trustDomain string
 @description('The WorkOS production client id (client_…); the setting is left out while it is empty.')
 param authKitClientId string
 
-@description('The aud of the WorkOS JWT template.')
+@description('The aud of the WorkOS JWT template: the single audience, ignored by the API while authKitAudiences lists any.')
 param authKitAudience string
+
+@description('The audiences of the 2S WorkOS applications; empty leaves Auth__AuthKit__Audiences out.')
+param authKitAudiences string[]
 
 @description('Adds Auth__AuthKit__ApiKey as a reference to the secret authkit-api-key, set by hand in the vault.')
 param authKitApiKeyEnabled bool
@@ -142,6 +145,14 @@ var disabledKindSettings = toObject(
   range(0, length(disabledCredentialKinds)),
   i => 'MachineAuth__DisabledCredentialKinds__${i}',
   i => disabledCredentialKinds[i]
+)
+
+// The list wins over Auth__AuthKit__Audience in the API; the single value stays, so that a rollback to a build that reads
+// only it still checks an audience.
+var authKitAudienceSettings = toObject(
+  range(0, length(authKitAudiences)),
+  i => 'Auth__AuthKit__Audiences__${i}',
+  i => authKitAudiences[i]
 )
 
 var authKitClientIdSetting = empty(authKitClientId) ? {} : { Auth__AuthKit__ClientId: authKitClientId }
@@ -259,7 +270,7 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
 resource appSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   parent: site
   name: 'appsettings'
-  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting, sentryDsnSetting, exhibitionSettings, stepUpEnabledSetting, stepUpMaxAgeSetting)
+  properties: union(baseSettings, disabledKindSettings, authKitAudienceSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting, sentryDsnSetting, exhibitionSettings, stepUpEnabledSetting, stepUpMaxAgeSetting)
 }
 
 resource scmCredentials 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2025-03-01' = {

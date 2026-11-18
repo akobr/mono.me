@@ -26,6 +26,9 @@ param trustDomain = '2s.42for.net'
 
 // The aud of the WorkOS JWT template (cookbook, step 13) is the default https://<trustDomain>; an open point until
 // confirmed.
+// authKitAudiences (the audiences of the 2S applications) stays at its default [] until the release that enables
+// Multiple Applications in WorkOS production; its values come from the staging check (424-239; runbook, "Enabling
+// Multiple Applications in WorkOS").
 
 // Step 13: the WorkOS production client id (client_…).
 param authKitClientId = 'client_01M3MMVAP9HG798GFH9WS2NB8J'
