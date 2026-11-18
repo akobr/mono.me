@@ -36,8 +36,11 @@ watch(open, (value) => {
   }
 })
 
-// The addresses entered, which the step-up's confirmation says its sign-in loses (424-264).
-useDirtySource(() => open.value && emails.value.length > 0)
+// The addresses entered, also one still being typed, which the step-up's confirmation says its sign-in loses (424-264).
+// Read when the confirmation asks, so the text of the input needs no reactivity.
+useDirtySource(
+  () => open.value && (emails.value.length > 0 || (tagsInput.value?.inputRef?.value.trim() ?? '') !== ''),
+)
 
 // Every commit of the tags input (a typed address, a pasted list, the text left when sending) goes through
 // normalizeEmails (424-41): a list becomes one tag per address, and duplicates go, also those in another case. With

@@ -101,9 +101,16 @@ const revealed = useRevealedValue(async () => {
 const revealTarget = (): RevealTarget | undefined =>
   context.scope ? { scope: `${context.scope.org}/${context.scope.project}/${context.scope.view}`, key: props.keyName } : undefined
 
+// The page keeps this component when it moves to another view: a value revealed in the previous one, or on its way, goes.
+watch(
+  () => revealTarget()?.scope,
+  () => revealed.hide(),
+)
+
+// The target is the scope the Reveal asked in, taken before the request: the page may move to another view meanwhile.
 async function reveal() {
-  await revealed.reveal()
   const target = revealTarget()
+  await revealed.reveal()
   if (isStepUpRequired(revealed.error.value) && target) {
     stepUp.rememberReveal(target)
   }

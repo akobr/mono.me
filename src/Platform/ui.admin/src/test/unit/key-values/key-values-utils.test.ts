@@ -119,4 +119,18 @@ describe('useRevealedValue', () => {
     expect(revealed.value.value).toBeUndefined()
     expect((revealed.error.value as Error).message).toBe('no rights')
   })
+
+  it('drops a reveal that arrives after the value was hidden', async () => {
+    let answer: (value: string) => void = () => {}
+    const revealed = useRevealedValue(() => new Promise<string>((resolve) => (answer = resolve)))
+
+    const pending = revealed.reveal()
+    expect(revealed.loading.value).toBe(true)
+    revealed.hide()
+    answer('the value of the previous view')
+    await pending
+
+    expect(revealed.value.value).toBeUndefined()
+    expect(revealed.loading.value).toBe(false)
+  })
 })

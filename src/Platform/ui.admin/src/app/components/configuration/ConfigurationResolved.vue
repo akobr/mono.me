@@ -26,16 +26,39 @@ const resolved = useGetResolvedConfiguration(scope.org, scope.project, scope.vie
 })
 
 // Whether the API withheld the secrets of the response shown: the token's auth_time older than the window itself when
-// it answered (no margin: the hint before a write asks a minute early), asked again with every response.
-const staleSignIn = ref(false)
+// it answered (no margin: the hint before a write asks a minute early), asked again with every response. The browser
+// knows only when the response arrived, by its own clock, so within half a minute of the window's end either answer may
+// be wrong: the alert says the values may be hidden.
+const edgeOfWindow = 30_000
+const signInAge = ref<'recent' | 'edge' | 'stale'>('recent')
 watch(
   [canSeeSecrets, () => resolved.dataUpdatedAt.value],
   async ([can, answeredAt]) => {
-    staleSignIn.value = can && (await isSignInTooOld(answeredAt || Date.now()))
+    const at = answeredAt || Date.now()
+    signInAge.value = !can
+      ? 'recent'
+      : (await isSignInTooOld(at - edgeOfWindow))
+        ? 'stale'
+        : (await isSignInTooOld(at + edgeOfWindow))
+          ? 'edge'
+          : 'recent'
   },
   { immediate: true },
 )
-const secretsWithheld = computed(() => canSeeSecrets.value && staleSignIn.value)
+const secretsWithheld = computed(() => canSeeSecrets.value && signInAge.value !== 'recent')
+const withheldAlert = computed(() =>
+  signInAge.value === 'stale'
+    ? {
+        title: 'Secret values are hidden',
+        description:
+          "Your sign-in is too old for secrets: they stay as their bindings until you confirm it's you. The response is never cached.",
+      }
+    : {
+        title: 'Secret values may be hidden',
+        description:
+          "Your sign-in is close to the age limit for secrets, so they may stay as their bindings. Confirm it's you to be sure they are included. The response is never cached.",
+      },
+)
 const confirmActions = [
   { label: "Confirm it's you", icon: 'i-lucide-log-in', color: 'warning' as const, onClick: () => void stepUp.ask() },
 ]
@@ -53,8 +76,8 @@ const bindingError = computed(() => {
       color="warning"
       variant="subtle"
       icon="i-lucide-shield-alert"
-      title="Secret values are hidden"
-      description="Your sign-in is too old for secrets: they stay as their bindings until you confirm it's you. The response is never cached."
+      :title="withheldAlert.title"
+      :description="withheldAlert.description"
       :actions="confirmActions"
     />
     <UAlert
