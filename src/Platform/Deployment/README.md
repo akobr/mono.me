@@ -49,7 +49,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `budgetStartDate` | the budget's first month, never moved afterwards | the month of the first run |
 | `exhibitionOrganization`, `exhibitionProject`, `exhibitionOwner` | `Exhibition__Organization`, `Exhibition__Project` and `Exhibition__Owner`: the exhibition, the demo project that the admin UI offers to a new user, and the id of the account that owns it ([access](../../../docs/Platform/Storyteller/access.md#exhibition)). All three or none: the template leaves the three settings out unless all three are set, and the API then has no exhibition | the seed of the exhibition ([runbook](../../../docs/Platform/Deployment/runbook-azure-production.md#turning-the-exhibition-on)); `prod.bicepparam` does not set them yet |
 | `stepUpEnabled` | `Auth__StepUp__Enabled`: `''` (the default, the setting left out: on under AuthKit), `'true'` or `'false'`, the escape hatch when a client cannot satisfy the [step-up](../../../docs/Platform/Storyteller/authentication.md#recent-sign-in-step-up) | optional, any time |
-| `stepUpMaxAge` | `Auth__StepUp__MaxAge`: `''` (the default, 10 minutes) or a `TimeSpan` from `00:01:00` to `1.00:00:00` (24 hours; `24:00:00` is 24 days, and the API would not start) | optional, any time |
+| `stepUpMaxAge` | `Auth__StepUp__MaxAge`: `''` (the default, 10 minutes) or a `TimeSpan` in whole seconds from `00:01:00` to `1.00:00:00` (24 hours; `24:00:00` is 24 days, and the API would not start, nor with a fraction of a second such as `00:10:00.5`) | optional, any time |
 
 Only the owner's personal values come from environment variables, so the repository doesn't hold them:
 

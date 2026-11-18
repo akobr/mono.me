@@ -78,7 +78,7 @@ param exhibitionOwner string = ''
 ])
 param stepUpEnabled string = ''
 
-@description('Auth__StepUp__MaxAge: the oldest sign-in that still counts, as a TimeSpan from 00:01:00 to 1.00:00:00 (24 hours; 24:00:00 would be 24 days and stop the API). Empty leaves the setting out (00:10:00).')
+@description('Auth__StepUp__MaxAge: the oldest sign-in that still counts, as a TimeSpan in whole seconds from 00:01:00 to 1.00:00:00 (24 hours; 24:00:00 would be 24 days and stop the API, and so would a fraction of a second). Empty leaves the setting out (00:10:00).')
 param stepUpMaxAge string = ''
 
 @description('The object id of the owner: Key Vault Administrator, Storage Blob Data Contributor.')
