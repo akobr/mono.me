@@ -38,6 +38,9 @@ public class StepUpTests
     [InlineData("Bearer error=insufficient_user_authentication, error_description=\"not max_age=5, see \\\"max_age=7\\\"\", max_age=\"300\"", 300)]
     [InlineData("Bearer error_description=\"max_age=5\", error=\"insufficient_user_authentication\"", null)]
     [InlineData("Bearer realm=\"api\", error=\"insufficient_user_authentication\", x_max_age=9, max_age=60", 60)]
+    [InlineData("Bearer error=\"invalid_token\", max_age=5, Bearer error=\"insufficient_user_authentication\", max_age=\"600\"", 600)]
+    [InlineData("Basic realm=\"api\", Bearer error=\"insufficient_user_authentication\", max_age=120", 120)]
+    [InlineData("Bearer realm=\"other\", max_age=5, Bearer error=\"insufficient_user_authentication\"", null)]
     public void Challenge_Alone_IsAStepUp(string challenge, int? seconds)
     {
         var exception = new ApiException("401", 401, string.Empty, Headers(challenge), null);
@@ -72,6 +75,20 @@ public class StepUpTests
         exception.IsStepUpRequired(out var maxAge).ShouldBeFalse();
 
         maxAge.ShouldBeNull();
+    }
+
+    // A step-up named by its code takes the window of the only challenge, and of no challenge when there are several.
+    [Theory]
+    [InlineData("Bearer max_age=\"120\"", 120)]
+    [InlineData("Bearer realm=\"a\", max_age=120, Basic realm=\"b\"", 300)]
+    public void Code_WithChallengesThatNameNoStepUp_TakesTheWindowOfTheOnlyOne(string challenge, int seconds)
+    {
+        var body = """{ "ErrorCode": "StepUpRequired", "Details": { "MaxAge": 300 } }""";
+        var exception = new ApiException("401", 401, body, Headers(challenge), null);
+
+        exception.IsStepUpRequired(out var maxAge).ShouldBeTrue();
+
+        maxAge.ShouldBe(TimeSpan.FromSeconds(seconds));
     }
 
     // A typed body without its text (the generated client keeps both, a caller may not) still gives the window.
