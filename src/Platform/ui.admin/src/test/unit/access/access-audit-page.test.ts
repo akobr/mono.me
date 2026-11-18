@@ -172,8 +172,8 @@ describe('organization Audit page', () => {
       action: 'MemberRoleChanged',
       target: 'user_01MOCKALAN',
       from: '2026-01-01T00:00:00.000Z',
-      // the end date is inclusive
-      to: '2100-01-01T00:00:00.000Z',
+      // the end date is inclusive: its last millisecond
+      to: '2099-12-31T23:59:59.999Z',
     })
     await vi.waitFor(() => expect(rows()).toHaveLength(1))
     expect(rows()[0]!.textContent).toContain('Alan Turing')
@@ -237,11 +237,16 @@ describe('organization Audit page', () => {
   it('drops a next page that arrives after the filters changed', async () => {
     let release: () => void = () => {}
     const held = new Promise<void>((resolve) => (release = resolve))
+    // set when the handler holds the next page, and when it answered it
+    let isHeld = false
+    let isAnswered = false
     server.use(
       http.get('*/api/v1/access/points/:key/audit', async ({ request }) => {
         const url = new URL(request.url)
         if (url.searchParams.get('continuationToken')) {
+          isHeld = true
           await held
+          isAnswered = true
           return HttpResponse.json({ Items: [entry('late')], Count: 1 })
         }
         const action = url.searchParams.get('action')
@@ -256,11 +261,12 @@ describe('organization Audit page', () => {
     await vi.waitFor(() => expect(button('Load more')).toBeTruthy())
 
     button('Load more')!.click()
-    await settle()
+    await vi.waitFor(() => expect(isHeld).toBe(true))
     await choose(view, 'Action filter', 'MemberRemoved')
     await vi.waitFor(() => expect(rowWith('Member filtered')).toBeTruthy())
     release()
-    await settle(6)
+    await vi.waitFor(() => expect(isAnswered).toBe(true))
+    await settle()
 
     expect(rows()).toHaveLength(1)
     expect(rowWith('Member late')).toBeUndefined()
@@ -269,11 +275,16 @@ describe('organization Audit page', () => {
   it('drops a next page that arrives after the first page was read again', async () => {
     let release: () => void = () => {}
     const held = new Promise<void>((resolve) => (release = resolve))
+    // set when the handler holds the next page, and when it answered it
+    let isHeld = false
+    let isAnswered = false
     let firstPages = 0
     server.use(
       http.get('*/api/v1/access/points/:key/audit', async ({ request }) => {
         if (new URL(request.url).searchParams.get('continuationToken')) {
+          isHeld = true
           await held
+          isAnswered = true
           return HttpResponse.json({ Items: [entry('late')], Count: 1 })
         }
         firstPages++
@@ -284,12 +295,13 @@ describe('organization Audit page', () => {
     await vi.waitFor(() => expect(button('Load more')).toBeTruthy())
 
     button('Load more')!.click()
-    await settle()
+    await vi.waitFor(() => expect(isHeld).toBe(true))
     // a change elsewhere refreshes the trail while the next page of the old first page is still loading
     await view.queryClient.invalidateQueries({ queryKey: ['v1', 'access', 'points'] })
     await vi.waitFor(() => expect(rowWith('Member first2')).toBeTruthy())
     release()
-    await settle(6)
+    await vi.waitFor(() => expect(isAnswered).toBe(true))
+    await settle()
 
     expect(rows()).toHaveLength(1)
     expect(rowWith('Member late')).toBeUndefined()

@@ -42,8 +42,8 @@ const params = computed<GetAccessAuditParams>(() => ({
   action: action.value === allActions ? undefined : action.value,
   target: targetFilter.value.trim() || undefined,
   from: from.value ? new Date(from.value).toISOString() : undefined,
-  // the end date is inclusive: up to the start of the next day
-  to: to.value ? new Date(new Date(to.value).getTime() + 86_400_000).toISOString() : undefined,
+  // the end date is inclusive, and so is the API's to: the last millisecond of the day
+  to: to.value ? new Date(new Date(to.value).getTime() + 86_399_999).toISOString() : undefined,
 }))
 
 const filtered = computed(() => Object.values(params.value).some((value) => value !== undefined))
