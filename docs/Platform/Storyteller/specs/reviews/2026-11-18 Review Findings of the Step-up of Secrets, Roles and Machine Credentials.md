@@ -36,7 +36,7 @@ This review covers the fixes of the automated reviews (CodeRabbit and Grok) of P
 
 ### 5. Left as they are
 
-- **The issuer replace is not conditional on the issuer read (FederationHttp).** Closing the window between the read and `SetAsync` needs an ETag in `IFederatedIssuerStore` and its Cosmos implementation; abusing it needs a legitimate create of that name in the window, and the issuer's rules need a step-up of their own. The actor check has the same window. Not worth the change here.
+- **The issuer replace is not conditional on the issuer read (FederationHttp).** Left in the first round as too large; fixed in the second, see section 6.
 - **The step-up before the role checks of the service** (removing a member, grant and revoke, recipients): documented in `authentication.md` and `access.md` since the branch's review; a new sign-in reveals nothing the role check would not.
 - **`Auth:StepUp:Enabled: true` under Entra ID**: an explicit choice, documented ("under Entra ID that is every user, unless their access tokens carry it"); the validator does not refuse it.
 - **`UpdateRecipient` guarded for every update**: intentional; removing a recipient stays open as the kill switch.
@@ -44,3 +44,15 @@ This review covers the fixes of the automated reviews (CodeRabbit and Grok) of P
 - **The step-up text of the MCP server does not name roles and members**: the server has no tools for them.
 - **One shared test of the window's description**: the server's `StepUpRequiredException.Describe` and the SDK's `DescribeWindow` live in assemblies that cannot reference each other; each is tested with the same cases.
 - **The service lookups of `JudgeSignIn`**: singletons, once per request; not worth caching.
+
+### 6. The second review (CodeRabbit CLI)
+
+A local `coderabbit review --agent` of the branch found seven more; all held and are fixed. The API (Debug and Release, 3229), Access.Federation (481), .NET SDK (405), CLI (2267), MCP (774) and admin UI (2134) tests pass; the admin UI lints and builds. The Cosmos test of the issuer store (`FederationPersistenceTests.IssuerStore_CreatesOnly_AnIssuerThatDoesNotExist`) is written but was not run: Docker was not available, and the local emulator is never used for these suites.
+
+- **The issuer that appears after the read.** `IFederatedIssuerStore.CreateAsync` creates and never replaces (`ConflictException`, also when Cosmos DB's create meets an item that appeared since); `PutFederatedIssuer` creates through it when its read found no issuer, so a concurrent create is never replaced without the step-up and the actor check. Both stores; tests of the in-memory store, the handler (a store whose read misses the issuer) and the Cosmos store.
+- **Several challenges.** The .NET SDK splits `WWW-Authenticate` into its challenges and takes `max_age` from the one whose `error` is the step-up's; without one, from the only challenge, else from the body.
+- **The remedy of `sform`.** The code exists only after `sform account`: sign out in the browser, run `sform account logout` and `sform account`, approve the new code (in a private window if the browser is still signed in), repeat. The same order in `sform.md` and `authentication.md`.
+- **`key-values.md`** has the `If-None-Match: *` note of `inheritance.md`.
+- **One-time credentials.** `OneTimeSecretDialog` counts as unsaved while it is open, for the shared certificates and the machines alike.
+- **A Reveal's own error.** `useRevealedValue.reveal` returns the error of that reveal while it is the current one; `KeyValueDetail` remembers the step-up from it, never from the shared error of another reveal.
+- **A storage that refuses the pending Reveal** no longer leaves the confirmation redirecting: the sign-in goes on, and only the repeated Reveal is lost.

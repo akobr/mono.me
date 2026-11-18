@@ -436,7 +436,7 @@ public class ConfigGetCommandTests
     // 424-264: each reason names its own remedy; a reason this sform does not know names none.
     [Theory]
     [InlineData("actor-restricted", " The sign-in acts through an actor that may not reveal secrets (NoSecretReveal), and a new sign-in does not change that: read it with a sign-in of your own.")]
-    [InlineData("step-up-required", " Secrets need a recent sign-in: sign out in the browser first (the admin UI's Sign out ends the browser's session) or approve the code in a private window, then run 'sform account logout' and 'sform account', and repeat the command.")]
+    [InlineData("step-up-required", " Secrets need a recent sign-in: sign out in the browser first (the admin UI's Sign out ends the browser's session), run 'sform account logout' and 'sform account', approve the new code (in a private window if the browser is still signed in), and repeat the command.")]
     [InlineData("something-new", "")]
     public async Task WithheldSecrets_NameTheRemedyOfTheReason(string reason, string hint)
     {
