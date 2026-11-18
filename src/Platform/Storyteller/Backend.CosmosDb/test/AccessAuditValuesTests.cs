@@ -215,6 +215,38 @@ public class AccessAuditValuesTests
     }
 
     [Fact]
+    public void Issuer_TheValuesOfAClaimAreASet()
+    {
+        var issuer = new FederatedIssuer
+        {
+            Name = "github",
+            Issuer = "https://token.actions.githubusercontent.com",
+            RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["environment"] = ["prod", "dev"] },
+        };
+        var reordered = issuer with
+        {
+            RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["environment"] = ["dev", "prod", "dev"] },
+        };
+        var another = issuer with
+        {
+            RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["environment"] = ["dev", "test"] },
+        };
+
+        AccessAuditValues.Issuer(reordered).Should().Be(AccessAuditValues.Issuer(issuer));
+        AccessAuditValues.Issuer(another).Should().NotBe(AccessAuditValues.Issuer(issuer));
+        AccessAuditValues.Issuer(issuer).Should().Contain("\"environment\":[\"dev\",\"prod\"]");
+    }
+
+    [Fact]
+    public void MachineAuthentication_NoEnabledKindsAndAnEmptyList_AreTheSame()
+    {
+        var policy = new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey };
+
+        AccessAuditValues.MachineAuthentication(policy with { EnabledCredentialKinds = [] })
+            .Should().Be(AccessAuditValues.MachineAuthentication(policy with { EnabledCredentialKinds = null }));
+    }
+
+    [Fact]
     public void MachineAuthentication_TheEnabledKindsAreASet_TheDefaultAndLifetimeCount()
     {
         var policy = new MachineAuthenticationPolicy
