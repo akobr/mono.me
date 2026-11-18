@@ -102,11 +102,13 @@ public class AuthKitBearerTokenValidatorTests
     }
 
     // The single value still in the list is the rollout's transition; left there, other products' tokens pass. One warning
-    // at the start, compared as aud is (ordinally, ignoring a trailing '/'); none otherwise.
+    // at the start, compared as IdentityModel matches aud (ordinally, or one trailing '/' more on one side); none otherwise.
     [Theory]
     [InlineData("https://2s.42for.net", new[] { "client_2s", "https://2s.42for.net" }, true)]
     [InlineData(" https://2s.42for.net/ ", new[] { "client_2s", "https://2s.42for.net" }, true)]
     [InlineData("https://2s.42for.net", new[] { "client_2s", "https://2s.42for.net/" }, true)]
+    [InlineData("https://2s.42for.net//", new[] { "client_2s", "https://2s.42for.net/" }, true)]
+    [InlineData("https://2s.42for.net//", new[] { "client_2s", "https://2s.42for.net" }, false)]
     [InlineData("https://2s.42for.net", new[] { "client_2s", "https://2S.42for.net" }, false)]
     [InlineData("https://2s.42for.net", new[] { "client_2s" }, false)]
     [InlineData("https://2s.42for.net", new string[0], false)]

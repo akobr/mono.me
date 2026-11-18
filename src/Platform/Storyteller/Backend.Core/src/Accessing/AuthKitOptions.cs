@@ -58,8 +58,8 @@ public class AuthKitOptions
         return string.IsNullOrWhiteSpace(Audience) ? [] : [Audience.Trim()];
     }
 
-    // True when Audiences overrides a non-blank Audience and still lists it, compared as the token handler compares aud:
-    // ordinally, ignoring a trailing '/'.
+    // True when Audiences overrides a non-blank Audience and still lists it, compared as IdentityModel matches aud:
+    // ordinally, or with one trailing '/' more on one side.
     public bool ListsTheSingleAudience()
     {
         if (string.IsNullOrWhiteSpace(Audience))
@@ -67,12 +67,20 @@ public class AuthKitOptions
             return false;
         }
 
-        var single = TrimSlash(Audience.Trim());
-        return GetListedAudiences().Any(audience => string.Equals(TrimSlash(audience), single, StringComparison.Ordinal));
+        var single = Audience.Trim();
+        return GetListedAudiences().Any(audience => Matches(audience, single));
 
-        static string TrimSlash(string value)
+        static bool Matches(string first, string second)
         {
-            return value.EndsWith('/') ? value[..^1] : value;
+            if (string.Equals(first, second, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            var (longer, shorter) = first.Length > second.Length ? (first, second) : (second, first);
+            return longer.Length == shorter.Length + 1
+                && longer.EndsWith('/')
+                && string.Equals(longer[..^1], shorter, StringComparison.Ordinal);
         }
     }
 
