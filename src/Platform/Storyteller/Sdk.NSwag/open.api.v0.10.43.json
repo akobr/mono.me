@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.42.39559"
+    "version": "0.10.43.46332"
   },
   "servers": [
     {
@@ -20133,7 +20133,7 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/ProjectTypeAppearanceMergePatch"
             },
-            "description": "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance. A null type goes back to its built-in appearance, a null member of a type to its built-in value.",
+            "description": "The changes of the appearance of annotation types, keyed by type code (rst, unt, sbt, usg, cnt, exe, uxe; any case). A type left out keeps its appearance; a null type goes back to its built-in appearance, a null member of a type to its built-in value.",
             "nullable": true
           },
           "DefaultTimeZone": {
@@ -20179,11 +20179,11 @@
         "properties": {
           "Label": {
             "type": "string",
-            "description": "The singular name of the type, such as Company: trimmed, at most 40 characters; absent for the built-in name."
+            "description": "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name."
           },
           "Plural": {
             "type": "string",
-            "description": "The plural, only with a Label: trimmed, at most 40 characters; clients derive it from the label when it is absent."
+            "description": "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent."
           },
           "Color": {
             "type": "string",
@@ -21052,12 +21052,12 @@
         "properties": {
           "Label": {
             "type": "string",
-            "description": "The singular name of the type, such as Company: trimmed, at most 40 characters; absent for the built-in name.",
+            "description": "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
             "nullable": true
           },
           "Plural": {
             "type": "string",
-            "description": "The plural, only with a Label: trimmed, at most 40 characters; clients derive it from the label when it is absent.",
+            "description": "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
             "nullable": true
           },
           "Color": {
