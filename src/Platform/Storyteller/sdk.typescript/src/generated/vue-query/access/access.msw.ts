@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.45.34964
+ * OpenAPI spec version: 0.10.49.48581
  */
 import { faker } from "@faker-js/faker";
 
@@ -965,6 +965,16 @@ export const getGetAuthConfigurationResponseMock = (
         faker.datatype.boolean(),
         undefined,
       ]),
+    },
+    undefined,
+  ]),
+  StepUp: faker.helpers.arrayElement([
+    {
+      Enabled: faker.helpers.arrayElement([
+        faker.datatype.boolean(),
+        undefined,
+      ]),
+      MaxAge: faker.helpers.arrayElement([faker.number.int(), undefined]),
     },
     undefined,
   ]),

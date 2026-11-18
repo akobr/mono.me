@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.45.34964
+ * OpenAPI spec version: 0.10.49.48581
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -803,7 +803,7 @@ export const addRecipient = async (
 export const getAddRecipientMutationKey = () => ["addRecipient"] as const;
 
 export const getAddRecipientMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -845,7 +845,7 @@ export type AddRecipientMutationResult = NonNullable<
 >;
 export type AddRecipientMutationBody =
   BodyType<ClientEncryptionRecipientCreate>;
-export type AddRecipientMutationError = ErrorType<ErrorResponse | void>;
+export type AddRecipientMutationError = ErrorType<ErrorResponse>;
 export type AddRecipientMutationVariables = {
   organization: string;
   project: string;
@@ -853,7 +853,7 @@ export type AddRecipientMutationVariables = {
 };
 
 export const useAddRecipient = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -930,7 +930,7 @@ export const updateRecipient = async (
 export const getUpdateRecipientMutationKey = () => ["updateRecipient"] as const;
 
 export const getUpdateRecipientMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -972,7 +972,7 @@ export type UpdateRecipientMutationResult = NonNullable<
 >;
 export type UpdateRecipientMutationBody =
   BodyType<ClientEncryptionRecipientUpdate>;
-export type UpdateRecipientMutationError = ErrorType<ErrorResponse | void>;
+export type UpdateRecipientMutationError = ErrorType<ErrorResponse>;
 export type UpdateRecipientMutationVariables = {
   organization: string;
   project: string;
@@ -981,7 +981,7 @@ export type UpdateRecipientMutationVariables = {
 };
 
 export const useUpdateRecipient = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -1310,7 +1310,7 @@ export const getGetKeyValueQueryKey = (
 
 export const getGetKeyValueQueryOptions = <
   TData = Awaited<ReturnType<typeof getKeyValue>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -1367,11 +1367,11 @@ export const getGetKeyValueQueryOptions = <
 export type GetKeyValueQueryResult = NonNullable<
   Awaited<ReturnType<typeof getKeyValue>>
 >;
-export type GetKeyValueQueryError = ErrorType<ErrorResponse | void>;
+export type GetKeyValueQueryError = ErrorType<ErrorResponse>;
 
 export function useGetKeyValue<
   TData = Awaited<ReturnType<typeof getKeyValue>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -1469,7 +1469,7 @@ export const setKeyValue = async (
 export const getSetKeyValueMutationKey = () => ["setKeyValue"] as const;
 
 export const getSetKeyValueMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1510,7 +1510,7 @@ export type SetKeyValueMutationResult = NonNullable<
   Awaited<ReturnType<typeof setKeyValue>>
 >;
 export type SetKeyValueMutationBody = BodyType<KeyValueWrite>;
-export type SetKeyValueMutationError = ErrorType<ErrorResponse | void>;
+export type SetKeyValueMutationError = ErrorType<ErrorResponse>;
 export type SetKeyValueMutationVariables = {
   organization: string;
   project: string;
@@ -1520,7 +1520,7 @@ export type SetKeyValueMutationVariables = {
 };
 
 export const useSetKeyValue = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -1586,7 +1586,7 @@ export const deleteKeyValue = async (
 export const getDeleteKeyValueMutationKey = () => ["deleteKeyValue"] as const;
 
 export const getDeleteKeyValueMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1634,7 +1634,7 @@ export type DeleteKeyValueMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteKeyValue>>
 >;
 
-export type DeleteKeyValueMutationError = ErrorType<ErrorResponse | void>;
+export type DeleteKeyValueMutationError = ErrorType<ErrorResponse>;
 export type DeleteKeyValueMutationVariables = {
   organization: string;
   project: string;
@@ -1644,7 +1644,7 @@ export type DeleteKeyValueMutationVariables = {
 };
 
 export const useDeleteKeyValue = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -1977,7 +1977,7 @@ export const getProtectKeyValuesMutationKey = () =>
   ["protectKeyValues"] as const;
 
 export const getProtectKeyValuesMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2018,7 +2018,7 @@ export type ProtectKeyValuesMutationResult = NonNullable<
   Awaited<ReturnType<typeof protectKeyValues>>
 >;
 export type ProtectKeyValuesMutationBody = BodyType<KeyValueBulkRequest>;
-export type ProtectKeyValuesMutationError = ErrorType<ErrorResponse | void>;
+export type ProtectKeyValuesMutationError = ErrorType<ErrorResponse>;
 export type ProtectKeyValuesMutationVariables = {
   organization: string;
   project: string;
@@ -2027,7 +2027,7 @@ export type ProtectKeyValuesMutationVariables = {
 };
 
 export const useProtectKeyValues = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -2270,7 +2270,7 @@ export const getGetKeyValueVersionQueryKey = (
 
 export const getGetKeyValueVersionQueryOptions = <
   TData = Awaited<ReturnType<typeof getKeyValueVersion>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -2340,11 +2340,11 @@ export const getGetKeyValueVersionQueryOptions = <
 export type GetKeyValueVersionQueryResult = NonNullable<
   Awaited<ReturnType<typeof getKeyValueVersion>>
 >;
-export type GetKeyValueVersionQueryError = ErrorType<ErrorResponse | void>;
+export type GetKeyValueVersionQueryError = ErrorType<ErrorResponse>;
 
 export function useGetKeyValueVersion<
   TData = Awaited<ReturnType<typeof getKeyValueVersion>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -2465,7 +2465,7 @@ export const getGetKeyValueVersionDiffQueryKey = (
 
 export const getGetKeyValueVersionDiffQueryOptions = <
   TData = Awaited<ReturnType<typeof getKeyValueVersionDiff>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -2535,11 +2535,11 @@ export const getGetKeyValueVersionDiffQueryOptions = <
 export type GetKeyValueVersionDiffQueryResult = NonNullable<
   Awaited<ReturnType<typeof getKeyValueVersionDiff>>
 >;
-export type GetKeyValueVersionDiffQueryError = ErrorType<ErrorResponse | void>;
+export type GetKeyValueVersionDiffQueryError = ErrorType<ErrorResponse>;
 
 export function useGetKeyValueVersionDiff<
   TData = Awaited<ReturnType<typeof getKeyValueVersionDiff>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -2665,7 +2665,7 @@ export const getGetKeyValueVersionDiffCustomQueryKey = (
 
 export const getGetKeyValueVersionDiffCustomQueryOptions = <
   TData = Awaited<ReturnType<typeof getKeyValueVersionDiffCustom>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -2740,12 +2740,11 @@ export const getGetKeyValueVersionDiffCustomQueryOptions = <
 export type GetKeyValueVersionDiffCustomQueryResult = NonNullable<
   Awaited<ReturnType<typeof getKeyValueVersionDiffCustom>>
 >;
-export type GetKeyValueVersionDiffCustomQueryError =
-  ErrorType<ErrorResponse | void>;
+export type GetKeyValueVersionDiffCustomQueryError = ErrorType<ErrorResponse>;
 
 export function useGetKeyValueVersionDiffCustom<
   TData = Awaited<ReturnType<typeof getKeyValueVersionDiffCustom>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -2849,7 +2848,7 @@ export const exportKeyValues = async (
 export const getExportKeyValuesMutationKey = () => ["exportKeyValues"] as const;
 
 export const getExportKeyValuesMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2891,7 +2890,7 @@ export type ExportKeyValuesMutationResult = NonNullable<
 >;
 export type ExportKeyValuesMutationBody =
   BodyType<KeyValueExportRequest> | undefined;
-export type ExportKeyValuesMutationError = ErrorType<ErrorResponse | void>;
+export type ExportKeyValuesMutationError = ErrorType<ErrorResponse>;
 export type ExportKeyValuesMutationVariables = {
   organization: string;
   project: string;
@@ -2900,7 +2899,7 @@ export type ExportKeyValuesMutationVariables = {
 };
 
 export const useExportKeyValues = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
@@ -2991,7 +2990,7 @@ export const importKeyValues = async (
 export const getImportKeyValuesMutationKey = () => ["importKeyValues"] as const;
 
 export const getImportKeyValuesMutationOptions = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3039,7 +3038,7 @@ export type ImportKeyValuesMutationResult = NonNullable<
   Awaited<ReturnType<typeof importKeyValues>>
 >;
 export type ImportKeyValuesMutationBody = BodyType<KeyValueDocument>;
-export type ImportKeyValuesMutationError = ErrorType<ErrorResponse | void>;
+export type ImportKeyValuesMutationError = ErrorType<ErrorResponse>;
 export type ImportKeyValuesMutationVariables = {
   organization: string;
   project: string;
@@ -3049,7 +3048,7 @@ export type ImportKeyValuesMutationVariables = {
 };
 
 export const useImportKeyValues = <
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<ErrorResponse>,
   TContext = unknown,
 >(
   options?: {
