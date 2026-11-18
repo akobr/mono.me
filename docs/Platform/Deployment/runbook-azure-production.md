@@ -524,7 +524,7 @@ Tracked in [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-auth
 
 ## Enabling Multiple Applications in WorkOS
 
-Before a second product signs users in. Tracked in [424-239](https://linear.app/424fun/issue/424-239/accept-only-the-2s-authkit-applications-audiences-in-the-api). Every application of a WorkOS environment issues its tokens with the same issuer and keys, and the one JWT template gives them all `aud` `https://2s.42for.net`. So from the moment a second application exists in production, its tokens would be accepted by the 2S API too, unless the API already accepts only the audiences of the 2S applications (`authKitAudiences`, the app settings `Auth__AuthKit__Audiences__<n>`; [Several WorkOS applications](../Storyteller/authentication.md#several-workos-applications)). This holds with or without the custom AuthKit domain. WorkOS doesn't document what `aud` an application's tokens carry, or what happens with the template's `aud`, so staging decides the values first.
+Before a second product signs users in. Tracked in [424-239](https://linear.app/424fun/issue/424-239/accept-only-the-2s-authkit-applications-audiences-in-the-api). Every application of a WorkOS environment issues its tokens with the same issuer and keys, and the one JWT template gives them all `aud` `https://2s.42for.net`. So from the moment a second application exists in production, its tokens would be accepted by the 2S API too, unless the API already accepts only the audiences of the 2S applications (`authKitAudiences`, the app settings `Auth__AuthKit__Audiences__<n>`; [Several WorkOS applications](../Storyteller/authentication.md#several-workos-applications)). This holds with or without the custom AuthKit domain. WorkOS doesn't document what `aud` an application's tokens carry, or what happens with the template's `aud`, so staging finds that out first.
 
 **Decode a token without logging it.** Only the payload, in a local PowerShell, never on a website:
 
@@ -538,6 +538,8 @@ Read-JwtClaims (Read-Host -Prompt 'access token')
 
 The admin UI's token is the `Authorization` header of an API request (the browser's developer tools, Network). `sform`'s is in its token file when it runs with an empty `SFORM_HOME` folder and `SFORM_TOKEN_STORE=file`. Delete that folder afterwards.
 
+**Run the local API as a Release build** for the checks of staging steps 1 and 9, for example `dotnet run --project src/Platform/Aspire.Host/src -c Release`. A Debug build (`DEV_AUTH`) decodes AuthKit tokens without checking them, so it ignores `Auth:AuthKit:Audience` and `Audiences` and serves any token ([authentication](../Storyteller/authentication.md#how-authkit-tokens-are-checked)). It is a Release build only if a token with one character changed in the middle of its last part (the signature) gets `401`.
+
 **1. In WorkOS staging** (the local admin UI and API use it; write every result into 424-239):
 
 1. Give the staging JWT template production's `"aud": "https://2s.42for.net"` (staging has no `aud` today), and set `Auth:AuthKit:Audience` of the local API to the same value. Sign in to the local admin UI and decode the token: `aud` is `https://2s.42for.net`.
@@ -545,21 +547,26 @@ The admin UI's token is the `Authorization` header of an API request (the browse
 3. Sign in again to the local admin UI, and with `sform account` against the local API (an empty `SFORM_HOME`, `SFORM_TOKEN_STORE=file`). Decode both tokens: `iss`, `aud` (one value or an array), `client_id`.
 4. Sign in to the second application (for example with its redirect URI and the [AuthKit authorize URL](https://workos.com/docs/reference/authkit/authentication)) with the same user. Decode its token, and note whether WorkOS asked for the password again.
 5. Wait for a refresh (the access token lives 5 minutes) and decode the 2S tokens again, also those of a session from before step 2.
-6. Remove `aud` from the staging template, sign in again, and decode again.
+6. Remove `aud` from the staging template. Sign in again to the local admin UI, with `sform`, and to the second application; decode all three tokens, and the 2S ones again after a refresh.
 7. With the template's `aud` back, get an MCP token for the staging resource indicator (`https://localhost:7180/mcp`, for example with the MCP Inspector): its `aud` must be the resource, not the template's ([424-287](https://linear.app/424fun/issue/424-287)).
-8. **Decide:** the 2S audiences are the values of steps 3 and 5 that the second application's tokens (step 4) do not carry. The template keeps `aud` only if it does not land in the other application's tokens; otherwise drop it from the template. If no `aud` tells the applications apart, even without the template's, stop: the API needs the `client_id` fallback first (424-239).
-9. Set the local API's `Auth:AuthKit:Audiences:0` (and `:1`…) to the decided values, then check the local admin UI and `sform` sign in, and that a request with the second application's token gets `401`.
+8. **Decide:**
+   - **The template:** it keeps `aud` only if the second application's token of step 4 does not carry `https://2s.42for.net`; otherwise it drops `aud` (step 6 shows the tokens without it).
+   - **The 2S audiences:** the values the 2S tokens carry and the second application's do not, with the template as decided: from steps 3 and 5 if it keeps `aud`, from step 6 if it drops it.
+   - **What each value is made of:** the token's own `client_id`, a fixed value (a URL), or something else. A value made of the client id differs per environment: production lists production's.
+   - **Stop** if no value tells the applications apart, even without the template's `aud`: the API needs the `client_id` fallback first (424-239).
+9. With the staging template as decided, set the local API's `Auth:AuthKit:Audiences:0` (and `:1`…) to the decided values (a Release build, above). Check that the local admin UI and `sform` sign in, also after a refresh, and that a request with the second application's token gets `401`.
 
 **2. In production, before the second application exists.** The list carries the old audience next to the new one while WorkOS switches, so nobody gets `401`. The old audience leaves the list before another application can carry it:
 
 1. The running API reads `Auth__AuthKit__Audiences` (424-239 is deployed; phase 11.1 publishes it from an up-to-date `main`).
-2. `parameters/prod.bicepparam`: `authKitAudiences = [ '<2S audience from staging>', 'https://2s.42for.net' ]`; `authKitAudience` stays (for a rollback). Commit through a pull request; what-if: only a `Modify` of `prod-2s-api-fa/appsettings`, `+ Auth__AuthKit__Audiences__0` and `__1`, nothing removed. Create. The 2S tokens of today still pass, through the second entry.
-3. WorkOS production: enable Multiple Applications, and change the JWT template as staging decided.
-4. Check: sign out and in to the admin UI, and `sform account` from a fresh sign-in; both work, also after 5 minutes (a refresh). The decoded `aud` holds the first entry of `authKitAudiences`.
-5. `parameters/prod.bicepparam`: remove `'https://2s.42for.net'` from `authKitAudiences`. Pull request, what-if (`- Auth__AuthKit__Audiences__1`, nothing else), create. Check step 4 again.
-6. Only now create the other product's application (with its own API key, [decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet), point 2). Check that a request to `https://api.2s.42for.net/api/v1/access/account` with its token gets `401`.
+2. `parameters/prod.bicepparam`: `authKitAudiences = [ '<production 2S audience>', 'https://2s.42for.net' ]`, where the first entry is production's value of the kind staging found: production's client id (`authKitClientId`, the `ClientId` of `GET v1/auth/configuration`) if the 2S `aud` was the client id, the same fixed value if it was one. Never copy a staging client id. `authKitAudience` stays (for a rollback). Commit through a pull request; what-if: only a `Modify` of `prod-2s-api-fa/appsettings`, `+ Auth__AuthKit__Audiences__0` and `__1`, nothing removed. Create. The 2S tokens of today still pass, through the second entry.
+3. WorkOS production: enable Multiple Applications, and keep the template as it is for now. Sign out and in to the admin UI and decode the token: its `aud` holds the first entry of `authKitAudiences` (if staging found that the template's `aud` wins, it holds only `https://2s.42for.net` until step 4). If it holds neither, roll back now. If the first entry doesn't match what staging found, fix it; the second entry still lets everyone in.
+4. If staging decided so, drop `aud` from the production JWT template.
+5. Check: sign out and in to the admin UI, and `sform account` from a fresh sign-in; both work, also after 5 minutes (a refresh). The decoded `aud` holds the first entry of `authKitAudiences`.
+6. `parameters/prod.bicepparam`: remove `'https://2s.42for.net'` from `authKitAudiences`. Pull request, what-if (`- Auth__AuthKit__Audiences__1`, nothing else), create. Check step 5 again.
+7. Only now create the other product's application (with its own API key, [decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet), point 2). Check that a request to `https://api.2s.42for.net/api/v1/access/account` with its token gets `401`.
 
-**Rollback.** Put the values that the 2S tokens carry now into `authKitAudiences`, or remove the parameter while no other application exists, and run the what-if and create again; without the list, the API checks `Auth__AuthKit__Audience` alone. Keep that single setting: a build of the API from before 424-239 reads only it, and without it would check no audience. Such a build refuses every 2S token once WorkOS no longer puts `https://2s.42for.net` into them, and accepts the other product's tokens if WorkOS still does.
+**Rollback.** Put the values that the 2S tokens carry now (decode a fresh one) into `authKitAudiences`, and run the what-if and create again. Removing the parameter instead makes the API check `Auth__AuthKit__Audience` alone, so do that only while no other application exists and the 2S tokens still carry `https://2s.42for.net`: if step 4 dropped the template's `aud`, give the production template `"aud": "https://2s.42for.net"` again first, and check a fresh token. Keep that single setting: a build of the API from before 424-239 reads only it, and without it would check no audience. Such a build refuses every 2S token once WorkOS no longer puts `https://2s.42for.net` into them, and accepts the other product's tokens if WorkOS still does.
 
 ## Adding the API's Sentry project
 

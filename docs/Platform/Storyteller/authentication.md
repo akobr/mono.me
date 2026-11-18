@@ -36,7 +36,7 @@ A token whose `azp` (v1: `appid`) is not `Auth:ClientId` is a machine with that 
 | `Auth:AuthKit:Issuer` | yes | `https://api.workos.com/` | Must match the token's `iss`. Use your custom auth domain if one is configured. |
 | `Auth:AuthKit:JwksUri` | no | `{ApiBaseUrl}/sso/jwks/{ClientId}` | Must be HTTPS. |
 | `Auth:AuthKit:ApiBaseUrl` | no | `https://api.workos.com` | Used to build the default JWKS URL. Must be HTTPS. |
-| `Auth:AuthKit:Audiences:*` | no, but set it once the environment has several applications | none | The audiences of the deployment's WorkOS applications: a user token must carry one of them (see [Several WorkOS applications](#several-workos-applications)). When it lists any, `Audience` is ignored. Entries are trimmed; a blank entry stops the start. |
+| `Auth:AuthKit:Audiences:*` | no, but set it before the WorkOS environment gets a second application | none | The audiences of the deployment's WorkOS applications: a user token must carry one of them (see [Several WorkOS applications](#several-workos-applications)). When it lists any, `Audience` is ignored. Entries are trimmed; a blank entry stops the start. |
 | `Auth:AuthKit:Audience` | no, but set it (or `Audiences`) in production | | The single audience, from before `Audiences`. When set and `Audiences` is empty, tokens must carry this `aud`. When both are empty, the audience is not checked. |
 | `Auth:AuthKit:DefaultUserScopes:*` | no | none | Scopes given to every signed-in user. Only `User.Impersonation` counts, see [Scopes for users](#scopes-for-users). |
 | `Auth:AuthKit:PermissionMap:<slug>` | no | none | Maps a WorkOS permission slug to exactly one Storyteller scope: `User.Impersonation` for users, or a [machine scope](#scopes-of-machines). |
