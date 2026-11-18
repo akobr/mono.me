@@ -43,13 +43,14 @@ async function view(entry: KeyValueVersion) {
   }
   busy.value = entry.Version
   compared.value = undefined
+  // The scope the View asked in, taken before the request: the page may move to another view meanwhile.
+  const target = revealTarget(entry.Version)
   try {
     const { org, project, view: viewName } = context.scope
     const result = await getKeyValueVersion(org, project, viewName, props.keyName, entry.Version, { reveal: isSecretLevel(entry.Protection) || undefined })
     viewed.value = { version: entry.Version, value: result.Value ?? '' }
   } catch (error) {
     viewed.value = { version: entry.Version, error: errorMessage(error) }
-    const target = revealTarget(entry.Version)
     if (isStepUpRequired(error) && target) {
       stepUp.rememberReveal(target)
     }

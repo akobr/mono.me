@@ -781,7 +781,7 @@ describe('the screens', () => {
 
   // The hint before a write asks a minute early; the API withholds only once the window itself ran out.
   it('says on the Resolved tab that secret values are included in the last minute of the window', async () => {
-    auth.authTime = Date.now() - 9.5 * minute
+    auth.authTime = Date.now() - 9.25 * minute
     await mountDialog(
       ConfigurationResolved,
       { annotationKey: 'exe.northwind.invoicing.prod' },
@@ -790,7 +790,23 @@ describe('the screens', () => {
 
     expect(await isSignInStale()).toBe(true)
     expect(text()).toContain('secret values are included')
-    expect(text()).not.toContain('Secret values are hidden')
+    expect(text()).not.toContain('Secret values')
+  })
+
+  // The browser knows only when the response arrived: at the end of the window either answer may be wrong.
+  it('says on the Resolved tab that secret values may be hidden at the end of the window', async () => {
+    auth.authTime = Date.now() - 10 * minute
+    await mountDialog(
+      ConfigurationResolved,
+      { annotationKey: 'exe.northwind.invoicing.prod' },
+      '/acme/billing/default/annotations/exe.northwind.invoicing.prod',
+    )
+
+    await vi.waitFor(() => expect(text()).toContain('Secret values may be hidden'))
+    expect(text()).not.toContain('secret values are included')
+    button("Confirm it's you")!.click()
+    await settle()
+    expect(useStepUpStore().open).toBe(true)
   })
 
   it('tells again with every response of the Resolved tab, as the window runs out', async () => {

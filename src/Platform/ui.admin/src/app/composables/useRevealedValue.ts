@@ -2,16 +2,20 @@ import { onBeforeUnmount, ref } from 'vue'
 
 /**
  * A revealed secret value: fetched on request, never cached, masked again after `hideAfterMs` (60 seconds) and when
- * the component goes away (spec section 29.8).
+ * the component goes away (spec section 29.8). A reveal still on its way when the value is hidden (the page moved to
+ * another view, a save) is dropped when it arrives: it may be the value of what was shown before.
  */
 export function useRevealedValue(fetch: () => Promise<string | undefined>, hideAfterMs = 60_000) {
   const value = ref<string>()
   const loading = ref(false)
   const error = ref<unknown>()
   let timer: ReturnType<typeof setTimeout> | undefined
+  let generation = 0
 
   function hide() {
+    generation++
     value.value = undefined
+    loading.value = false
     if (timer) {
       clearTimeout(timer)
       timer = undefined
@@ -19,18 +23,27 @@ export function useRevealedValue(fetch: () => Promise<string | undefined>, hideA
   }
 
   async function reveal(): Promise<void> {
+    const asked = ++generation
     loading.value = true
     error.value = undefined
     try {
-      value.value = await fetch()
+      const fetched = await fetch()
+      if (asked !== generation) {
+        return
+      }
+      value.value = fetched
       if (timer) {
         clearTimeout(timer)
       }
       timer = setTimeout(hide, hideAfterMs)
     } catch (caught) {
-      error.value = caught
+      if (asked === generation) {
+        error.value = caught
+      }
     } finally {
-      loading.value = false
+      if (asked === generation) {
+        loading.value = false
+      }
     }
   }
 
