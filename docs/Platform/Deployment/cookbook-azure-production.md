@@ -492,7 +492,7 @@ In the WorkOS dashboard, environment **Production**:
    }
    ```
 
-   `aud` must equal `Auth__AuthKit__Audience` (or be one of `Auth__AuthKit__Audiences__<n>`, once those are set). Don't create a second application in this environment before the API lists the 2S audiences ([runbook](runbook-azure-production.md#enabling-multiple-applications-in-workos)).
+   While no `Auth__AuthKit__Audiences__<n>` is set, `aud` must equal `Auth__AuthKit__Audience`. Once the list is set, `aud` must be one of its entries: the API then ignores the single value. Don't create a second application in this environment before the API lists the 2S audiences ([runbook](runbook-azure-production.md#enabling-multiple-applications-in-workos)).
 4. **Redirects** of the admin UI: redirect URI `https://app.2s.42for.net/callback`, sign-out URI `https://app.2s.42for.net/login`, allowed origin (CORS) `https://app.2s.42for.net`.
 5. **CLI Auth** on, so `sform` can sign in with the device flow.
 6. **Invitation link**: `https://app.2s.42for.net/invitations/accept` (and the management key of step 8.3 for the emails).
