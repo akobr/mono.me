@@ -418,7 +418,7 @@ public class AccessAuditCoreRecordTests(Startup startup)
         });
 
         // only the first save is a change: from no policy to ApiKey
-        added.Should().ContainSingle().Which.NewValue.Should().Be("{\"CredentialKind\":\"ApiKey\"}");
+        added.Should().ContainSingle().Which.NewValue.Should().Be("{\"EnabledCredentialKinds\":[\"ApiKey\"],\"CredentialKind\":\"ApiKey\"}");
     }
 
     [Fact]

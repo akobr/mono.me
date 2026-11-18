@@ -179,7 +179,7 @@ public class AccessAuditValuesTests
     }
 
     [Fact]
-    public void Issuer_TheSameKeysWithTheirMembersInAnotherOrder_AreNoChange()
+    public void Issuer_TheSameKeysWithTheirMembersOrTheKeysInAnotherOrder_AreNoChange()
     {
         var ordered = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"one\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"},{\"kty\":\"RSA\",\"kid\":\"two\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"}]}";
         var reordered = "{\"keys\":[{\"e\":\"AQAB\",\"n\":\"" + Modulus + "\",\"kid\":\"one\",\"kty\":\"RSA\"},{\"kid\":\"two\",\"e\":\"AQAB\",\"kty\":\"RSA\",\"n\":\"" + Modulus + "\"}]}";
@@ -188,8 +188,18 @@ public class AccessAuditValuesTests
 
         AccessAuditValues.Issuer(issuer with { Jwks = reordered }).Should().Be(AccessAuditValues.Issuer(issuer));
 
-        // the order of the keys themselves is kept: arrays are not sorted
-        AccessAuditValues.Issuer(issuer with { Jwks = swappedOrder }).Should().NotBe(AccessAuditValues.Issuer(issuer));
+        // the keys of the set in another order
+        AccessAuditValues.Issuer(issuer with { Jwks = swappedOrder }).Should().Be(AccessAuditValues.Issuer(issuer));
+    }
+
+    [Fact]
+    public void Issuer_NoRequiredClaimsAndAnEmptyDictionary_AreTheSame()
+    {
+        var issuer = new FederatedIssuer { Name = "github", Issuer = "https://token.actions.githubusercontent.com" };
+
+        AccessAuditValues.Issuer(issuer with { RequiredClaims = new Dictionary<string, IReadOnlyList<string>>() })
+            .Should().Be(AccessAuditValues.Issuer(issuer with { RequiredClaims = null }))
+            .And.NotContain("RequiredClaims");
     }
 
     [Fact]
@@ -244,6 +254,24 @@ public class AccessAuditValuesTests
 
         AccessAuditValues.MachineAuthentication(policy with { EnabledCredentialKinds = [] })
             .Should().Be(AccessAuditValues.MachineAuthentication(policy with { EnabledCredentialKinds = null }));
+
+        // a legacy policy of only its default enables just that kind
+        AccessAuditValues.MachineAuthentication(policy with { EnabledCredentialKinds = [MachineCredentialKind.ApiKey] })
+            .Should().Be(AccessAuditValues.MachineAuthentication(policy));
+        AccessAuditValues.MachineAuthentication(policy with { EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate] })
+            .Should().NotBe(AccessAuditValues.MachineAuthentication(policy));
+    }
+
+    [Fact]
+    public void MachineAuthentication_WithoutADefault_TheFirstKindIsTheDefault()
+    {
+        var policy = new MachineAuthenticationPolicy { EnabledCredentialKinds = [MachineCredentialKind.Certificate, MachineCredentialKind.ApiKey] };
+
+        // the first kind sent is the default, so another first kind is a change
+        AccessAuditValues.MachineAuthentication(policy with { EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate] })
+            .Should().NotBe(AccessAuditValues.MachineAuthentication(policy));
+        AccessAuditValues.MachineAuthentication(policy)
+            .Should().Be(AccessAuditValues.MachineAuthentication(policy with { CredentialKind = MachineCredentialKind.Certificate }));
     }
 
     [Fact]
