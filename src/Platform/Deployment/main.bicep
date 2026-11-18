@@ -49,8 +49,11 @@ param trustDomain string
 @description('The WorkOS production client id (client_…), known after step 13; the setting is left out while it is empty.')
 param authKitClientId string = ''
 
-@description('The aud of the WorkOS JWT template (step 13).')
+@description('The aud of the WorkOS JWT template (step 13): Auth__AuthKit__Audience, the single audience. Ignored by the API while authKitAudiences lists any; it stays for a rollback to a build that reads only it.')
 param authKitAudience string = 'https://${trustDomain}'
+
+@description('The audiences of the 2S WorkOS applications (Auth__AuthKit__Audiences__<n>, 424-239): user tokens must carry one of them, and authKitAudience no longer counts. Empty until Multiple Applications is enabled in WorkOS production (runbook, "Enabling Multiple Applications in WorkOS").')
+param authKitAudiences string[] = []
 
 @description('Adds Auth__AuthKit__ApiKey as a reference to the secret authkit-api-key, set by hand in the vault.')
 param authKitApiKeyEnabled bool = false
@@ -277,6 +280,7 @@ module functions 'modules/functions.bicep' = {
     trustDomain: trustDomain
     authKitClientId: authKitClientId
     authKitAudience: authKitAudience
+    authKitAudiences: authKitAudiences
     authKitApiKeyEnabled: authKitApiKeyEnabled
     byokClientId: byokClientId
     sentryDsn: sentryDsn
