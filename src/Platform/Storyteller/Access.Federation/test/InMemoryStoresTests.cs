@@ -54,6 +54,17 @@ public class InMemoryStoresTests
     }
 
     [Fact]
+    public async Task IssuerStore_CreatesOnly_AnIssuerThatDoesNotExist()
+    {
+        var store = new InMemoryFederatedIssuerStore();
+        await store.CreateAsync("org1", "proj1", Issuer("cluster"));
+
+        await Should.ThrowAsync<ConflictException>(() => store.CreateAsync("org1", "proj1", Issuer("cluster") with { Description = "Replaced" }));
+
+        (await store.GetAsync("org1", "proj1", "cluster"))!.Description.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task IssuerStore_DeletesOnce()
     {
         var store = new InMemoryFederatedIssuerStore();

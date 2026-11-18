@@ -14,6 +14,10 @@ public interface IFederatedIssuerStore
     // issuer number MaxIssuersPerProject + 1 or when it changes the Issuer of an existing one.
     Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, CancellationToken cancellationToken = default);
 
+    // Creates the issuer named issuer.Name, never replaces one: ConflictException when it exists, also when it appeared
+    // after the caller found none (a replace needs the checks of a replace). InvalidInputException as SetAsync.
+    Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, CancellationToken cancellationToken = default);
+
     // False when the issuer did not exist.
     Task<bool> DeleteAsync(string organization, string project, string name, CancellationToken cancellationToken = default);
 }

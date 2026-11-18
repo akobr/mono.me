@@ -111,6 +111,19 @@ public class FederationPersistenceTests(CosmosFixture fixture)
     }
 
     [Fact]
+    public async Task IssuerStore_CreatesOnly_AnIssuerThatDoesNotExist()
+    {
+        const string project = "issuercreate";
+        await EnsureProjectAsync(project);
+        var store = CreateIssuerStore();
+        await store.CreateAsync(Organization, project, Issuer("a"));
+
+        await Should.ThrowAsync<ConflictException>(() => store.CreateAsync(Organization, project, Issuer("a") with { Description = "Replaced" }));
+
+        (await store.GetAsync(Organization, project, "a"))!.Description.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task IssuerStore_RefusesTheIssuerNumber21()
     {
         const string project = "issuerlimit";
