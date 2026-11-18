@@ -325,6 +325,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | --- | --- |
 | `Auth__AuthKit__Issuer` | must equal the `iss` of WorkOS tokens: `https://api.workos.com/user_management/<client id>` (the client id of step 13) until the custom domain exists, then `https://auth.42for.net` |
 | `Auth__AuthKit__Audience` | tokens must carry this `aud` (the JWT template, step 13): `https://2s.42for.net`, shared by every application of the environment (see "Open points") |
+| `Auth__AuthKit__Audiences__<n>` | not set yet: the audiences of the 2S applications, which replace the single value once WorkOS has several applications (see "Open points") |
 | `Auth__AuthKit__DefaultUserScopes__0` | every signed-in user gets `User.Impersonation`, and their roles decide the rest; without it (and without a permission map) every user gets `401` |
 | `Auth__TokenExchange__Enabled=false` | no MCP server in this phase |
 | `MachineAuth__DisabledCredentialKinds__*` | no mTLS yet: projects can't enable certificate machines or issue shared certificates |
@@ -491,7 +492,7 @@ In the WorkOS dashboard, environment **Production**:
    }
    ```
 
-   `aud` must equal `Auth__AuthKit__Audience`.
+   `aud` must equal `Auth__AuthKit__Audience` (or be one of `Auth__AuthKit__Audiences__<n>`, once those are set). Don't create a second application in this environment before the API lists the 2S audiences ([runbook](runbook-azure-production.md#enabling-multiple-applications-in-workos)).
 4. **Redirects** of the admin UI: redirect URI `https://app.2s.42for.net/callback`, sign-out URI `https://app.2s.42for.net/login`, allowed origin (CORS) `https://app.2s.42for.net`.
 5. **CLI Auth** on, so `sform` can sign in with the device flow.
 6. **Invitation link**: `https://app.2s.42for.net/invitations/accept` (and the management key of step 8.3 for the emails).
@@ -624,7 +625,7 @@ What raises it: Cosmos DB throughput above 1000 RU/s, a second region or zone re
 
 ## 19. Open points (decide before or during the work)
 
-- **The shared WorkOS environment** (step 13): decided, one environment and one WorkOS Application per product ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)). The JWT template's `aud` stays `https://2s.42for.net`. **Before a second product signs users in**, each API has to accept only its own audience: with WorkOS Multiple Applications enabled, tokens carry the `aud` of their application, and the 2S API accepts only the audiences of the 2S applications ([424-239](https://linear.app/424fun/issue/424-239)). Enabling it changes the `aud` of every token: test it in WorkOS staging and change `Auth__AuthKit__Audience` in the same release. Until then, a token another product gets for a user would also be accepted by the 2S API.
+- **The shared WorkOS environment** (step 13): decided, one environment and one WorkOS Application per product ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)). The JWT template's `aud` stays `https://2s.42for.net`. **Before a second product signs users in**, each API has to accept only its own audience: with WorkOS Multiple Applications enabled, tokens carry the `aud` of their application, and the 2S API accepts only the audiences of the 2S applications, `Auth__AuthKit__Audiences__<n>` ([424-239](https://linear.app/424fun/issue/424-239); the API reads them, the Bicep parameter `authKitAudiences` sets them). Enabling it changes the `aud` of every token, and WorkOS doesn't document the new value: WorkOS staging decides it, and production lists it next to `https://2s.42for.net` while WorkOS switches, then drops the old value before the second application is created ([runbook](runbook-azure-production.md#enabling-multiple-applications-in-workos)). The issuer doesn't help: every application of the environment has the same one. So until then, a token another product gets for a user would also be accepted by the 2S API.
 - **Invitations** route to the application they were sent from; invitations sent from the WorkOS dashboard go to the default application, the 2S Platform.
 - **Publisher verification** of `2S Platform Customer Keys` (step 11.1), before the first BYOK customer.
 - **The development environment** comes later as a new subscription (`dev-42fornet-sub`) from the same Bicep templates (spec, section 11), with WorkOS staging, its own trust domain and its own BYOK application.
