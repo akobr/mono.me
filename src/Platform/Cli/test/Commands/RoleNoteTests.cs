@@ -172,7 +172,9 @@ public partial class RoleNoteTests
         detail.Count.ShouldBeGreaterThan(1);
         detail[0].ShouldBeEmpty();
         lines.TakeLast(detail.Count).ShouldBe(detail);
-        lines[^(detail.Count + 1)].TrimStart().ShouldStartWith("-?|-h|--help");
+        // the options end before the detail: the help option among them (the inherited --builtin comes after it)
+        lines.SkipLast(detail.Count).ShouldContain(line => line.TrimStart().StartsWith("-?|-h|--help"));
+        lines[^(detail.Count + 1)].ShouldNotBeNullOrWhiteSpace();
         detail.ShouldAllBe(line => line.Length <= DetailWidth);
         detail.ShouldAllBe(line => line == line.TrimEnd());
     }

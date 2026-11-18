@@ -155,6 +155,8 @@ describe('project settings store', () => {
       signIn: vi.fn(async () => {}),
       signOut: vi.fn(async () => {}),
       consumeReturnTo: () => undefined,
+      getAuthTime: async () => Date.now(),
+      getStepUpReturn: () => undefined,
     }
     setBootState({ status: 'ready', auth: service })
     const settings = useProjectSettingsStore()

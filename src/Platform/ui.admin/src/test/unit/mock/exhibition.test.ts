@@ -162,7 +162,7 @@ describe('POST /access/exhibition/join', () => {
     expect(db.accessPoints.exhibition?.AccessMap).toEqual({ [grace]: 'Owner' })
     expect(await getAccount()).toEqual(account)
     expect(await getProjects()).toEqual([
-      { Key: projectKey, Role: 'Reader', Description: seeded[projectKey]?.Description },
+      { Key: projectKey, Role: 'Reader', Description: seeded[projectKey]?.Description, Settings: { Types: {}, Version: 0 } },
     ])
     expect(await getAccessPoints()).toEqual([])
   })

@@ -9,13 +9,11 @@ import {
   loadDb,
   resetDb,
   saveDb,
-  type MockDb,
   type MockExhibition,
   type MockScenario,
 } from './db'
 import { getDocument, latest, putVersion, type ScopeRef } from './documents'
 import { mockHandlers } from './all-handlers'
-import { writeShowcaseSettings } from './showcase/settings'
 import { setStaleSignIn } from './step-up'
 import {
   invalidSettingsMessage,
