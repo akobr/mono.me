@@ -86,6 +86,21 @@ public class AccessAuditHttpTests
         log.Calls.ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData("MemberGranted,MemberRevoked")]
+    [InlineData("MemberGranted, MemberRevoked")]
+    [InlineData(",MemberGranted")]
+    public async Task Action_WithAComma_IsInvalidQuery_AndReadsNoLog(string action)
+    {
+        var (http, log, _) = Create();
+
+        // Enum.TryParse would combine the names into the value of their flags, here MemberRevoked
+        var exception = await Should.ThrowAsync<InvalidInputException>(() => http.GetAccessAudit(Request(q => q["action"] = action), Org));
+
+        ShouldBeBadRequest(exception, ErrorCodes.InvalidQuery);
+        log.Calls.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task From_LaterThanTo_IsInvalidQuery_AndReadsNoLog()
     {

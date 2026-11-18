@@ -61,9 +61,11 @@ public static class AccessAuditValues
         return Json(rules ?? []);
     }
 
+    // The enabled kinds are a set: the order they were sent in is no change.
     public static string MachineAuthentication(MachineAuthenticationPolicy? policy)
     {
-        return Json(policy ?? new MachineAuthenticationPolicy());
+        policy ??= new MachineAuthenticationPolicy();
+        return Json(policy with { EnabledCredentialKinds = policy.EnabledCredentialKinds?.Distinct().Order().ToList() });
     }
 
     // What of a key/value policy decides who gets secrets and how; key versions, health and rewrap progress are left out,
@@ -102,7 +104,11 @@ public static class AccessAuditValues
             JwksKeys = CountJwksKeys(issuer.Jwks),
             JwksThumbprint = JwksThumbprint(issuer.Jwks),
             issuer.MaxTokenLifetimeSeconds,
-            issuer.RequiredClaims,
+
+            // by claim name, so the same pins in another order are no change; the values keep their order
+            RequiredClaims = issuer.RequiredClaims?
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
             issuer.Description,
         });
     }

@@ -65,9 +65,16 @@ public sealed record StoredAccessAudit(AccessAuditEntity Record, JsonObject Docu
     {
         var text = Document.ToJsonString();
 
+        // the serialized text escapes some characters (a + or a / of a key), so the decoded strings are checked too,
+        // also inside the JSON of the old and new values
+        var strings = StringValues(Document)
+            .Concat(new[] { Record.OldValue, Record.NewValue }.Where(IsJson).SelectMany(value => StringValues(JsonNode.Parse(value!))))
+            .ToList();
+
         foreach (var secret in secrets.Where(secret => !string.IsNullOrEmpty(secret)))
         {
             text.ShouldNotContain(secret!, Case.Sensitive);
+            strings.ShouldNotContain(value => value.Contains(secret!, StringComparison.Ordinal), $"a stored string holds the secret {secret}");
         }
 
         text.ShouldNotContain("***");
@@ -121,6 +128,23 @@ public sealed record StoredAccessAudit(AccessAuditEntity Record, JsonObject Docu
 
         // The id order is the time order.
         return records.OrderBy(stored => stored.Record.Id, StringComparer.Ordinal).ToList();
+    }
+
+    // Every string value of the JSON, decoded, at any depth.
+    private static IEnumerable<string> StringValues(JsonNode? node)
+    {
+        return node switch
+        {
+            JsonObject json => json.SelectMany(property => StringValues(property.Value)),
+            JsonArray array => array.SelectMany(StringValues),
+            JsonValue value when value.TryGetValue<string>(out var text) => [text],
+            _ => [],
+        };
+    }
+
+    private static bool IsJson(string? value)
+    {
+        return value is not null && (value.StartsWith('{') || value.StartsWith('['));
     }
 
     private static IEnumerable<string> PropertyNames(JsonNode? node)

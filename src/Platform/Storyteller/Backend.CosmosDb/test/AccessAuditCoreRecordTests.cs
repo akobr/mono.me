@@ -386,6 +386,13 @@ public class AccessAuditCoreRecordTests(Startup startup)
         {
             await store.SetAsync(Organization, ProjectOf(pointKey), policy, ViaMcp);
             await store.SetAsync(Organization, ProjectOf(pointKey), policy with { }, ViaMcp);
+
+            // the same kinds in another order, and twice, with the same default: no change
+            await store.SetAsync(
+                Organization,
+                ProjectOf(pointKey),
+                policy with { EnabledCredentialKinds = [MachineCredentialKind.Certificate, MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate] },
+                ViaMcp);
         });
 
         added.Should().ContainSingle().Which.ShouldMatch(new ExpectedAccessAudit(AccessAuditAction.MachineAuthenticationPolicyChanged, pointKey, ViaMcp)

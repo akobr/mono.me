@@ -178,10 +178,12 @@ internal static class KeyValueQuery
             : throw Invalid(name, "a date (yyyy-MM-dd)");
     }
 
+    // One name or number: Enum.TryParse would combine "A,B" into the value of A | B, which can be another defined value.
     private static TEnum ParseEnum<TEnum>(string name, string raw)
         where TEnum : struct, Enum
     {
-        return Enum.TryParse<TEnum>(raw, ignoreCase: true, out var value) && Enum.IsDefined(value)
+        return !raw.Contains(',', StringComparison.Ordinal)
+            && Enum.TryParse<TEnum>(raw, ignoreCase: true, out var value) && Enum.IsDefined(value)
             ? value
             : throw Invalid(name, string.Join(", ", Enum.GetNames<TEnum>()));
     }

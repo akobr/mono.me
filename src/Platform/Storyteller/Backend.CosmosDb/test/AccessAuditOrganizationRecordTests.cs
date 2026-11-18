@@ -160,6 +160,39 @@ public class AccessAuditOrganizationRecordTests(Startup startup)
     }
 
     [Fact]
+    public async Task DeleteMachine_AChangeAfterTheCleanup_IsReadAgain_AndTheRecordDescribesTheDeletedVersion()
+    {
+        var project = NewName("p");
+        var storage = new InterceptedRepositoryProvider(Repositories);
+        var machines = Machines(storage);
+        var machine = await machines.CreateMachineAccessAsync(ApiKeyMachine(project), Admin);
+        var changed = false;
+
+        // the annotation restriction of the machine changes after the read of the delete and before its batch
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (!changed && batch.Contains(BatchOperationKind.Delete, machine.Id))
+            {
+                changed = true;
+                await Repositories.GetOrganizationContainer(Organization).Container.PatchItemAsync<object>(
+                    machine.Id,
+                    OrganizationKeys.Key(Organization, AccessPartition(project)),
+                    [PatchOperation.Set("/AnnotationKey", "unit.payroll")]);
+            }
+
+            return null;
+        };
+
+        var added = await AddedAsync(AccessPartition(project), async () =>
+            (await machines.DeleteMachineAccessAsync(Organization, project, machine.Id, ViaMcp)).Should().BeTrue());
+
+        storage.Interceptor.Batches.Where(batch => batch.Contains(BatchOperationKind.Delete, machine.Id)).Select(batch => batch.StatusCode)
+            .Should().Equal(HttpStatusCode.PreconditionFailed, HttpStatusCode.OK);
+        added.Should().ContainSingle().Which.OldValue.Should().Be(AccessAuditValues.Machine(MachineCredentialKind.ApiKey, Scopes, "unit.payroll", false, null));
+        (await Machines(Repositories).GetMachineAccessAsync(Organization, project, machine.Id)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task DeleteMachine_AFailedBatch_KeepsTheMachineListedAndStoresNoRecord()
     {
         var project = NewName("p");
