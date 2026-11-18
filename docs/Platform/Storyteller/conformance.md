@@ -208,19 +208,20 @@ dotnet run src/Platform/Storyteller/conformance/tools/time-zones.cs
 - `expected`: the normalized settings, as the API writes them without `Version` and `Modified`. `Types` holds every type that has a value, and `DefaultTimeZone` and `DateFormat` are there only when set. A runner compares them as JSON values, so the order of the members does not count.
 - `problems`: every problem that refuses the document, each a `path` and a `rule`, in any order.
 
-**The rules** are `type-code`, `label`, `plural`, `plural-without-label`, `color`, `icon`, `time-zone`, `date-format`, `unknown-member`, `case-collision`, `type` and `format` (see [the rules of the API](access.md#project-settings)). A runner checks that the vectors refuse by each of them.
+**The rules** are `type-code`, `label`, `plural`, `control-character`, `plural-without-label`, `color`, `icon`, `time-zone`, `date-format`, `unknown-member`, `case-collision`, `type` and `format` (see [the rules of the API](access.md#project-settings)). A runner checks that the vectors refuse by each of them.
 
 - Member names, type codes, colors, icons, date formats and time zones match in ASCII case only (`A-Z` equals `a-z`, no other folding) and are stored in the catalog's spelling. `Format` matches exactly.
-- Labels and plurals are trimmed of Unicode `White_Space` and measured in UTF-16 code units, as `String.length` of JavaScript. A blank label, plural, time zone or date format means none, `null` means none, and a type without any value is removed.
+- Labels and plurals are trimmed of Unicode `White_Space` and measured in UTF-16 code units, as `String.length` of JavaScript. After trimming, they may not hold a C0 or C1 control (`char.IsControl` of .NET), U+2028, U+2029 or a bidirectional control (U+061C, U+200E, U+200F, U+202A–U+202E, U+2066–U+2069). A blank label, plural, time zone or date format means none, `null` means none, and a type without any value is removed.
 - `Version` and `Modified` are read-only and ignored, of any JSON type.
 - **A path** starts at `$`. A member whose name is ASCII letters, digits, `_` and `-` (starting with a letter or `_`) is `.name`, any other `['name']`. A known member or type code is written in its canonical spelling, an unknown one as given.
 
-The 72 vectors cover:
+The 77 vectors cover:
 
 - an empty document, every member, every type code, and the file shape with its marker;
 - each rule once accepted and once refused, and a document that breaks several at once;
 - matching in any case, trimming, blank values, `null`, and an appearance without any value;
 - labels and plurals of 40 and 41 characters, also outside the Basic Multilingual Plane;
+- an escape character, a line break, the line separator and a bidirectional override inside a label or a plural, and a line break and a line separator at the ends of a label, which are trimmed;
 - the zones `Europe/Prague`, `America/Phoenix`, `UTC`, a link and an `Etc` zone accepted, and a made-up zone, the Windows zone `Central Europe Standard Time` and an offset refused;
 - the camelCase shape of the `exhibit` data set, read as the PascalCase one.
 

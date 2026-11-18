@@ -1078,6 +1078,63 @@
       ]
     },
     {
+      "name": "a label with an escape character is refused",
+      "settings": {
+        "Types": {
+          "sbt": { "Label": "Com\u001Bpany" }
+        }
+      },
+      "problems": [
+        { "path": "$.Types.sbt.Label", "rule": "control-character" }
+      ]
+    },
+    {
+      "name": "a plural with a line break is refused",
+      "settings": {
+        "Types": {
+          "sbt": { "Label": "Company", "Plural": "Compa\u000Anies" }
+        }
+      },
+      "problems": [
+        { "path": "$.Types.sbt.Plural", "rule": "control-character" }
+      ]
+    },
+    {
+      "name": "a label with a line separator is refused",
+      "settings": {
+        "Types": {
+          "sbt": { "Label": "Com\u2028pany" }
+        }
+      },
+      "problems": [
+        { "path": "$.Types.sbt.Label", "rule": "control-character" }
+      ]
+    },
+    {
+      "name": "a plural with a bidirectional override is refused",
+      "settings": {
+        "Types": {
+          "sbt": { "Label": "Company", "Plural": "\u202EseinapmoC" }
+        }
+      },
+      "problems": [
+        { "path": "$.Types.sbt.Plural", "rule": "control-character" }
+      ]
+    },
+    {
+      "name": "a line break or a line separator at either end of a label is trimmed",
+      "settings": {
+        "Types": {
+          "sbt": { "Label": "\u000ACompany\u2028" }
+        }
+      },
+      "expected": {
+        "Types": {
+          "sbt": { "Label": "Company" }
+        }
+      }
+    },
+    {
       "name": "a plural without a label is refused",
       "settings": {
         "Types": {

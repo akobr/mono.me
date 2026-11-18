@@ -23,6 +23,7 @@ export const projectSettingsRules = [
   'type-code',
   'label',
   'plural',
+  'control-character',
   'plural-without-label',
   'color',
   'icon',
@@ -168,6 +169,23 @@ function fold(value: string): string {
 function trimmed(value: string | undefined): string | undefined {
   const text = value?.replace(/^\p{White_Space}+|\p{White_Space}+$/gu, '')
   return text ? text : undefined
+}
+
+// A control character (C0 or C1, as .NET's char.IsControl), a line or paragraph separator, or a bidirectional control.
+// eslint-disable-next-line no-control-regex -- the controls are what the rule refuses
+const controlCharacter = /[\u0000-\u001F\u007F-\u009F\u2028\u2029\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/
+
+// Checked after trimming, so a white space control at either end (a tab, a line break) is trimmed rather than refused.
+function addControlCharacter(value: string | undefined, path: string, field: 'label' | 'plural', problems: ProjectSettingsProblem[]): void {
+  const found = value === undefined ? null : controlCharacter.exec(value)
+  if (found) {
+    const code = found[0].charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')
+    problems.push({
+      path,
+      rule: 'control-character',
+      message: `The ${field} contains the character U+${code}; control characters, line and paragraph separators and bidirectional controls are not allowed.`,
+    })
+  }
 }
 
 function isBlank(value: string | undefined): boolean {
@@ -353,6 +371,9 @@ function normalizeAppearance(input: AppearanceInput, path: string, problems: Pro
       message: `The plural has ${plural.length} characters; at most ${projectSettingsLimits.plural} are allowed.`,
     })
   }
+
+  addControlCharacter(label, toPropertyPath(path, 'Label'), 'label', problems)
+  addControlCharacter(plural, toPropertyPath(path, 'Plural'), 'plural', problems)
 
   if (plural !== undefined && label === undefined) {
     problems.push({

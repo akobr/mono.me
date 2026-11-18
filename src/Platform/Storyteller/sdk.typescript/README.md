@@ -417,7 +417,7 @@ The catalog module (`src/generated/catalog/project-settings.ts`, generated from 
 | `validateProjectSettings(document)` | The rules of the API (`ProjectSettingsJson` and `ProjectSettingsRules` of the .NET abstractions) for any settings document: member names and type codes in any ASCII case, `Format` optional, `Version` and `Modified` ignored. `{ valid: true, settings }` with what a `PUT` would store (trimmed names, the catalog's spelling, empty types left out), or `{ valid: false, problems }` with every problem (`path`, `rule`, `message`) the API would answer with `400 InvalidSettings` |
 | `isTypeColor`, `isTypeIconName`, `isDateFormat`, `isCatalogTimeZone` | Guards of a value in the catalog's spelling (`isCatalogTimeZone('Europe/Prague')`; the validation also takes other cases) |
 | `projectSettingsEntityTag(version)` | `"<Version>"`, the `ETag` of that version |
-| `projectSettingsRules`, `ProjectSettingsRule` | The rule ids: `type-code`, `label`, `plural`, `plural-without-label`, `color`, `icon`, `time-zone`, `date-format`, `unknown-member`, `case-collision`, `type`, `format` |
+| `projectSettingsRules`, `ProjectSettingsRule` | The rule ids: `type-code`, `label`, `plural`, `control-character`, `plural-without-label`, `color`, `icon`, `time-zone`, `date-format`, `unknown-member`, `case-collision`, `type`, `format` |
 
 `test/conformance/project-settings.test.ts` checks the catalog module against `../conformance/project-settings.json` and runs every vector of the file through `validateProjectSettings`.
 
