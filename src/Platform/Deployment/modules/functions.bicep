@@ -69,7 +69,7 @@ param exhibitionOwner string
 ])
 param stepUpEnabled string
 
-@description('Auth__StepUp__MaxAge as a TimeSpan (hh:mm:ss, 1.00:00:00 for 24 hours); the setting is left out while it is empty (00:10:00).')
+@description('Auth__StepUp__MaxAge as a TimeSpan in whole seconds (hh:mm:ss, 1.00:00:00 for 24 hours); the setting is left out while it is empty (00:10:00).')
 param stepUpMaxAge string
 
 @description('The machine credential kinds turned off until mTLS exists.')

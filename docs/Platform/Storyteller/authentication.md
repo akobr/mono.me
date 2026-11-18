@@ -692,6 +692,7 @@ Content-Type: application/json; charset=utf-8
 - **Impersonation.** A token with an `act` claim, a WorkOS impersonation, is never recent, whatever its `auth_time`: the sign-in is the impersonator's.
 - **Actors.** A Storyteller user token carries the person's `auth_time` from its subject token, so a call through the MCP server is judged by the person's sign-in at the MCP client. Its actor stays in the delegation, never in the claims.
 - **Machines** are never judged: API keys, certificates, client credentials and federated tokens have no sign-in. Their secret rights follow their scopes and the mTLS rule only.
+- **Delegated tokens of another application.** Under Entra ID, a token of a person issued to another client application (its `azp` is not `Auth:ClientId`, for example an on-behalf-of token) is a machine with that application's id, not the person (see [Entra ID settings](#entra-id-settings)). It is not judged either, and it gets no right of the person's role: only what a registered machine of that id has, and nothing without one.
 
 ### The clients
 
