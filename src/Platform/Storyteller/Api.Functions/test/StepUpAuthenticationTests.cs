@@ -222,6 +222,31 @@ public class StepUpAuthenticationTests
         request.GetSignInRecency().MaxAge.ShouldBe(StepUpOptions.DefaultMaxAge);
     }
 
+    // The same request on a host whose settings turn the step-up off for its provider needs none in any build; where they
+    // turn it on, Release builds still find no recent sign-in.
+    [Theory]
+    [InlineData(IdentityProviderKind.EntraId, null, false)]
+    [InlineData(IdentityProviderKind.AuthKit, false, false)]
+    [InlineData(IdentityProviderKind.AuthKit, null, true)]
+    [InlineData(IdentityProviderKind.EntraId, true, true)]
+    public void UserWithoutAJudgement_FollowsTheSettingsOfTheHost(IdentityProviderKind provider, bool? enabled, bool required)
+    {
+        var services = new ServiceCollection()
+            .Configure<StepUpOptions>(options =>
+            {
+                options.Enabled = enabled;
+                options.MaxAge = TimeSpan.FromMinutes(3);
+            })
+            .Configure<UserAuthenticationOptions>(options => options.Provider = provider)
+            .BuildServiceProvider();
+        var request = TestRequests.User(services: services).WithSignIn(null);
+
+        var recency = request.GetSignInRecency();
+
+        recency.IsRecent.ShouldBe(!required || DevAuth);
+        recency.MaxAge.ShouldBe(TimeSpan.FromMinutes(3));
+    }
+
     [Fact]
     public void EnsureRecentSignIn_Stale_ThrowsTheStepUpWithTheWindow()
     {

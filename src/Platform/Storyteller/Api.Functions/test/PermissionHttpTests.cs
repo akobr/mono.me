@@ -269,7 +269,8 @@ public class PermissionHttpTests
     // a call through an actor under NoSecretReveal; restrictions, through an actor with exactly those.
     private static TestHttpRequestData UserRequest(string body, bool contentType = true, bool restricted = false, string[]? restrictions = null)
     {
-        using var services = new ServiceCollection().BuildServiceProvider();
+        // Not disposed: the request reads it when it has no judged sign-in, as the host's services of a request.
+        var services = new ServiceCollection().BuildServiceProvider();
         var headers = contentType ? FunctionTestDoubles.JsonContentType() : null;
         var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, "POST", body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
