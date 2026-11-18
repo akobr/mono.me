@@ -1,4 +1,4 @@
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { stepUpRequiredCode } from '@42for.net/2splatform.sdk'
 import { getAuthService, getStepUpSettings } from '@/boot/state'
@@ -25,9 +25,22 @@ export interface RevealTarget {
 
 const pendingRevealKey = '2s-admin:step-up-reveal'
 
-/** True when the sign-in moved since the step-up started; with no sign-in time before it, since the start itself. */
-export function signedInSince(returned: StepUpReturn, authTime: number | undefined): boolean {
-  return authTime !== undefined && authTime > (returned.previousAuthTime ?? returned.startedAt)
+/**
+ * Whether the sign-in moved since the step-up started: true or false by the sign-in before it (both times of the
+ * provider's clock), false without a sign-in time now. With no sign-in time before it, true when the sign-in is newer
+ * than the start, and otherwise undefined: the start is the browser's clock, which may run ahead of the provider's, so
+ * an older sign-in time proves nothing.
+ */
+export function signedInSince(returned: StepUpReturn, authTime: number | undefined): boolean | undefined {
+  if (authTime === undefined) {
+    return false
+  }
+
+  if (returned.previousAuthTime !== undefined) {
+    return authTime > returned.previousAuthTime
+  }
+
+  return authTime > returned.startedAt ? true : undefined
 }
 
 /**
@@ -65,7 +78,7 @@ async function isSignInOlderThan(now: number, marginOf: (maxAge: number) => numb
   }
 
   const returned = auth.getStepUpReturn()
-  const signedInAt = returned && signedInSince(returned, authTime) ? Math.max(authTime, returned.returnedAt) : authTime
+  const signedInAt = returned && signedInSince(returned, authTime) === true ? Math.max(authTime, returned.returnedAt) : authTime
   return now - signedInAt > (settings.maxAge - marginOf(settings.maxAge)) * 1000
 }
 
@@ -79,19 +92,32 @@ const sameTarget = (left: RevealTarget, right: RevealTarget) =>
 export const useStepUpStore = defineStore('step-up', () => {
   const open = ref(false)
   const mode = ref<StepUpMode>('confirm')
-  /** Whether the page had unsaved changes when the confirmation opened: the redirect loses them. */
-  const unsaved = ref(false)
+  /**
+   * Whether the page has unsaved changes while the confirmation is open: the redirect loses them. Live, so credentials
+   * shown once that arrive while it is open (a request that was still on its way) add the warning.
+   */
+  const unsaved = computed(() => open.value && hasUnsavedChanges())
   const redirecting = ref(false)
   const failure = shallowRef<unknown>()
   let pendingReveal: RevealTarget | undefined
   let opening: Promise<void> | undefined
+  /** Whether the confirmation has warned of the unsaved changes: set when it opens with them, or by a held-back click. */
+  let warned = false
+  /** The runs of deferWhile under way, and whether one of them asked. */
+  let deferring = 0
+  let deferred = false
 
   /**
    * Asks the person to confirm it is them, once however many requests failed (the SDK's onStepUpRequired, a bulk item
    * with StepUpRequired, the client hint). After a step-up that came back without a newer sign-in, it shows the error
-   * of the loop guard instead of another redirect.
+   * of the loop guard instead of another redirect. Within deferWhile it waits until the work is done.
    */
   function ask(): Promise<void> {
+    if (deferring > 0) {
+      deferred = true
+      return Promise.resolve()
+    }
+
     if (open.value || redirecting.value) {
       return Promise.resolve()
     }
@@ -99,15 +125,33 @@ export const useStepUpStore = defineStore('step-up', () => {
     opening ??= (async () => {
       const auth = getAuthService()
       const returned = auth?.getStepUpReturn()
-      const looped = returned !== undefined && !signedInSince(returned, await auth?.getAuthTime())
+      const looped = returned !== undefined && signedInSince(returned, await auth?.getAuthTime()) === false
 
       mode.value = looped ? 'failed' : 'confirm'
-      unsaved.value = hasUnsavedChanges()
       failure.value = undefined
       open.value = true
+      warned = unsaved.value
     })().finally(() => (opening = undefined))
 
     return opening
+  }
+
+  /**
+   * Runs work (a loop of requests, such as a bulk delete one key at a time) with the confirmation held back: the
+   * requests it refused for the step-up open it once, after the work is done and has reported, so a sign-in cannot
+   * leave the page while the loop still runs.
+   */
+  async function deferWhile<T>(work: () => Promise<T>): Promise<T> {
+    deferring++
+    try {
+      return await work()
+    } finally {
+      deferring--
+      if (deferring === 0 && deferred) {
+        deferred = false
+        void ask()
+      }
+    }
   }
 
   /**
@@ -128,6 +172,13 @@ export const useStepUpStore = defineStore('step-up', () => {
     const auth = getAuthService()
 
     if (!auth) {
+      return
+    }
+
+    // Unsaved changes that came after the confirmation opened (credentials shown once): the click holds back once, so
+    // the person sees the warning before the redirect loses them.
+    if (unsaved.value && !warned) {
+      warned = true
       return
     }
 
@@ -216,8 +267,9 @@ export const useStepUpStore = defineStore('step-up', () => {
   let returnAnnounced = false
 
   /**
-   * True once per page load after a step-up return whose sign-in moved, for the toast that says a change is not
-   * repeated. A return without a newer sign-in gets none: the loop guard's error tells it when the API asks again.
+   * True once per page load after a step-up return whose sign-in moved (or may have: see signedInSince), for the toast
+   * that says a change is not repeated. A return without a newer sign-in gets none: the loop guard's error tells it
+   * when the API asks again.
    */
   async function takeReturnNotice(): Promise<boolean> {
     const auth = getAuthService()
@@ -228,7 +280,7 @@ export const useStepUpStore = defineStore('step-up', () => {
     }
 
     returnAnnounced = true
-    return signedInSince(returned, await auth.getAuthTime())
+    return signedInSince(returned, await auth.getAuthTime()) !== false
   }
 
   return {
@@ -238,6 +290,7 @@ export const useStepUpStore = defineStore('step-up', () => {
     redirecting,
     failure,
     ask,
+    deferWhile,
     ensureRecentSignIn,
     confirm,
     abandonRedirect,

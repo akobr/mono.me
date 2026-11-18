@@ -70,8 +70,11 @@ const secret = ref<OneTimeSecret>()
 const setup = ref<MachineAccess>()
 const busy = ref(false)
 
+// The form opens for the project of the click, or not at all: the page stays when the switcher moves to another project
+// while the sign-in is checked.
 async function create() {
-  if (await stepUp.ensureRecentSignIn()) {
+  const projectKey = context.projectKey
+  if ((await stepUp.ensureRecentSignIn()) && projectKey === context.projectKey) {
     creating.value = true
   }
 }

@@ -94,7 +94,9 @@ async function remove() {
     return
   }
   const { org, project, view } = context.scope
-  await run(async () => {
+  // One request per key: a secret refused for the step-up opens the confirmation only once every key is done and the
+  // failed ones are selected, so its sign-in cannot leave the page halfway through.
+  await stepUp.deferWhile(() => run(async () => {
     const failed: string[] = []
     for (const key of props.keys) {
       try {
@@ -109,7 +111,7 @@ async function remove() {
       toast.add({ title: `${count.value} key(s) deleted`, color: 'success', icon: 'i-lucide-trash-2' })
     }
     return failed
-  })
+  }))
 }
 
 async function protect(level: KeyValueProtection) {

@@ -35,13 +35,15 @@ const disabled = computed(() => !!policy.data.value && !allowsSharedCertificates
 
 const issuing = ref(false)
 const label = ref('')
-const lifetime = ref(365)
+const defaultLifetime = 365
+const lifetime = ref(defaultLifetime)
 const busy = ref(false)
 const revoking = ref<SharedCertificate>()
 const secret = ref<OneTimeSecret>()
 
-// The typed label of the next certificate, which the step-up's confirmation says its sign-in loses (424-264).
-useDirtySource(() => issuing.value && label.value.trim().length > 0)
+// The typed label and a changed lifetime of the next certificate, which the step-up's confirmation says its sign-in
+// loses (424-264).
+useDirtySource(() => issuing.value && (label.value.trim().length > 0 || lifetime.value !== defaultLifetime))
 
 const daysLeft = (certificate: SharedCertificate) =>
   certificate.NotAfter ? Math.floor((Date.parse(certificate.NotAfter) - now.value.getTime()) / 86_400_000) : undefined

@@ -5,7 +5,7 @@ import { encryptForRecipients, getHyokPlace } from '@42for.net/2splatform.sdk/hy
 import { hasStepUpItems, useStepUpStore } from '@/composables/useStepUp'
 import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { useKeyValuePolicy, useRecipients } from '@/queries/scope'
-import { useContextStore } from '@/stores/context'
+import { useContextStore, type Scope } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
 import {
   formatLabels,
@@ -76,6 +76,25 @@ useDirtySource(() => open.value && text.value.trim().length > 0)
 const recentEnoughFor = async (rows: ImportItem[]) =>
   !rows.some((item) => isSecretLevel(item.protection)) || (await stepUp.ensureRecentSignIn())
 
+const scopeKey = (scope: Scope | undefined) => (scope ? `${scope.org}/${scope.project}/${scope.view}` : undefined)
+
+/**
+ * The scope of the click, for the whole Check or Import (the write and the HYOK place): undefined when the sign-in is
+ * not recent enough, or when the page moved to another project or view while that was checked (a Replace there could
+ * delete keys the document does not list).
+ */
+async function scopeAfterCheck(rows: ImportItem[]): Promise<Scope | undefined> {
+  const scope = context.scope
+  if (!scope || !(await recentEnoughFor(rows))) {
+    return undefined
+  }
+  if (scopeKey(context.scope) !== scopeKey(scope)) {
+    failure.value = `The page moved away from ${scopeKey(scope)}: nothing was sent. Check and import again here.`
+    return undefined
+  }
+  return scope
+}
+
 const allowedLevels = computed(() => (policy.data.value?.AllowedProtections ?? ['Public', 'Standard']) as KeyValueProtection[])
 const levelItems = computed(() =>
   levels
@@ -118,15 +137,15 @@ function mark() {
 const invalid = computed(() => items.value.filter((item) => item.invalid).length)
 const deletes = computed(() => plan.value?.Items?.filter((item) => item.Action === 'Delete').length ?? 0)
 
-async function prepared(): Promise<ImportItem[]> {
+async function prepared(scope: Scope): Promise<ImportItem[]> {
   const enabled = (recipients.data.value ?? []).filter((recipient) => recipient.IsEnabled !== false)
   const output: ImportItem[] = []
   for (const item of items.value) {
-    if (isClientEncrypted(item.protection) && context.scope) {
+    if (isClientEncrypted(item.protection)) {
       if (enabled.length === 0) {
         throw new Error('The project has no enabled recipient for HYOK values.')
       }
-      const { org, project, view } = context.scope
+      const { org, project, view } = scope
       output.push({ ...item, value: await encryptForRecipients(item.value, enabled, getHyokPlace(org, project, view, item.key), item.contentType ?? 'text/plain') })
     } else {
       output.push(item)
@@ -136,14 +155,15 @@ async function prepared(): Promise<ImportItem[]> {
 }
 
 async function check() {
-  if (!context.scope || !(await recentEnoughFor(items.value))) {
+  const scope = await scopeAfterCheck(items.value)
+  if (!scope) {
     return
   }
   busy.value = true
   failure.value = undefined
   try {
-    const { org, project, view } = context.scope
-    plan.value = await importKeyValues(org, project, view, toDocument(await prepared()), {
+    const { org, project, view } = scope
+    plan.value = await importKeyValues(org, project, view, toDocument(await prepared(scope)), {
       mode: mode.value,
       dryRun: true,
       keyPrefix: mode.value === 'Replace' && prefix.value ? prefix.value : undefined,
@@ -165,20 +185,26 @@ function apply() {
 
 async function run(subset: ImportItem[]) {
   confirmReplace.value = false
-  if (!context.scope || !(await recentEnoughFor(subset))) {
+  const scope = await scopeAfterCheck(subset)
+  if (!scope) {
     return
   }
   busy.value = true
   failure.value = undefined
   try {
-    const { org, project, view } = context.scope
-    const document = toDocument(await prepared().then((all) => all.filter((item) => subset.some((wanted) => wanted.key === item.key))))
+    const { org, project, view } = scope
+    const document = toDocument(await prepared(scope).then((all) => all.filter((item) => subset.some((wanted) => wanted.key === item.key))))
     result.value = await importKeyValues(org, project, view, document, {
       mode: mode.value,
       keyPrefix: mode.value === 'Replace' && prefix.value ? prefix.value : undefined,
     })
     step.value = 3
     emit('imported')
+    // Items the API refused for the step-up (a key that became a secret after the plan): the written ones stay, and
+    // the confirmation tells that a new sign-in lets the refused ones through.
+    if (hasStepUpItems(result.value.Items)) {
+      void stepUp.ask()
+    }
   } catch (error) {
     failure.value = errorMessage(error)
   } finally {

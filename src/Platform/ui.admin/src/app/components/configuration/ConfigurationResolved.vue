@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { isNotFound, isStorytellerError } from '@42for.net/2splatform.sdk'
 import { useGetResolvedConfiguration } from '@42for.net/2splatform.sdk/vue-query'
+import { getStepUpSettings } from '@/boot/state'
 import { isSignInTooOld, useStepUpStore } from '@/composables/useStepUp'
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 
@@ -31,17 +32,23 @@ const resolved = useGetResolvedConfiguration(scope.org, scope.project, scope.vie
 // be wrong: the alert says the values may be hidden.
 const edgeOfWindow = 30_000
 const signInAge = ref<'recent' | 'edge' | 'stale'>('recent')
+// Each response asks again; only the answer of the latest one is shown, however the checks overtake each other.
+let classified = 0
 watch(
   [canSeeSecrets, () => resolved.dataUpdatedAt.value],
   async ([can, answeredAt]) => {
+    const run = ++classified
     const at = answeredAt || Date.now()
-    signInAge.value = !can
+    const age = !can
       ? 'recent'
       : (await isSignInTooOld(at - edgeOfWindow))
         ? 'stale'
         : (await isSignInTooOld(at + edgeOfWindow))
           ? 'edge'
           : 'recent'
+    if (run === classified) {
+      signInAge.value = age
+    }
   },
   { immediate: true },
 )
@@ -59,6 +66,10 @@ const withheldAlert = computed(() =>
           "Your sign-in is close to the age limit for secrets, so they may stay as their bindings. Confirm it's you to be sure they are included. The response is never cached.",
       },
 )
+// The age check is only an estimate (the browser's clock against the provider's), so with a step-up the text says so.
+const includedText = getStepUpSettings().enabled
+  ? 'Bindings are evaluated with your role; secret values are included unless your sign-in is too old for them, which this browser can only estimate. The response is never cached.'
+  : 'Bindings are evaluated with your role; secret values are included. The response is never cached.'
 const confirmActions = [
   { label: "Confirm it's you", icon: 'i-lucide-log-in', color: 'warning' as const, onClick: () => void stepUp.ask() },
 ]
@@ -88,7 +99,7 @@ const bindingError = computed(() => {
       title="May contain secrets"
       :description="
         canSeeSecrets
-          ? 'Bindings are evaluated with your role; secret values are included. The response is never cached.'
+          ? includedText
           : 'Secret values are left out for your role (ContributorWithSecrets is required to see them).'
       "
     />

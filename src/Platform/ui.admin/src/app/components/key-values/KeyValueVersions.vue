@@ -37,10 +37,24 @@ const busy = ref<number>()
 const revealTarget = (version: number): RevealTarget | undefined =>
   context.scope ? { scope: `${context.scope.org}/${context.scope.project}/${context.scope.view}`, key: props.keyName, version } : undefined
 
+// One View or Compare at a time: a newer one, or a move to another view or key, makes the answer of an older one
+// (a View repeated after the step-up, say) arrive for nothing: neither its result, nor its error, nor its loading end.
+let generation = 0
+watch(
+  () => `${context.org}/${context.project}/${context.view}/${props.keyName}`,
+  () => {
+    generation++
+    viewed.value = undefined
+    compared.value = undefined
+    busy.value = undefined
+  },
+)
+
 async function view(entry: KeyValueVersion) {
   if (!context.scope || entry.Version === undefined) {
     return
   }
+  const asked = ++generation
   busy.value = entry.Version
   compared.value = undefined
   // The scope the View asked in, taken before the request: the page may move to another view meanwhile.
@@ -48,26 +62,34 @@ async function view(entry: KeyValueVersion) {
   try {
     const { org, project, view: viewName } = context.scope
     const result = await getKeyValueVersion(org, project, viewName, props.keyName, entry.Version, { reveal: isSecretLevel(entry.Protection) || undefined })
-    viewed.value = { version: entry.Version, value: result.Value ?? '' }
+    if (asked === generation) {
+      viewed.value = { version: entry.Version, value: result.Value ?? '' }
+    }
   } catch (error) {
+    if (asked !== generation) {
+      return
+    }
     viewed.value = { version: entry.Version, error: errorMessage(error) }
     if (isStepUpRequired(error) && target) {
       stepUp.rememberReveal(target)
     }
   } finally {
-    busy.value = undefined
+    if (asked === generation) {
+      busy.value = undefined
+    }
   }
 }
 
 // Back from the step-up that a View of a secret asked for, that View runs once more. The pending View is taken once the
-// versions are there, also when none of them is it.
+// versions and the pair are there, also when none of them is it; never while the key is HYOK, whose versions are not
+// shown (an older server-side version would be).
 watch(
-  () => (versions.data.value ? rows.value : undefined),
+  () => (versions.data.value && !pair.isPending.value ? rows.value : undefined),
   (entries) => {
     if (!entries) {
       return
     }
-    const secrets = canSecrets.value ? entries.filter((entry) => entry.Version !== undefined && isSecretLevel(entry.Protection)) : []
+    const secrets = canSecrets.value && !clientEncrypted.value ? entries.filter((entry) => entry.Version !== undefined && isSecretLevel(entry.Protection)) : []
     const taken = stepUp.takePendingReveal(secrets.flatMap((entry) => revealTarget(entry.Version!) ?? []))
     const pending = taken && secrets.find((entry) => entry.Version === taken.version)
     if (pending) {
@@ -81,17 +103,24 @@ async function compare(entry: KeyValueVersion) {
   if (!context.scope || entry.Version === undefined) {
     return
   }
+  const asked = ++generation
   busy.value = entry.Version
   viewed.value = undefined
   const from = entry.Version - 1
   try {
     const { org, project, view: viewName } = context.scope
     const diff = (await getKeyValueVersionDiffCustom(org, project, viewName, props.keyName, entry.Version, from)) as DiffResult
-    compared.value = { version: entry.Version, from, diff }
+    if (asked === generation) {
+      compared.value = { version: entry.Version, from, diff }
+    }
   } catch (error) {
-    compared.value = { version: entry.Version, from, error: errorMessage(error) }
+    if (asked === generation) {
+      compared.value = { version: entry.Version, from, error: errorMessage(error) }
+    }
   } finally {
-    busy.value = undefined
+    if (asked === generation) {
+      busy.value = undefined
+    }
   }
 }
 

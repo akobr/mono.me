@@ -14,11 +14,32 @@ export const mockStepUpMaxAge = 600
 export const stepUpMessage =
   'This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.'
 
-export const isStaleSignIn = (): boolean => sessionStorage.getItem(staleKey) === 'true'
+/** How old the sign-in of a stale mock session is when it becomes stale: well past the window of 10 minutes. */
+const staleAgeMs = 60 * 60_000
+
+export const isStaleSignIn = (): boolean => sessionStorage.getItem(staleKey) !== null
+
+/**
+ * The time of the stale sign-in (auth_time of the mock token) in milliseconds since the epoch, fixed when it became
+ * stale, so every read until the next change gives the same time; undefined while the sign-in is recent.
+ */
+export function staleSignInTime(): number | undefined {
+  const stored = sessionStorage.getItem(staleKey)
+  if (stored === null) {
+    return undefined
+  }
+  const time = Number(stored)
+  if (Number.isFinite(time) && time > 0) {
+    return time
+  }
+  // a stale state kept by an older version, without its time: fixed from now on
+  setStaleSignIn(true)
+  return Number(sessionStorage.getItem(staleKey))
+}
 
 export function setStaleSignIn(stale: boolean): void {
   if (stale) {
-    sessionStorage.setItem(staleKey, 'true')
+    sessionStorage.setItem(staleKey, String(Date.now() - staleAgeMs))
   } else {
     sessionStorage.removeItem(staleKey)
   }

@@ -5,7 +5,7 @@ import { hasErrorCode, isConflict, setKeyValue, type KeyValue, type KeyValueProt
 import { encryptForRecipients, getHyokPlace } from '@42for.net/2splatform.sdk/hyok'
 import { keyValueFormSchema, type KeyValueForm } from '@/forms/key-value.schema'
 import { toTypedSchema } from '@/forms/typed-schema'
-import { useStepUpStore } from '@/composables/useStepUp'
+import { isSignInStale, useStepUpStore } from '@/composables/useStepUp'
 import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { useKeyValuePolicy, useRecipients } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
@@ -62,10 +62,17 @@ watch(secretDefault, (secret) => {
 // The typed key and value, which the step-up's confirmation says its sign-in loses.
 useDirtySource(() => open.value && (!!values.key?.trim() || !!values.value))
 
-// Before the secret is typed: the redirect of the step-up would lose it.
-watch(protection, (level) => {
-  if (open.value && isSecretLevel(level)) {
-    void stepUp.ensureRecentSignIn()
+// Before the secret is typed: the redirect of the step-up would lose it. The confirmation opens only while the same
+// opening of the dialog still has a secret level once the sign-in was checked (that check may wait for a token).
+let session = 0
+watch(open, () => session++)
+watch(protection, async (level) => {
+  if (!open.value || !isSecretLevel(level)) {
+    return
+  }
+  const asked = session
+  if ((await isSignInStale()) && open.value && asked === session && isSecretLevel(protection.value)) {
+    void stepUp.ask()
   }
 })
 

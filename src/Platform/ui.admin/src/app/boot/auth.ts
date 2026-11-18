@@ -111,17 +111,40 @@ export function authTimeOf(accessToken: string | undefined): number | undefined 
 
 const configurationCacheKey = (apiBaseUrl: string) => `2s-admin:auth-configuration:${apiBaseUrl}`
 
-/** GET v1/auth/configuration (anonymous), cached in sessionStorage for the lifetime of the tab. */
+/**
+ * How long a tab keeps the discovery: an API deployment that turns its step-up on (or changes its window) reaches an
+ * open tab at its first load after that.
+ */
+export const authConfigurationCacheMs = 5 * 60_000
+
+/** The discovery in sessionStorage, with when it was read (milliseconds since the epoch). */
+interface CachedAuthConfiguration {
+  storedAt: number
+  configuration: AuthConfiguration
+}
+
+/** The cached discovery while younger than authConfigurationCacheMs; anything else (an older format, a bad entry) is none. */
+function cachedConfiguration(key: string, now: number): AuthConfiguration | undefined {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(key) ?? 'null') as Partial<CachedAuthConfiguration> | null
+    const age = typeof cached?.storedAt === 'number' ? now - cached.storedAt : Number.NaN
+    return age >= 0 && age < authConfigurationCacheMs ? cached?.configuration : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** GET v1/auth/configuration (anonymous), cached in sessionStorage for authConfigurationCacheMs. */
 export async function loadAuthConfiguration(config: AppConfig): Promise<AuthConfiguration> {
   const key = configurationCacheKey(config.apiBaseUrl)
-  const cached = sessionStorage.getItem(key)
+  const cached = cachedConfiguration(key, Date.now())
 
   if (cached) {
-    return JSON.parse(cached) as AuthConfiguration
+    return cached
   }
 
   const configuration = await getAuthConfiguration()
-  sessionStorage.setItem(key, JSON.stringify(configuration))
+  sessionStorage.setItem(key, JSON.stringify({ storedAt: Date.now(), configuration } satisfies CachedAuthConfiguration))
   return configuration
 }
 
@@ -181,13 +204,20 @@ export async function createAuth(config: AppConfig): Promise<AuthBoot> {
     },
   })
 
+  // auth_time of the last access token the page got. A refresh keeps it, so it stays the sign-in's time for the page.
+  // The step-up's sign-in reads it, not a token: a token request could refresh, fail and start a plain sign-in
+  // (onRefreshFailure) whose PKCE verifier would replace the step-up's.
+  let lastAuthTime: number | undefined
+
   const getAccessToken = async (options?: { forceRefresh?: boolean }) => {
     if (!client.getUser()) {
       return undefined
     }
 
     try {
-      return await client.getAccessToken({ forceRefresh: options?.forceRefresh })
+      const token = await client.getAccessToken({ forceRefresh: options?.forceRefresh })
+      lastAuthTime = authTimeOf(token) ?? lastAuthTime
+      return token
     } catch (error) {
       if (error instanceof LoginRequiredError) {
         return undefined
@@ -211,7 +241,7 @@ export async function createAuth(config: AppConfig): Promise<AuthBoot> {
       getAuthTime,
       signIn: async (options = {}) => {
         const redirect = {
-          state: signInState(options, options.maxAge === undefined ? undefined : await getAuthTime()),
+          state: signInState(options, options.maxAge === undefined ? undefined : lastAuthTime),
           invitationToken: options.invitationToken,
           loginHint: options.loginHint,
         }
