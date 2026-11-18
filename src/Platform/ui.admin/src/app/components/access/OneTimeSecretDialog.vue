@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { MachineAccess } from '@42for.net/2splatform.sdk'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 
 export interface OneTimeSecret {
   title: string
@@ -36,6 +37,8 @@ watch(
 )
 
 const open = computed(() => !!props.secret)
+// Credentials shown once are lost for good by the step-up's sign-in: its confirmation warns while they are open (424-264).
+useDirtySource(() => open.value)
 const clientCredentials = computed(() => props.secret?.credentialKind === 'ClientCredentials')
 // A reset never issues a certificate again (424-82): a Certificate machine has no Reset, a CertificateAndApiKey reset
 // replaces only the API key, and a shared certificate (no kind) is replaced by issuing another one.

@@ -134,8 +134,14 @@ export const useStepUpStore = defineStore('step-up', () => {
     redirecting.value = true
     failure.value = undefined
 
+    // A storage that refuses it (full, or off in the browser) costs only the repeated Reveal, never the sign-in: a throw
+    // here would leave the confirmation redirecting for good.
     if (pendingReveal) {
-      sessionStorage.setItem(pendingRevealKey, JSON.stringify(pendingReveal))
+      try {
+        sessionStorage.setItem(pendingRevealKey, JSON.stringify(pendingReveal))
+      } catch {
+        // the Reveal is not repeated after the return
+      }
     }
 
     // The person confirmed that the unsaved changes are lost.

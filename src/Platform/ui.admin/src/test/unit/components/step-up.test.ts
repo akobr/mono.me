@@ -8,6 +8,7 @@ import { configureStoryteller, deleteKeyValue, getKeyValue, setMemberRole } from
 import type { AuthService, StepUpReturn } from '@/boot/auth'
 import { setBootState } from '@/boot/state'
 import MembersTable from '@/components/access/MembersTable.vue'
+import OneTimeSecretDialog from '@/components/access/OneTimeSecretDialog.vue'
 import TrustedIssuerDialog from '@/components/access/TrustedIssuerDialog.vue'
 import ConfigurationResolved from '@/components/configuration/ConfigurationResolved.vue'
 import KeyValueBulkBar from '@/components/key-values/KeyValueBulkBar.vue'
@@ -17,7 +18,7 @@ import KeyValueImportDialog from '@/components/key-values/KeyValueImportDialog.v
 import KeyValueVersions from '@/components/key-values/KeyValueVersions.vue'
 import StepUpDialog from '@/components/shell/StepUpDialog.vue'
 import { isSignInStale, isSignInTooOld, signedInSince, useStepUpStore } from '@/composables/useStepUp'
-import { hasUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { hasUnsavedChanges, leaveWithoutPrompt } from '@/composables/useUnsavedChanges'
 import { mockHandlers } from '@/mock/all-handlers'
 import { createSeed, loadDb } from '@/mock/db'
 import { setStaleSignIn } from '@/mock/step-up'
@@ -232,6 +233,29 @@ describe('the step-up coordinator', () => {
     expect(document.body.textContent).toContain('The sign-in could not start.')
     expect(useStepUpStore().redirecting).toBe(false)
     expect(button('Sign in again')).toBeDefined()
+  })
+
+  it('signs in also when the browser refuses to keep the Reveal for the return', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError')
+    })
+    try {
+      await mountDialog()
+      const stepUp = useStepUpStore()
+      stepUp.rememberReveal({ scope: 'acme/billing/default', key: 'db.password' })
+
+      await stepUp.ask()
+      await settle()
+      button('Sign in again')!.click()
+      await settle()
+
+      expect(auth.signIn).toHaveBeenCalledOnce()
+      expect(stepUp.failure).toBeUndefined()
+    } finally {
+      setItem.mockRestore()
+      // the sign-in never leaves the page here: the browser asks before unsaved changes go again
+      leaveWithoutPrompt(false)
+    }
   })
 
   // The loop guard: back from a step-up whose sign-in did not move, another redirect would not help.
@@ -634,6 +658,12 @@ describe('the screens', () => {
 
     expect(useStepUpStore().open).toBe(true)
     expect(text()).toContain(lostChanges)
+  })
+
+  it('counts credentials shown once as unsaved changes while they are open', async () => {
+    await mountDialog(OneTimeSecretDialog, { secret: { title: 'Machine created', id: 'machine-1', apiKey: 'k3y' } })
+
+    expect(hasUnsavedChanges()).toBe(true)
   })
 
   it('counts what a dialog holds as unsaved changes, not what it opened with', async () => {
