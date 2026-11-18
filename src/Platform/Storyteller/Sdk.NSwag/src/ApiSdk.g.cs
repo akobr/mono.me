@@ -1427,7 +1427,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -1533,7 +1533,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -1770,7 +1770,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -2023,7 +2023,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -3095,7 +3095,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -3783,7 +3783,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -3803,7 +3803,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Federation rules of machines still reference the name of a deleted issuer (ErrorCode FederatedIssuerInUse); the message names up to 10 machines.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Federation rules of machines still reference the name of a deleted issuer (ErrorCode FederatedIssuerInUse; the message names up to 10 machines): change those rules or delete the machines first. Or the issuer was created or deleted by another request since this one read it (ErrorCode Conflict): reload it and retry, which runs the checks of a create or of a replace again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -4047,7 +4047,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -4433,7 +4433,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -5317,7 +5317,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -5446,7 +5446,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -16698,7 +16698,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="body">Keys, or a key prefix.</param>
-        /// <returns>The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.</returns>
+        /// <returns>The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed. A secret key refused because the user's sign-in is not recent is Forbidden with ErrorCode StepUpRequired: sign in again and restore it again.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<KeyValueBulkResult> RestoreKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
@@ -16710,7 +16710,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="body">Keys, or a key prefix.</param>
-        /// <returns>The outcome per key: Done, NotFound or Failed.</returns>
+        /// <returns>The outcome per key: Done, NotFound, Forbidden or Failed. A key with a secret version, refused because the sign-in is not recent, is Forbidden with ErrorCode StepUpRequired: sign in again and purge it again.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<KeyValueBulkResult> PurgeKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
@@ -16804,7 +16804,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="mode">Merge (default) or Replace.</param>
         /// <param name="dryRun">Report the actions without writing.</param>
         /// <param name="keyPrefix">Replace only the keys under this prefix.</param>
-        /// <returns>The action per item: Create, Update, Unchanged or Delete, with the version after a write.</returns>
+        /// <returns>The action per item: Create, Update, Unchanged or Delete, with the version after a write. An item that failed has an ErrorCode and IsComplete is false; the items before it stay written. A secret item refused because the user's sign-in is not recent has ErrorCode StepUpRequired: sign in again and import again, which leaves the written items Unchanged.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<KeyValueImportResult> ImportKeyValuesAsync(string organization, string project, string view, KeyValueDocument body, string mode = null, bool? dryRun = null, string keyPrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
@@ -17797,7 +17797,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -17946,7 +17946,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing). These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -18401,7 +18401,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -18576,7 +18576,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -18769,7 +18769,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -18849,7 +18849,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="body">Keys, or a key prefix.</param>
-        /// <returns>The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.</returns>
+        /// <returns>The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed. A secret key refused because the user's sign-in is not recent is Forbidden with ErrorCode StepUpRequired: sign in again and restore it again.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<KeyValueBulkResult> RestoreKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
@@ -18985,7 +18985,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="body">Keys, or a key prefix.</param>
-        /// <returns>The outcome per key: Done, NotFound or Failed.</returns>
+        /// <returns>The outcome per key: Done, NotFound, Forbidden or Failed. A key with a secret version, refused because the sign-in is not recent, is Forbidden with ErrorCode StepUpRequired: sign in again and purge it again.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<KeyValueBulkResult> PurgeKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
@@ -19211,7 +19211,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -19545,7 +19545,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -19726,7 +19726,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -19902,7 +19902,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -20059,7 +20059,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)
@@ -20132,7 +20132,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="mode">Merge (default) or Replace.</param>
         /// <param name="dryRun">Report the actions without writing.</param>
         /// <param name="keyPrefix">Replace only the keys under this prefix.</param>
-        /// <returns>The action per item: Create, Update, Unchanged or Delete, with the version after a write.</returns>
+        /// <returns>The action per item: Create, Update, Unchanged or Delete, with the version after a write. An item that failed has an ErrorCode and IsComplete is false; the items before it stay written. A secret item refused because the user's sign-in is not recent has ErrorCode StepUpRequired: sign in again and import again, which leaves the written items Unchanged.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<KeyValueImportResult> ImportKeyValuesAsync(string organization, string project, string view, KeyValueDocument body, string mode = null, bool? dryRun = null, string keyPrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
@@ -20236,7 +20236,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge (RFC 9470) gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable. These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode StepUpRequired and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 403)

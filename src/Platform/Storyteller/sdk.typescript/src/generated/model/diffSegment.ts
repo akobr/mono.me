@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.49.48581
+ * OpenAPI spec version: 0.10.50.58415
  */
 
 export interface DiffSegment {
