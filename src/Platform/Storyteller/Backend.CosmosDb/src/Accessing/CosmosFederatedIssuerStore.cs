@@ -80,7 +80,19 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         return entity is null ? null : ToModel(entity);
     }
 
-    public async Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+    public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+    {
+        return WriteAsync(organization, project, issuer, caller, createOnly: false, cancellationToken);
+    }
+
+    public Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+    {
+        return WriteAsync(organization, project, issuer, caller, createOnly: true, cancellationToken);
+    }
+
+    // A create-only write never replaces: an issuer it finds, or one that appears before the batch creates it (409), is
+    // a conflict.
+    private async Task<FederatedIssuer> WriteAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, bool createOnly, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(issuer);
         ArgumentNullException.ThrowIfNull(caller);
@@ -113,6 +125,10 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
                 Target = AccessAuditTarget.Issuer(issuer.Name),
                 NewValue = AccessAuditValues.Issuer(ToModel(entity)),
             }));
+        }
+        else if (createOnly)
+        {
+            throw new ConflictException($"The trusted issuer '{issuer.Name}' was created concurrently; reload and retry.");
         }
         else
         {

@@ -39,6 +39,16 @@ public class InMemoryFederatedIssuerStore : IFederatedIssuerStore
 
     public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
     {
+        return WriteAsync(organization, project, issuer, createOnly: false);
+    }
+
+    public Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+    {
+        return WriteAsync(organization, project, issuer, createOnly: true);
+    }
+
+    private Task<FederatedIssuer> WriteAsync(string organization, string project, FederatedIssuer issuer, bool createOnly)
+    {
         ArgumentNullException.ThrowIfNull(issuer);
 
         if (!FederationValidation.IsValidName(issuer.Name))
@@ -50,6 +60,11 @@ public class InMemoryFederatedIssuerStore : IFederatedIssuerStore
 
         lock (issuers)
         {
+            if (createOnly && issuers.ContainsKey(issuer.Name))
+            {
+                throw new ConflictException($"The trusted issuer '{issuer.Name}' was created concurrently; reload and retry.");
+            }
+
             if (FederationValidation.ValidateIssuerChange(issuer, issuers.Values) is { } error)
             {
                 throw new InvalidInputException(error, ErrorCodes.InvalidFederation);

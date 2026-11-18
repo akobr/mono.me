@@ -573,7 +573,7 @@ public class FederationHttpTests
         (await Http.PutFederatedIssuer(IssuerRequest(GitHub()), Org, Project, "github")).ShouldBeOfType<OkObjectResult>();
         (await Http.DeleteFederatedIssuer(UserRequest(method: "DELETE"), Org, Project, "github")).ShouldBeOfType<OkResult>();
 
-        _issuerWrites.Writes.Select(write => write.Call).ShouldBe([$"set:{Org}/{Project}/github", $"delete:{Org}/{Project}/github"]);
+        _issuerWrites.Writes.Select(write => write.Call).ShouldBe([$"create:{Org}/{Project}/github", $"delete:{Org}/{Project}/github"]);
         _issuerWrites.Writes[0].Caller.ShouldBeUserCaller();
         _issuerWrites.Writes[1].Caller.ShouldBeUserCaller();
     }
@@ -608,7 +608,7 @@ public class FederationHttpTests
     [Fact]
     public async Task ReplaceIssuerAndRules_WithAStaleSignIn_RequireAStepUp_NewIssuerDoesNot()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()));
 
         await UserOnlyRoutes.ShouldRequireStepUpAsync(() => Http.PutFederatedIssuer(IssuerRequest(Rekeyed()).WithSignIn(TestRequests.StaleSignIn), Org, Project, "github"));
@@ -619,6 +619,20 @@ public class FederationHttpTests
 
         var created = await Http.PutFederatedIssuer(IssuerRequest(GitHub("gitlab")).WithSignIn(TestRequests.StaleSignIn), Org, Project, "gitlab");
         created.ShouldBeOfType<OkObjectResult>();
+    }
+
+    // An issuer that appears between the handler's read and its write is not replaced without the step-up: the create of
+    // a name the handler found free never replaces.
+    [Fact]
+    public async Task PutIssuer_ThatAppearsAfterTheRead_IsNotReplacedWithoutAStepUp()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
+        var http = new FederationHttp(_access, new MissingOnRead(_issuers), _exchange, Options.Create(_options), FunctionTestDoubles.ApiJsonOptions, NullLogger<FederationHttp>.Instance);
+
+        await Should.ThrowAsync<ConflictException>(
+            () => http.PutFederatedIssuer(IssuerRequest(Rekeyed()).WithSignIn(TestRequests.StaleSignIn), Org, Project, "github"));
+
+        ShouldBeIssuer(await _issuers.GetAsync(Org, Project, "github"), GitHub());
     }
 
     [Fact]
@@ -1149,10 +1163,35 @@ public class FederationHttpTests
             return inner.SetAsync(organization, project, issuer, caller, cancellationToken);
         }
 
+        public Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+        {
+            Writes.Add(($"create:{organization}/{project}/{issuer.Name}", caller));
+            return inner.CreateAsync(organization, project, issuer, caller, cancellationToken);
+        }
+
         public Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default)
         {
             Writes.Add(($"delete:{organization}/{project}/{name}", caller));
             return inner.DeleteAsync(organization, project, name, caller, cancellationToken);
         }
+    }
+
+    // A store whose read misses every issuer, as a read before a concurrent create does.
+    private sealed class MissingOnRead(IFederatedIssuerStore inner) : IFederatedIssuerStore
+    {
+        public Task<IReadOnlyList<FederatedIssuer>> ListAsync(string organization, string project, CancellationToken cancellationToken = default)
+            => inner.ListAsync(organization, project, cancellationToken);
+
+        public Task<FederatedIssuer?> GetAsync(string organization, string project, string name, CancellationToken cancellationToken = default)
+            => Task.FromResult<FederatedIssuer?>(null);
+
+        public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+            => inner.SetAsync(organization, project, issuer, caller, cancellationToken);
+
+        public Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+            => inner.CreateAsync(organization, project, issuer, caller, cancellationToken);
+
+        public Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default)
+            => inner.DeleteAsync(organization, project, name, caller, cancellationToken);
     }
 }
