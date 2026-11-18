@@ -217,6 +217,10 @@ public class AccessAuditValuesTests
 
         replaced.Should().NotBe(thumbprint);
 
+        // the rest is still canonical: the same key set indented, with its members in another order, is no change
+        var reindented = "{\n  \"keys\": [\n    { \"e\": \"AQAB\", \"n\": \"" + Modulus + "\", \"kid\": \"\\ud800\", \"kty\": \"RSA\" }\n  ]\n}";
+        AccessAuditValues.Issuer(issuer with { Jwks = reindented }).Should().Be(AccessAuditValues.Issuer(issuer));
+
         static string OneKeyThumbprint(string value)
         {
             var match = System.Text.RegularExpressions.Regex.Match(value, "\"JwksKeys\":1,\"JwksThumbprint\":\"(?<thumbprint>[0-9a-f]{16})\"");

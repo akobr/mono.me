@@ -174,7 +174,7 @@ public static class AccessAuditValues
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
-            // not JSON, or a string that does not decode (a lone surrogate such as \ud800): the text as it is
+            // not JSON, or a member name that does not decode: the text as it is
             return Thumbprint(jwks);
         }
     }
@@ -190,10 +190,23 @@ public static class AccessAuditValues
                     .Select(member => $"{JsonSerializer.Serialize(member.Name)}:{CanonicalMember(member, isRoot)}")) + "}",
             JsonValueKind.Array => "[" + string.Join(",", element.EnumerateArray().Select(item => Canonical(item))) + "]",
 
-            // decoded and written again, so the same text escaped differently (o for o) is the same string
-            JsonValueKind.String => JsonSerializer.Serialize(element.GetString()),
+            JsonValueKind.String => CanonicalString(element),
             _ => element.GetRawText(),
         };
+    }
+
+    // Decoded and written again, so the same text escaped differently ("one" or "\u006fne") is the same string. A string
+    // that does not decode (a lone surrogate such as "\ud800") stays as written, and the rest is still canonical.
+    private static string CanonicalString(JsonElement element)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(element.GetString());
+        }
+        catch (InvalidOperationException)
+        {
+            return element.GetRawText();
+        }
     }
 
     // The keys of a JWKS are a set: their canonical forms are sorted, so the order of the keys is no change.
