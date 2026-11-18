@@ -488,6 +488,80 @@ describe('storytellerFetch step-up', () => {
     expect(read).not.toHaveBeenCalled()
     expect(onStepUpRequired).toHaveBeenCalledOnce()
   })
+
+  it('leaves no unhandled rejection of an async onStepUpRequired that rejects', async () => {
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => unhandled.push(reason)
+    process.on('unhandledRejection', onUnhandled)
+
+    try {
+      const onStepUpRequired = vi.fn(async () => {
+        await Promise.resolve()
+        throw new Error('The sign-in could not start.')
+      })
+      const { fetch } = fakeFetch(stepUp())
+      configure({ fetch, getAccessToken: () => 'token', onStepUpRequired })
+
+      const error = await storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      expect(isStepUpRequired(error)).toBe(true)
+      expect(onStepUpRequired).toHaveBeenCalledOnce()
+      expect(unhandled).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
+  })
+
+  it('gives up on a 401 body that stalls and refreshes the token, cancelling the whole body', async () => {
+    useFakeTimers()
+    const cancelled = vi.fn()
+    const stalled401 = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"Message":'))
+        },
+        cancel: cancelled,
+      }),
+      { status: 401, headers: { 'content-type': 'application/json' } },
+    )
+    const onStepUpRequired = vi.fn()
+    const { fetch, calls } = fakeFetch(stalled401, json({ Id: 'user-1' }))
+    configure({ fetch, getAccessToken: () => 'token', onStepUpRequired })
+
+    const pending = storytellerFetch('/v1/a')
+    await vi.advanceTimersByTimeAsync(4999)
+    expect(calls).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(pending).resolves.toEqual({ Id: 'user-1' })
+    expect(calls).toHaveLength(2)
+    expect(onStepUpRequired).not.toHaveBeenCalled()
+    // the check's branch and the response's own: the transport's stream is cancelled
+    expect(cancelled).toHaveBeenCalledOnce()
+  })
+
+  it("cancels the check's read of a 401 body when the request runs out of time", async () => {
+    useFakeTimers()
+    const cancelled = vi.fn()
+    const stalled401 = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"ErrorCode":'))
+        },
+        cancel: cancelled,
+      }),
+      { status: 401, headers: { 'content-type': 'application/json' } },
+    )
+    const { fetch } = fakeFetch(stalled401)
+    configure({ fetch, getAccessToken: () => 'token', timeoutMs: 1000 })
+
+    const pending = storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(isTimedOut(await pending)).toBe(true)
+    expect(cancelled).toHaveBeenCalledOnce()
+  })
 })
 
 const errorOf = (status: number, body: unknown) => StorytellerError.fromResponse(status, '', body)

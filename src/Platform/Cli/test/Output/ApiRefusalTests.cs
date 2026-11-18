@@ -105,6 +105,31 @@ public class ApiRefusalTests
         refusal.ErrorCode.ShouldBe("StepUpRequired");
     }
 
+    // A body whose members are no scalars (a proxy, a newer API) still gives the step-up its hint, and a 403 the general
+    // sentence: the members are read as absent.
+    [Fact]
+    public void Bodies_WithMembersThatAreNoScalars_ReadThemAsAbsent()
+    {
+        const string body = """{ "Message": { "text": "No." }, "ErrorCode": ["StepUpRequired"] }""";
+        var stepUp = new ApiException(
+            "Unauthorized",
+            401,
+            body,
+            new Dictionary<string, IEnumerable<string>> { ["WWW-Authenticate"] = ["Bearer error=\"insufficient_user_authentication\", max_age=600"] },
+            null);
+
+        var refusal = ApiRefusal.Of(stepUp);
+
+        refusal.Message.ShouldBe("This needs a recent sign-in: a sign-in counts for 10 minutes.");
+        refusal.Hint.ShouldBe(StepUpRefusal.Hint);
+        KeyValueConsoleExtensions.ReadError(stepUp).ShouldBe((null, null));
+
+        var forbidden = ApiRefusal.Of(new ApiException("Forbidden", 403, body, new Dictionary<string, IEnumerable<string>>(), null));
+
+        forbidden.Message.ShouldBe(ApiRefusal.GeneralMessage);
+        forbidden.MayBeTheCredentials.ShouldBeTrue();
+    }
+
     [Fact]
     public void StepUp_WithoutAWindowOrAMessage_IsTheSentenceAlone()
     {

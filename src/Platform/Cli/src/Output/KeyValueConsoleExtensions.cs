@@ -322,12 +322,18 @@ public static class KeyValueConsoleExtensions
         try
         {
             var body = JObject.Parse(exception.Response);
-            return (body["Message"]?.Value<string>(), body["ErrorCode"]?.Value<string>());
+            return (Scalar(body["Message"]), Scalar(body["ErrorCode"]));
         }
         catch (Newtonsoft.Json.JsonException)
         {
             return (exception.Response.Length > 200 ? exception.Response[..200] : exception.Response, null);
         }
+    }
+
+    // A member that is an object or an array is absent: whatever a proxy sends, the read of an error never throws.
+    private static string? Scalar(JToken? token)
+    {
+        return token is JValue value ? (string?)value : null;
     }
 
     private static int ModulusBits(RsaJsonWebKey? key)

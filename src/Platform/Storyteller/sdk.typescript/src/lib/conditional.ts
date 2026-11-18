@@ -6,8 +6,9 @@ import { StorytellerError } from './errors'
 import { readBody, runRequest, type StorytellerRequestInit } from './fetcher'
 
 /**
- * Why a resolved read left its secret bindings unresolved (X-2S-Secrets-Withheld); the read is a 200 either way, and the
- * header holds one reason:
+ * Why a resolved read left its secret bindings unresolved (X-2S-Secrets-Withheld). The header comes on a 200 and on a
+ * 304: a 304 to the ETag of a withheld 200 carries it as well, and the cached document is still the unresolved one, so
+ * check secretsWithheld also when notModified is true. It holds one reason:
  * - mtls-required: a machine with Secrets.Read but no mTLS, when the project delivers secrets only over mTLS;
  * - actor-restricted: a user acting through an actor (the MCP server) whose restrictions withhold secret values;
  * - step-up-required: a user whose role reads secrets, but whose last sign-in is older than the API's step-up window.

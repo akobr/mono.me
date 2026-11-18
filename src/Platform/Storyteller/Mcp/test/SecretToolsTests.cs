@@ -124,9 +124,9 @@ public class SecretToolsTests
         var notice = SecretsWithheldNotice.For("step-up-required");
         result.IsError.ShouldNotBe(true);
         result.Text().ShouldStartWith(notice + "\n{");
-        notice.ShouldStartWith("The API left the secret bindings unresolved (step-up-required): their values are the expressions as stored");
+        notice.ShouldStartWith("The API withheld the access to secrets (step-up-required): any secret binding stays unresolved, its value the expression as stored");
         notice.ShouldContain("signed in longer ago");
-        notice.ShouldContain("sign out at the identity provider first (for AuthKit, Sign out in the admin UI)");
+        notice.ShouldContain("sign out at the identity provider first (for AuthKit, open the admin UI in that browser, sign in if it asks, then use its Sign out)");
         notice.ShouldContain("reconnect the MCP server");
         notice.ShouldContain("The assistant cannot do this itself.");
         var content = result.StructuredContent!.Value;
@@ -138,14 +138,14 @@ public class SecretToolsTests
     [Theory]
     [InlineData("actor-restricted", "NoSecretReveal")]
     [InlineData("mtls-required", "mTLS")]
-    [InlineData("something-new", "their values are the expressions as stored.")]
+    [InlineData("something-new", "its value the expression as stored.")]
     public async Task GetResolvedConfiguration_WithOtherReasons_NamesThem(string reason, string expected)
     {
         SetupResolved(new Sdk.Configuration { AnnotationKey = "sbt.northwind", Content = new JObject() }, reason);
 
         var result = await Tools().GetResolvedConfiguration("house", "main", "sbt.northwind");
 
-        result.Text().ShouldStartWith($"The API left the secret bindings unresolved ({reason})");
+        result.Text().ShouldStartWith($"The API withheld the access to secrets ({reason})");
         result.Text().ShouldContain(expected);
         result.StructuredContent!.Value.GetProperty(SecretsWithheldNotice.ReasonProperty).GetString().ShouldBe(reason);
     }

@@ -34,16 +34,24 @@ public static class ApiErrors
     public const string StepUpRequiredCode = Sdk.StepUp.ErrorCode;
 
     // The MCP client signs the person in at the identity provider itself and cannot ask it for a new sign-in (max_age); a
-    // token exchange copies the old time of the sign-in.
-    public const string StepUpRemedy =
+    // token exchange copies the old time of the sign-in. The admin UI's Sign out ends the AuthKit session only while the
+    // admin UI has a session of its own, so the person signs in there first.
+    public const string SignOutFirst =
         "A reconnect that reuses the person's browser session keeps the old sign-in: ask the person to sign out at the "
-        + "identity provider first (for AuthKit, Sign out in the admin UI), then reconnect the MCP server in the client and "
-        + "retry, or to make the change in the admin UI. The assistant cannot do this itself.";
+        + "identity provider first (for AuthKit, open the admin UI in that browser, sign in if it asks, then use its Sign "
+        + "out), then reconnect the MCP server in the client";
 
-    // A restore or a purge answers 200 and refuses each secret it may not touch for a stale sign-in with this code.
+    public const string StepUpRemedy =
+        SignOutFirst + " and retry, or to make the change in the admin UI. The assistant cannot do this itself.";
+
+    // A restore or a purge answers 200 and refuses each secret it may not touch for a stale sign-in with this code. A
+    // prefix selects the keys that match when each request runs, so the retry names the refused keys, never the prefix:
+    // a purge by the prefix again could remove for good a key deleted meanwhile.
     public const string StepUpItemsNotice =
         "The items with ErrorCode StepUpRequired were refused because the person's sign-in is not recent: the Storyteller "
-        + "API needs a recent sign-in of the person for secret values. " + StepUpRemedy;
+        + "API needs a recent sign-in of the person for secret values. " + SignOutFirst + ", and retry only those items: "
+        + "pass their keys in 'keys' (at most 100 per call), not the original 'keyPrefix'. Or make the change in the admin "
+        + "UI. The assistant cannot do the sign-in itself.";
 
     // The text of a step-up, with the window written out when the API names it ("within the last 10 minutes").
     public static string StepUpRequiredMessage(TimeSpan? maxAge)

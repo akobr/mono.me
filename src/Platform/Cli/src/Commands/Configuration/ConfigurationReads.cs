@@ -40,13 +40,17 @@ internal static class ConfigurationReads
     }
 
     // What gets the secrets of a resolved read that the API withheld (X-2S-Secrets-Withheld), per reason; null for a
-    // reason this sform does not know.
-    public static string? WithheldHint(string? reason)
+    // reason this sform does not know. storedKey is the key of a configuration that a write (config set -r) has already
+    // stored: after a new sign-in it is read again, never written again, which could add array items twice or overwrite
+    // a change someone made meanwhile.
+    public static string? WithheldHint(string? reason, string? storedKey = null)
     {
         return reason switch
         {
             SecretsWithheldReasons.MtlsRequired => "A machine receives secrets over mTLS with its certificate, or from a project that does not require mTLS for secret delivery.",
             SecretsWithheldReasons.ActorRestricted => "The sign-in acts through an actor that may not reveal secrets (NoSecretReveal), and a new sign-in does not change that: read it with a sign-in of your own.",
+            SecretsWithheldReasons.StepUpRequired when storedKey is not null =>
+                $"The configuration is stored. Its secrets need a recent sign-in: {StepUpRefusal.SignInSteps}, and read it with 'sform story config {storedKey} -r'; do not repeat the write.",
             SecretsWithheldReasons.StepUpRequired => "Secrets need a recent sign-in: " + StepUpRefusal.Remedy,
             _ => null,
         };

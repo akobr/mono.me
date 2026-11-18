@@ -119,12 +119,17 @@ Without `Secrets.Read` or such a sign-in, the API withholds the secrets (`X-2S-S
 
 1. An Administrator enables `Certificate` for the project. `sform account machine machine-auth` prints the policy. With `-k` it sets the whole policy, so name the kinds it printed, the default kind first, add `-k certificate`, and add `-l` when the project has a certificate lifetime of its own.
 2. A user with the `ContributorWithSecrets` role creates the machine with `Secrets.Read` and writes its certificate to a file. `machine create` prints the password of the certificate once. Where the API turns its step-up on (by default under AuthKit), creating the machine needs a recent sign-in of that user (the last 10 minutes by default): an older session ends with exit code `44` and `StepUpRequired`, and [Sign in](https://42for.net/cli/sform#sign-in) says how to sign in again.
-3. The repository gets two secrets: `STORYTELLER_CERTIFICATE_BASE64`, the file in base64 on one line, and `STORYTELLER_CERTIFICATE_PASSWORD`, the password. Then delete the file.
+3. Only once `machine create` succeeded (exit code `0`) and printed the password, the repository gets two secrets: `STORYTELLER_CERTIFICATE_BASE64`, the file in base64 on one line, and `STORYTELLER_CERTIFICATE_PASSWORD`, the password. Then delete the file. Any other exit code, such as `44` for a sign-in that is not recent, leaves no new certificate, and a `storyteller.pfx` left from before is not it: sign in again and run `machine create` again before you upload either secret.
 
 ```bash
 sform account machine machine-auth                              # the enabled kinds, the default kind and the lifetime
 sform account machine machine-auth -k api-key -k certificate    # the kinds it printed, and certificate
 sform account machine create -r --scope secrets-read -k certificate -o storyteller.pfx
+```
+
+Then, once it succeeded:
+
+```bash
 base64 -w0 storyteller.pfx | gh secret set STORYTELLER_CERTIFICATE_BASE64
 gh secret set STORYTELLER_CERTIFICATE_PASSWORD                  # paste the password that machine create printed
 rm storyteller.pfx

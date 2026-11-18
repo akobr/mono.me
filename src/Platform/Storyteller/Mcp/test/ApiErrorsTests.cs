@@ -211,7 +211,8 @@ public class ApiErrorsTests
             "Storyteller API answered 401 StepUpRequired: The Storyteller API needs a recent sign-in of the person for this (within the last "
             + "10 minutes): reading or writing secret values, creating or resetting machine credentials, changing federation rules. A "
             + "reconnect that reuses the person's browser session keeps the old sign-in: ask the person to sign out at the identity "
-            + "provider first (for AuthKit, Sign out in the admin UI), then reconnect the MCP server in the client and retry, or to make "
+            + "provider first (for AuthKit, open the admin UI in that browser, sign in if it asks, then use its Sign out), then reconnect "
+            + "the MCP server in the client and retry, or to make "
             + "the change in the admin UI. The assistant cannot do this itself.");
         var content = result.StructuredContent!.Value;
         content.GetProperty("Status").GetInt32().ShouldBe(401);

@@ -98,7 +98,7 @@ public class ConfigSetCommand : BaseContextCommand
 
                 if (secretsWithheld is not null)
                 {
-                    var hint = ConfigurationReads.WithheldHint(secretsWithheld);
+                    var hint = ConfigurationReads.WithheldHint(secretsWithheld, storedKey: AnnotationKey);
                     Console.WriteErrorLine($"Warning: the API withheld the secrets of the configuration ({secretsWithheld}): the values of secret bindings are their expressions.{(hint is null ? string.Empty : " " + hint)}");
                 }
             }

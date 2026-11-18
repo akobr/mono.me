@@ -14,9 +14,10 @@ export interface StorytellerConfig {
    * Called for a 401 StepUpRequired (isStepUpRequired), right before the request fails with it: the operation needs a
    * recent sign-in, and a token refresh keeps the time of the last one, so the request is neither refreshed nor
    * retried and onUnauthorized is not called. For example to ask the person to sign in again with max_age
-   * (stepUpMaxAge gives the window the API counts).
+   * (stepUpMaxAge gives the window the API counts). It is not awaited; what it throws or rejects with is ignored, and
+   * the request fails with the step-up either way.
    */
-  onStepUpRequired?: (error: StorytellerError) => void
+  onStepUpRequired?: (error: StorytellerError) => void | PromiseLike<void>
   /** Transport override for tests and special hosts. Defaults to the global fetch. */
   fetch?: typeof globalThis.fetch
   /** Extra headers on every request, for example X-Client. */
@@ -190,20 +191,40 @@ async function perform<T>(
 }
 
 /**
+ * The longest the step-up check waits for the body of a 401, in milliseconds. The API sends its small body at once, so a
+ * body that takes longer (a proxy that stalls) is no step-up, and the 401 takes its usual path: the refresh still runs.
+ */
+const stepUpProbeMs = 5_000
+
+/**
  * Throws the StorytellerError of a step-up 401 after onStepUpRequired. Only a 401 with a JSON body can be one; it is
- * read on a clone within the attempt's signal, so the response itself stays unread for read and for the cancel before
- * the retry. An abort or the deadline during that read is the request's failure; a body that cannot be read is no
- * step-up, and the 401 takes its usual path.
+ * read on a clone within the attempt's signal and its own bound (stepUpProbeMs), so the response itself stays unread for
+ * read and for the cancel before the retry. Either one ends the read and cancels the clone's branch, so with the
+ * response's own branch cancelled as well the transport lets go of the body. An abort or the deadline during that read
+ * is the request's failure; a body that cannot be read, or not within the bound, is no step-up, and the 401 takes its
+ * usual path.
  */
 async function failOnStepUp(current: StorytellerConfig, response: Response, attempt: Attempt): Promise<void> {
   if (response.status !== 401 || !response.body || !isJson(response.headers.get('content-type') ?? '')) {
     return
   }
 
+  const probe = response.clone()
+  const stop = new AbortController()
+  const onAbort = () => stop.abort(attempt.signal?.reason)
+  const timer = setTimeout(() => stop.abort(new DOMException('The body of the 401 did not arrive in time.', 'TimeoutError')), stepUpProbeMs)
+  unref(timer)
+
+  if (attempt.signal?.aborted) {
+    onAbort()
+  } else {
+    attempt.signal?.addEventListener('abort', onAbort, { once: true })
+  }
+
   let error: StorytellerError
 
   try {
-    const body = await race(() => readBody(response.clone()), attempt.signal)
+    const body = await race(() => readProbe(probe, stop.signal), stop.signal)
     error = StorytellerError.fromResponse(response.status, response.statusText, body)
   } catch (caught) {
     if (!attempt.signal?.aborted) {
@@ -212,6 +233,9 @@ async function failOnStepUp(current: StorytellerConfig, response: Response, atte
 
     discard(response)
     throw failure(caught, attempt)
+  } finally {
+    clearTimeout(timer)
+    attempt.signal?.removeEventListener('abort', onAbort)
   }
 
   if (!isStepUpRequired(error)) {
@@ -220,14 +244,66 @@ async function failOnStepUp(current: StorytellerConfig, response: Response, atte
 
   // The clone read the whole body; the response's own copy of it is not needed.
   discard(response)
-  // A hook that fails must not hide the step-up from the caller, whose own handling needs its error.
+  // A hook that fails must not hide the step-up from the caller, whose own handling needs its error. The rejection of an
+  // async hook is the hook's too: never an unhandled rejection, which could end a Node process.
   try {
-    current.onStepUpRequired?.(error)
+    const pending: unknown = current.onStepUpRequired?.(error)
+
+    if (isThenable(pending)) {
+      pending.then(undefined, () => undefined)
+    }
   } catch {
     // the request fails with the step-up below
   }
 
   throw error
+}
+
+/** The body of the step-up check as readBody reads JSON, through a reader that the signal cancels. */
+async function readProbe(probe: Response, signal: AbortSignal): Promise<unknown> {
+  const reader = probe.body!.getReader()
+  const cancel = () => {
+    reader.cancel(signal.reason).catch(() => undefined)
+  }
+  signal.addEventListener('abort', cancel, { once: true })
+
+  try {
+    const decoder = new TextDecoder()
+    let text = ''
+
+    for (;;) {
+      const { done, value } = await reader.read()
+
+      if (done) {
+        break
+      }
+
+      text += decoder.decode(value, { stream: true })
+    }
+
+    // A cancelled read ends as done: what it read is no whole body.
+    if (signal.aborted) {
+      throw signal.reason
+    }
+
+    text += decoder.decode()
+
+    if (text.length === 0) {
+      return undefined
+    }
+
+    try {
+      return JSON.parse(text) as unknown
+    } catch {
+      return text
+    }
+  } finally {
+    signal.removeEventListener('abort', cancel)
+  }
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (typeof value === 'object' || typeof value === 'function') && value !== null && typeof (value as { then?: unknown }).then === 'function'
 }
 
 async function send(current: StorytellerConfig, target: string, init: RequestInit, forceRefresh: boolean, attempt: Attempt): Promise<Response> {
