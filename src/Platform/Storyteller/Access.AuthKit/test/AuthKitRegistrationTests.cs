@@ -83,10 +83,10 @@ public class AuthKitRegistrationTests
 
     [Theory]
     [InlineData("https://2s.42for.net", "https://2s.42for.net")]
-    [InlineData(" https://2s.42for.net ", " https://2s.42for.net ")]
+    [InlineData(" https://2s.42for.net ", "https://2s.42for.net")]
     [InlineData(" ", null)]
     [InlineData(null, null)]
-    public void GetAudiences_WithoutAList_IsTheSingleValueAsConfigured(string? audience, string? expected)
+    public void GetAudiences_WithoutAList_IsTheSingleValueTrimmed(string? audience, string? expected)
     {
         var options = new AuthKitOptions { Audience = audience };
 
