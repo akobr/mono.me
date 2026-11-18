@@ -157,6 +157,8 @@ internal sealed class RecordingKeyValueService : IKeyValueService
     // The items restore and purge answer; none by default.
     public List<KeyValueBulkItemResult> BulkItems { get; set; } = [];
 
+    public List<KeyValueImportItemResult> ImportItems { get; set; } = [];
+
     public List<KeyValueVersion> Versions { get; set; } = [];
 
     public static KeyValue Public(string key, string value) => Create(key, KeyValueProtection.Public, value);
@@ -273,7 +275,7 @@ internal sealed class RecordingKeyValueService : IKeyValueService
             throw KeyValueErrors.SecretRightsRequired(secret.Key);
         }
 
-        return Task.FromResult(new KeyValueImportResult { IsDryRun = options.DryRun, IsComplete = true, Items = [] });
+        return Task.FromResult(new KeyValueImportResult { IsDryRun = options.DryRun, IsComplete = ImportItems.All(item => item.ErrorCode is null), Items = [.. ImportItems] });
     }
 
     public Task<KeyValueLookup?> LookupAsync(string organization, string project, string view, string key, bool includeSecrets)

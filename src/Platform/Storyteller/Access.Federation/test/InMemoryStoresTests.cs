@@ -67,6 +67,22 @@ public class InMemoryStoresTests
         (await store.GetAsync("org1", "proj1", "cluster"))!.Description.ShouldBeNull();
     }
 
+    // A replace never creates: an issuer deleted after the caller found it stays deleted.
+    [Fact]
+    public async Task IssuerStore_ReplacesOnly_AnIssuerThatExists()
+    {
+        var store = new InMemoryFederatedIssuerStore();
+
+        await Should.ThrowAsync<ConflictException>(() => store.ReplaceAsync("org1", "proj1", Issuer("cluster"), Caller));
+        (await store.GetAsync("org1", "proj1", "cluster")).ShouldBeNull();
+
+        await store.CreateAsync("org1", "proj1", Issuer("cluster"), Caller);
+        await store.ReplaceAsync("org1", "proj1", Issuer("cluster") with { Description = "Replaced" }, Caller);
+        (await store.GetAsync("org1", "proj1", "cluster"))!.Description.ShouldBe("Replaced");
+
+        await Should.ThrowAsync<InvalidInputException>(() => store.ReplaceAsync("org1", "proj1", Issuer("cluster") with { Issuer = "https://other.example" }, Caller));
+    }
+
     [Fact]
     public async Task IssuerStore_DeletesOnce()
     {

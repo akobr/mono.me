@@ -215,9 +215,10 @@ public static class HttpRequestDataExtensions
     }
 
     // How recent the sign-in of the user is (Auth:StepUp), as the bearer middleware judged it. Machines never need a
-    // step-up. A user request without the judgement never passed the bearer middleware: it needs none where the host's
-    // settings turn the step-up off for its provider, and none in Debug builds (DEV_AUTH, which serve requests without an
-    // identity); otherwise, also where the host registers no settings, it is not recent.
+    // step-up. A user request without the judgement never passed the bearer middleware: it is not recent where the host's
+    // settings turn the step-up on for its provider (in Debug builds only an explicit Enabled true does) and needs none
+    // where they turn it off; where the host registers no settings, it needs none in Debug builds (DEV_AUTH, which serve
+    // requests without an identity) and is not recent otherwise.
     public static SignInRecency GetSignInRecency(this HttpRequestData @this)
     {
         if (@this.IsApplicationIdentity())
@@ -234,9 +235,13 @@ public static class HttpRequestDataExtensions
         var options = services?.GetService<IOptions<StepUpOptions>>()?.Value;
         var provider = services?.GetService<IOptions<UserAuthenticationOptions>>()?.Value.Provider;
 
-        if (options is not null && provider is { } kind && !options.IsEnabledFor(kind, IsDevelopmentAuthentication))
+        if (options is not null && provider is { } kind)
         {
-            return SignInRecency.NotRequired(options.MaxAge);
+            // Turned on for the provider, in a Debug build only by Enabled true: a request without the judgement has no
+            // sign-in to count.
+            return options.IsEnabledFor(kind, IsDevelopmentAuthentication)
+                ? SignInRecency.Stale(options.MaxAge)
+                : SignInRecency.NotRequired(options.MaxAge);
         }
 
         var maxAge = options?.MaxAge ?? StepUpOptions.DefaultMaxAge;

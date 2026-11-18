@@ -247,7 +247,7 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueBulkRequest), Required = true, Description = "Keys, or a key prefix.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueBulkResult), Description = "The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueBulkResult), Description = "The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed. A secret key refused because the user's sign-in is not recent is Forbidden with ErrorCode StepUpRequired: sign in again and restore it again.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementKeyValueManage)]
@@ -285,7 +285,7 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueBulkRequest), Required = true, Description = "Keys, or a key prefix.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueBulkResult), Description = "The outcome per key: Done, NotFound or Failed.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueBulkResult), Description = "The outcome per key: Done, NotFound, Forbidden or Failed. A key with a secret version, refused because the sign-in is not recent, is Forbidden with ErrorCode StepUpRequired: sign in again and purge it again.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
@@ -561,7 +561,7 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.DryRun, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "Report the actions without writing.")]
     [OpenApiParameter(Definitions.Parameters.KeyPrefix, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "Replace only the keys under this prefix.")]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueDocument), Required = true, Description = "The document.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueImportResult), Description = "The action per item: Create, Update, Unchanged or Delete, with the version after a write.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueImportResult), Description = "The action per item: Create, Update, Unchanged or Delete, with the version after a write. An item that failed has an ErrorCode and IsComplete is false; the items before it stay written. A secret item refused because the user's sign-in is not recent has ErrorCode StepUpRequired: sign in again and import again, which leaves the written items Unchanged.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The document is invalid (ImportInvalid, with the failing items in Details); nothing was written.")]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredKeyValueImport)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A level is not allowed in the project (ProtectionNotAllowed).")]
@@ -601,6 +601,7 @@ public class KeyValuesHttp
         var result = await KeyValueAuthorization.UnderSecretWriteRuleAsync(
             rights,
             () => _keyValues.ImportAsync(organization, project, view, document, options, rights.Caller));
+        result = KeyValueAuthorization.WithStepUpOutcomes(rights, result);
 
         _logger.LogInformation("Key/value import into {Organization}/{Project}/{View}: {Count} items, dry run {DryRun}", organization, project, view, result.Items.Count, result.IsDryRun);
         return new OkObjectResult(result);

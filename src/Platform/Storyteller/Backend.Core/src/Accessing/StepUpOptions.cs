@@ -18,9 +18,10 @@ public class StepUpOptions
     public static readonly TimeSpan ClockSkew = TimeSpan.FromMinutes(5);
 
     // Null: on under AuthKit, whose access tokens carry auth_time and whose clients (the admin UI) can ask for a new sign-in
-    // with max_age; off under Entra ID, whose access tokens carry no auth_time, and under Keycloak, where no client of the
-    // platform can ask for one yet; off in Debug builds (DEV_AUTH) whatever the provider. True or false decides in every
-    // build; true refuses every user token without auth_time.
+    // with max_age; off under Entra ID, whose access tokens carry auth_time only when the API registration adds it as an
+    // optional claim (not by default), and under Keycloak, where no client of the platform can ask for one yet; off in
+    // Debug builds (DEV_AUTH) whatever the provider. True or false decides in every build; true refuses every user token
+    // without auth_time.
     public bool? Enabled { get; set; }
 
     // The oldest sign-in that still counts, in whole seconds.

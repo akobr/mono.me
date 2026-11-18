@@ -110,8 +110,9 @@ public class MembersHttp
         request.EnsureUser();
         var caller = request.GetAccessCaller();
 
-        // Removing another member needs a recent sign-in (Auth:StepUp); leaving, the way the service tells it, does not.
-        if (!string.Equals(request.GetIdentityUniqueId(), accountId, StringComparison.Ordinal))
+        // Removing another member needs a recent sign-in (Auth:StepUp); leaving, the way the service tells it (the actor
+        // of the caller), does not.
+        if (!string.Equals(caller.Actor.Id, accountId, StringComparison.Ordinal))
         {
             request.EnsureRecentSignIn();
         }

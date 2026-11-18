@@ -242,6 +242,12 @@ public class CosmosKeyValueService : IKeyValueService
 
             if (options.Permanent)
             {
+                // It removes every version, so a secret one among them needs the secret rights as well.
+                if (!caller.CanWriteSecrets && await HasSecretVersionAsync(place, existing.Key))
+                {
+                    throw KeyValueErrors.SecretRightsRequired(existing.Key);
+                }
+
                 await PermanentlyDeleteAsync(place, existing, etag!);
                 await RecordWriteAsync(place, caller, existing, KeyValueAuditOperation.PermanentDelete, previous: null);
                 return true;
@@ -996,6 +1002,28 @@ public class CosmosKeyValueService : IKeyValueService
         return true;
     }
 
+    // Whether a stored version of the key is a secret: the history items, which keep their level until they expire.
+    private async Task<bool> HasSecretVersionAsync(Place place, string key)
+    {
+        var query = new QueryDefinition("SELECT VALUE COUNT(1) FROM c WHERE STARTSWITH(c.id, @prefix) AND c.Content.Protection != @public")
+            .WithParameter("@prefix", GetVersionIdPrefix(KeyValueRules.Normalize(key)))
+            .WithParameter("@public", nameof(KeyValueProtection.Public));
+        var count = 0;
+
+        using var iterator = place.Container.GetItemQueryIterator<int>(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = place.PartitionKey });
+
+        while (iterator.HasMoreResults)
+        {
+            var page = await iterator.ReadNextAsync();
+            LogCharge("secret-versions", place, page.RequestCharge);
+            count += page.Sum();
+        }
+
+        return count > 0;
+    }
+
     private async Task<IReadOnlyList<string>> QueryIdsAsync(Place place, string idPrefix)
     {
         var query = new QueryDefinition("SELECT VALUE c.id FROM c WHERE STARTSWITH(c.id, @prefix)")
@@ -1182,7 +1210,8 @@ public class CosmosKeyValueService : IKeyValueService
             return new KeyValueBulkItemResult { Key = key, Outcome = KeyValueBulkOutcome.NotFound };
         }
 
-        if (existing.Content.Protection.IsSecret() && !caller.CanWriteSecrets)
+        // A purge removes every version: a secret one among them needs the secret rights as well.
+        if (!caller.CanWriteSecrets && (existing.Content.Protection.IsSecret() || await HasSecretVersionAsync(place, existing.Key)))
         {
             return new KeyValueBulkItemResult { Key = key, Outcome = KeyValueBulkOutcome.Forbidden, ErrorCode = ErrorCodes.AccessDenied };
         }
@@ -1535,6 +1564,9 @@ public class CosmosKeyValueService : IKeyValueService
                 {
                     return item.ToResult(existing?.Version);
                 }
+
+                // The plan checked the version it read; a key that became a secret since needs the secret rights too.
+                EnsureSecretWriteRights(existing, existing.Content.Protection, caller);
 
                 if (await TrySoftDeleteAsync(place, existing, etag!, caller.Actor))
                 {

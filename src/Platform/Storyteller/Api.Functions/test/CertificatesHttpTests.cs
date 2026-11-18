@@ -67,7 +67,8 @@ public class CertificatesHttpTests
         var certificate = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<SharedCertificate>();
         certificate.Label.ShouldBe("build-agent");
         certificate.Thumbprint.ShouldBe("THUMBPRINT");
-        backend.Calls.ShouldBe(["policy:acme.billing", "label:acme.billing:build-agent", "issue:acme.billing:build-agent:30", "store:acme.billing:THUMBPRINT"]);
+        // The policy before the step-up, and again by the issue itself.
+        backend.Calls.ShouldBe(["policy:acme.billing", "policy:acme.billing", "label:acme.billing:build-agent", "issue:acme.billing:build-agent:30", "store:acme.billing:THUMBPRINT"]);
     }
 
     // The access audit records who issued and who revoked a shared certificate, and the request it came with.
@@ -103,15 +104,18 @@ public class CertificatesHttpTests
     }
 
     // A shared certificate belongs to CertificateAndApiKey: a project without that kind gets a coded 400 and no
-    // certificate.
-    [Fact]
-    public async Task PostSharedCertificate_ProjectWithoutCertificateAndApiKey_IsBadRequestWithMachineAccessNotSupported()
+    // certificate, also with a stale sign-in: a new sign-in cannot change the policy, so it comes before the step-up.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PostSharedCertificate_ProjectWithoutCertificateAndApiKey_IsBadRequestWithMachineAccessNotSupported(bool stale)
     {
         var backend = new SharedCertificateBackend { EnabledCredentialKinds = [MachineCredentialKind.ApiKey] };
         var http = CreateHttp(backend.CreateService());
         var body = FunctionTestDoubles.ToJsonBody(new SharedCertificateCreate { Label = "build-agent" });
+        var request = stale ? UserRequest(body).WithSignIn(TestRequests.StaleSignIn) : UserRequest(body);
 
-        var result = await http.PostSharedCertificate(UserRequest(body), "acme", "billing");
+        var result = await http.PostSharedCertificate(request, "acme", "billing");
 
         var badRequest = result.ShouldBeOfType<ObjectResult>();
         badRequest.StatusCode.ShouldBe((int)HttpStatusCode.BadRequest);

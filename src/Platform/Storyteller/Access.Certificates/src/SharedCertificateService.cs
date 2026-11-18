@@ -27,6 +27,19 @@ public class SharedCertificateService
         _logger = logger;
     }
 
+    // Shared certificates follow CertificateAndApiKey: MachineAccessNotSupportedException when the project does not enable it.
+    // Listing and revoking stay open, to clean up. IssueAsync checks it too.
+    public async Task EnsureIssuableAsync(string organization, string project)
+    {
+        var policy = await _policyStore.GetEffectiveAsync(organization, project, _options.Value);
+
+        if (!policy.AllowsSharedCertificates())
+        {
+            throw new MachineAccessNotSupportedException(
+                $"The project {organization}.{project} does not enable {MachineCredentialKind.CertificateAndApiKey}, which shared certificates belong to.");
+        }
+    }
+
     public async Task<SharedCertificate> IssueAsync(
         string organization,
         string project,
@@ -35,14 +48,7 @@ public class SharedCertificateService
         AccessCaller caller)
     {
         var opts = _options.Value;
-        var policy = await _policyStore.GetEffectiveAsync(organization, project, opts);
-
-        // Shared certificates follow CertificateAndApiKey; listing and revoking stay open, to clean up.
-        if (!policy.AllowsSharedCertificates())
-        {
-            throw new MachineAccessNotSupportedException(
-                $"The project {organization}.{project} does not enable {MachineCredentialKind.CertificateAndApiKey}, which shared certificates belong to.");
-        }
+        await EnsureIssuableAsync(organization, project);
 
         var lifetimeDays = Math.Clamp(
             requestedLifetimeDays ?? opts.CertificateLifetimeDays,

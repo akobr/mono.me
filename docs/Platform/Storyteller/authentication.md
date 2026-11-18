@@ -636,13 +636,13 @@ A valid session is not enough for what an attacker wants most: secret values, ro
 Both are bound and checked at start. The defaults follow what the provider's tokens carry and what its clients can do:
 
 - **AuthKit** is on: every access token carries `auth_time`, and the admin UI asks AuthKit for a new sign-in with `max_age`.
-- **Entra ID** is off: its access tokens carry no `auth_time`. Its own step-up is Conditional Access with authentication contexts, which the API does not use.
+- **Entra ID** is off: its access tokens carry no `auth_time` by default (the API registration can add it as an optional claim). Its own step-up is Conditional Access with authentication contexts, which the API does not use.
 - **Keycloak** is off: its access tokens carry `auth_time`, but no client of the platform signs in with Keycloak yet, so none could ask for a new sign-in.
-- **Debug builds** (`DEV_AUTH`) leave it off whatever the provider, as they skip the other checks of users. A set `Enabled` decides in every build, so a local API can try the step-up against AuthKit staging.
+- **Debug builds** (`DEV_AUTH`) leave it off whatever the provider, as they skip the other checks of users. A set `Enabled` decides in every build, so a local API can try the step-up against AuthKit staging; with `true`, a request without a token, which a Debug build serves, has no sign-in to count either.
 
 The [discovery endpoint](#discovery-endpoint) publishes the outcome for this build and provider as `"StepUp": { "Enabled": true, "MaxAge": 600 }`, the window in seconds, so clients can show it and tell a stale session before they call.
 
-The deployment sets both through optional Bicep parameters, `stepUpEnabled` and `stepUpMaxAge` ([`src/Platform/Deployment`](../../../src/Platform/Deployment/README.md#parameters)), so a changed window, or the escape hatch `false`, survives the next run of the templates.
+The deployment sets both through optional Bicep parameters, `stepUpEnabled` and `stepUpMaxAgeSeconds` (60 to 86400, which the build checks; [`src/Platform/Deployment`](../../../src/Platform/Deployment/README.md#parameters)), so a changed window, or the escape hatch `false`, survives the next run of the templates.
 
 ### What needs a recent sign-in
 
@@ -661,7 +661,7 @@ The operations that answer the `401` are listed in `OperationAccess.StepUp` (`Ap
 
 The order of the checks:
 
-- **What a new sign-in cannot fix comes first:** a machine on a route for users only, the role checks of the route, the [restriction of the actor](#restrictions-of-actors) and a bad body. So a person without the role gets `403`, as before.
+- **What a new sign-in cannot fix comes first:** a machine on a route for users only, the role checks of the route, the [restriction of the actor](#restrictions-of-actors), a bad body, and what the handler has already read: a machine that does not exist (`404`, for a reset and new federation rules) or is not `Federated` (`400 MachineNotFederated`), a changed `Issuer` of a trusted issuer (`400 InvalidFederation`), and a shared certificate of a project that does not enable `CertificateAndApiKey` (`400 MachineAccessNotSupported`). So a person without the role gets `403`, as before.
 - **The role checks inside the service come after it.** Grant, revoke, a member's role change, the removal of a member and a new invitation check the role in the service, and a new invitation also its email, role and validity there, so a person without the role (or with such a bad invitation) whose sign-in is old gets `401` first, and `403` (or `400`) after signing in again. The admin UI offers these actions only to the roles that may use them, and asks for the sign-in before their dialogs open.
 - **Secret rights are withheld only where the role gives them.** A user below `ContributorWithSecrets` gets `403 AccessDenied` and no header, whatever the time of the sign-in.
 - **The actor wins for reads.** Through an actor under `NoSecretReveal`, a secret read answers `403 ActorRestricted` and a resolved configuration `actor-restricted`, because a new sign-in would not lift the restriction. Writes through the actor are judged by the step-up.
@@ -1944,7 +1944,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `409` | `FederatedIssuerInUse` | Creating a trusted issuer whose name rules of machines still reference. |
 | `409` | `ElevatedRole` | Revoke names a lower role than the member holds. Revoke the stored role instead. |
 | `409` | `LastOwner` | The revoke would leave the access point without an `Owner`. |
-| `409` | `Conflict` | A reset of a machine whose API key another reset replaced meanwhile, a reset of a machine that changed three times in a row while it wrote, or a federation rules `PUT` of one that changed twice. Reload and retry. |
+| `409` | `Conflict` | A reset of a machine whose API key another reset replaced meanwhile, a reset of a machine that changed three times in a row while it wrote, a federation rules `PUT` of one that changed twice, or a trusted issuer `PUT` that another request created or deleted after this one read it (the create never replaces it, the replace never creates it again). Reload and retry: the retry runs the checks of a create or a replace again. |
 | `413` | `BodyTooLarge` | A body larger than its route reads: 8 KiB for an account, an access point, a project update, a permission, a machine authentication policy or a shared certificate, 1 MiB for a trusted issuer, and 4 MiB for a machine or its federation rules. |
 | `501` | `MachineAccessNotConfigured` | The deployment lacks what a machine operation needs: the `ClientCredentials` provider (create, reset, delete), the federated provider (create, reset of a `Federated` machine), the AuthKit machine organization, the AuthKit permission or Entra ID app role of a requested scope, or the service principal of the API application in the Entra ID machine tenant. The deployment has to be configured; the request is not at fault. |
 

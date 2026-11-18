@@ -39,6 +39,13 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         _audit = audit ?? AccessAuditRecords.Default;
     }
 
+    private enum WriteMode
+    {
+        CreateOrReplace,
+        Create,
+        Replace,
+    }
+
     public static string GetPartition(string project)
     {
         return $"{project}.{PartitionSuffix}";
@@ -82,17 +89,22 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
 
     public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
     {
-        return WriteAsync(organization, project, issuer, caller, createOnly: false, cancellationToken);
+        return WriteAsync(organization, project, issuer, caller, WriteMode.CreateOrReplace, cancellationToken);
     }
 
     public Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
     {
-        return WriteAsync(organization, project, issuer, caller, createOnly: true, cancellationToken);
+        return WriteAsync(organization, project, issuer, caller, WriteMode.Create, cancellationToken);
     }
 
-    // A create-only write never replaces: an issuer it finds, or one that appears before the batch creates it (409), is
-    // a conflict.
-    private async Task<FederatedIssuer> WriteAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, bool createOnly, CancellationToken cancellationToken)
+    public Task<FederatedIssuer> ReplaceAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+    {
+        return WriteAsync(organization, project, issuer, caller, WriteMode.Replace, cancellationToken);
+    }
+
+    // A create never replaces: an issuer it finds, or one that appears before the batch creates it (409), is a conflict.
+    // A replace never creates: an issuer it misses, or one deleted before the batch replaces it (404), is a conflict.
+    private async Task<FederatedIssuer> WriteAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, WriteMode mode, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(issuer);
         ArgumentNullException.ThrowIfNull(caller);
@@ -110,6 +122,12 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         FederatedIssuerEntity entity;
         var batch = repository.Container.CreateTransactionalBatch(partitionKey);
 
+        if (existing is null && mode == WriteMode.Replace)
+        {
+            Invalidate(organization, project);
+            throw new ConflictException($"The trusted issuer '{issuer.Name}' was deleted concurrently; reload and retry.");
+        }
+
         if (existing is null)
         {
             // Counted from the store, not the cached list, so concurrent instances cannot pass the limit together by much.
@@ -126,8 +144,10 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
                 NewValue = AccessAuditValues.Issuer(ToModel(entity)),
             }));
         }
-        else if (createOnly)
+        else if (mode == WriteMode.Create)
         {
+            // The cached list of this instance may still miss it, and the caller is told to reload.
+            Invalidate(organization, project);
             throw new ConflictException($"The trusted issuer '{issuer.Name}' was created concurrently; reload and retry.");
         }
         else
@@ -157,7 +177,8 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         using var response = await batch.ExecuteAsync(cancellationToken);
         Invalidate(organization, project);
 
-        if (response.Failed(HttpStatusCode.Conflict) || response.Failed(HttpStatusCode.PreconditionFailed))
+        // A replace of an issuer deleted since the read fails with 404: never created again here.
+        if (response.Failed(HttpStatusCode.Conflict) || response.Failed(HttpStatusCode.PreconditionFailed) || response.Failed(HttpStatusCode.NotFound))
         {
             throw new ConflictException($"The trusted issuer '{issuer.Name}' was changed concurrently; reload and retry.");
         }
