@@ -193,6 +193,19 @@ public class AccessAuditValuesTests
     }
 
     [Fact]
+    public void Issuer_TheSameKeysEscapedDifferentlyAndReordered_AreNoChange()
+    {
+        var ordered = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"one\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"},{\"kty\":\"RSA\",\"kid\":\"two\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"}]}";
+
+        // the keys swapped, and "one" written as "\u006fne"
+        var escaped = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"two\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"},{\"kty\":\"RSA\",\"kid\":\"\\u006fne\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"}]}";
+        var issuer = new FederatedIssuer { Name = "k8s", Issuer = "https://k8s.example.com", KeySource = FederatedIssuerKeySource.Jwks, Jwks = ordered };
+
+        escaped.Should().Contain("\\u006fne");
+        AccessAuditValues.Issuer(issuer with { Jwks = escaped }).Should().Be(AccessAuditValues.Issuer(issuer));
+    }
+
+    [Fact]
     public void Issuer_NoRequiredClaimsAndAnEmptyDictionary_AreTheSame()
     {
         var issuer = new FederatedIssuer { Name = "github", Issuer = "https://token.actions.githubusercontent.com" };
