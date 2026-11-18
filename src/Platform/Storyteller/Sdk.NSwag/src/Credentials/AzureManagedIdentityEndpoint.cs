@@ -70,7 +70,7 @@ internal sealed class AzureManagedIdentityEndpoint
         return Uri.TryCreate(endpoint, UriKind.Absolute, out var url) && IsAllowed(url)
             ? new AzureManagedIdentityEndpoint(url, AppServiceApiVersion, AppServiceHeaderName, header, false)
             : throw StorytellerAuthenticationException.Configuration(
-                $"{StorytellerVariables.IDENTITY_ENDPOINT} must be an absolute URL without user info: https, or http to localhost or to a loopback, link-local or private address.");
+                $"{StorytellerVariables.IDENTITY_ENDPOINT} must be an absolute URL without user info or a fragment: https, or http to localhost or to a loopback, link-local or private address.");
     }
 
     // The header value is a secret.
@@ -83,10 +83,10 @@ internal sealed class AzureManagedIdentityEndpoint
     // host's own network, 127.0.0.1 on Windows App Service, localhost on Container Apps and a link-local address on Linux
     // App Service. So https, or http to localhost or to an address literal that is loopback, link-local (169.254.0.0/16,
     // fe80::/10) or private (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7); never http to a name that DNS
-    // resolves, and no user info.
+    // resolves, no user info, and no fragment, which would take the query that the request appends.
     internal static bool IsAllowed(Uri uri)
     {
-        if (!uri.IsAbsoluteUri || !string.IsNullOrEmpty(uri.UserInfo))
+        if (!uri.IsAbsoluteUri || !string.IsNullOrEmpty(uri.UserInfo) || uri.Fragment.Length > 0)
         {
             return false;
         }

@@ -179,6 +179,45 @@ public class AzureManagedIdentityTokenTests
         proxied.ShouldNotContain(IdentityHeader);
     }
 
+    // The attempt timeout of the pipeline ends with the headers of an answer. A body that stalls after them ends too,
+    // within that time again, also for a caller without a token of its own. Over real sockets: the stub answers whole
+    // bodies.
+    [Fact]
+    public async Task AnAnswerWhoseBodyStalls_IsUnavailable_AlsoWithoutATokenOfTheCaller()
+    {
+        using var host = new TcpListener(IPAddress.Loopback, 0);
+        host.Start();
+        using var hold = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var serving = ServeAStalledAnswerAsync(host, hold.Token);
+        UseAppService($"http://{host.LocalEndpoint}/msi/token");
+        using var credential = BindOverSockets(TimeSpan.FromMilliseconds(300));
+
+        var exception = await Should.ThrowAsync<StorytellerAuthenticationException>(async () => await credential.GetAuthorizationAsync(null, CancellationToken.None));
+
+        exception.Reason.ShouldBe(StorytellerAuthenticationFailureReason.Unavailable);
+        exception.Message.ShouldBe($"The managed identity token request to http://{host.LocalEndpoint}/msi/token for the resource {Resource} failed: the body of its answer did not end within 00:00:00.3000000.{Hint}");
+        await hold.CancelAsync();
+        await serving;
+    }
+
+    // The cancellation of the caller stays one while the body stalls: it is not the timeout of the answer.
+    [Fact]
+    public async Task AnAnswerWhoseBodyStalls_EndsWithTheCancellationOfTheCaller()
+    {
+        using var host = new TcpListener(IPAddress.Loopback, 0);
+        host.Start();
+        using var hold = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var serving = ServeAStalledAnswerAsync(host, hold.Token);
+        UseAppService($"http://{host.LocalEndpoint}/msi/token");
+        using var credential = BindOverSockets(TimeSpan.FromMinutes(1));
+        using var caller = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+
+        await Should.ThrowAsync<OperationCanceledException>(async () => await credential.GetAuthorizationAsync(null, caller.Token));
+
+        await hold.CancelAsync();
+        await serving;
+    }
+
     // An Azure Function needs only its app settings; the host adds its own two variables.
     [Fact]
     public async Task AnUnboundCredential_ExchangesAtTheTokenEndpointOfTheEnvironment()
@@ -226,12 +265,15 @@ public class AzureManagedIdentityTokenTests
         _http.Requests[1].Form["subject_token_type"].ShouldBe("urn:ietf:params:oauth:token-type:access_token");
     }
 
-    // access_token is the default of the variables and of ForAzureManagedIdentity only: SubjectTokenType has one default
-    // for every source, so options that set AzureManagedIdentity themselves set the type too.
+    // The token of a managed identity is always an access token, so that is the default of the source however it is set:
+    // by the variables, by ForAzureManagedIdentity, or by options that set AzureManagedIdentity themselves. A type that
+    // the options set wins.
     [Theory]
-    [InlineData(null, "urn:ietf:params:oauth:token-type:jwt")]
+    [InlineData(null, "urn:ietf:params:oauth:token-type:access_token")]
+    [InlineData(" ", "urn:ietf:params:oauth:token-type:access_token")]
     [InlineData("access_token", "urn:ietf:params:oauth:token-type:access_token")]
-    public async Task OptionsThatSetTheManagedIdentityThemselves_KeepTheDefaultTokenType_UnlessTheySetIt(string? subjectTokenType, string expected)
+    [InlineData("jwt", "urn:ietf:params:oauth:token-type:jwt")]
+    public async Task OptionsThatSetTheManagedIdentityThemselves_ExchangeAnAccessToken_UnlessTheySetAnotherType(string? subjectTokenType, string expected)
     {
         UseAppService();
         _http.Respond(HttpStatusCode.OK, IdentityAnswer("mi-token-1"))
@@ -287,6 +329,7 @@ public class AzureManagedIdentityTokenTests
     [InlineData("http://[2001:db8::1]/msi/token")]
     [InlineData("http://user@127.0.0.1:41741/MSI/token/")]
     [InlineData("https://user:p4ssw0rd@identity.example.com/msi/token")]
+    [InlineData("http://127.0.0.1:41741/MSI/token#top")]
     [InlineData("ftp://127.0.0.1/msi/token")]
     [InlineData("/msi/token")]
     [InlineData("not a url")]
@@ -297,7 +340,7 @@ public class AzureManagedIdentityTokenTests
         var exception = await ShouldFail(StorytellerAuthenticationFailureReason.Configuration);
 
         exception.Message.ShouldBe(
-            "IDENTITY_ENDPOINT must be an absolute URL without user info: https, or http to localhost or to a loopback, link-local or private address.");
+            "IDENTITY_ENDPOINT must be an absolute URL without user info or a fragment: https, or http to localhost or to a loopback, link-local or private address.");
         _http.Requests.ShouldBeEmpty();
     }
 
@@ -505,6 +548,53 @@ public class AzureManagedIdentityTokenTests
             Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {json.Length}\r\nConnection: close\r\n\r\n{json}"),
             cancellationToken);
         return request.ToString(0, Math.Max(headLength, 0));
+    }
+
+    // The head of an answer and the start of its body, then nothing more: the connection stays open until the token
+    // ends.
+    private static async Task ServeAStalledAnswerAsync(TcpListener listener, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var socket = await listener.AcceptSocketAsync(cancellationToken);
+            await using var stream = new NetworkStream(socket, ownsSocket: false);
+            var request = new StringBuilder();
+            var buffer = new byte[4096];
+
+            while (!request.ToString().Contains("\r\n\r\n", StringComparison.Ordinal))
+            {
+                var read = await stream.ReadAsync(buffer, cancellationToken);
+
+                if (read == 0)
+                {
+                    return;
+                }
+
+                request.Append(Encoding.ASCII.GetString(buffer, 0, read));
+            }
+
+            await stream.WriteAsync(
+                Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 64\r\n\r\n{\"access_token\":"),
+                cancellationToken);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // The test ended the answer.
+        }
+    }
+
+    // A credential of the managed identity whose requests go over real sockets, without retries.
+    private StorytellerCredential BindOverSockets(TimeSpan attemptTimeout)
+    {
+        return FederatedTokenCredential.Create(FederatedTokenOptions.ForAzureManagedIdentity(MachineId, Resource), null, name => _variables.GetValueOrDefault(name))
+            .Bind(new StorytellerCredentialBinding(new Uri("http://localhost:7071/api"))
+            {
+                Organization = "acme",
+                Project = "billing",
+                TimeProvider = _time,
+                Resilience = new StorytellerResilienceOptions { MaxRetryAttempts = 0, AttemptTimeout = attemptTimeout },
+            });
     }
 
     // The variables of App Service, Functions and Container Apps on a host with a managed identity.
