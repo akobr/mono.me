@@ -247,6 +247,25 @@ public class ProjectSettingsTwinsTests
         }
     }
 
+    // Details are any JSON value: InvalidSettings answers an array of problems, SettingsPreconditionFailed an object.
+    [Fact]
+    public async Task InvalidSettings_KeepTheArrayOfTheirDetails()
+    {
+        const string invalid = """{ "Message": "The project settings have 2 problems.", "ErrorCode": "InvalidSettings", "Details": [ { "Path": "$.Types.sbt.Label", "Rule": "control-character", "Message": "No." }, { "Path": "$.DateFormat", "Rule": "date-format", "Message": "No." } ] }""";
+        _http.Respond(HttpStatusCode.BadRequest, invalid);
+        _http.Respond(HttpStatusCode.BadRequest, invalid);
+        var client = CreateClient();
+
+        var generated = await Should.ThrowAsync<ApiException<ErrorResponse>>(() => client.SetProjectSettingsAsync("acme", "billing", new ProjectSettings()));
+        var twin = await Should.ThrowAsync<ApiException<ErrorResponse>>(() => client.SetProjectSettingsVersionedAsync("acme", "billing", new ProjectSettings()));
+
+        foreach (var exception in new[] { generated, twin })
+        {
+            var details = exception.Result.Details.ShouldBeOfType<JArray>();
+            details.Select(problem => (string?)problem["Rule"]).ShouldBe(["control-character", "date-format"]);
+        }
+    }
+
     // The read is the only one that documents a 304; the generated read throws on it, the twin answers it.
     [Fact]
     public async Task GeneratedRead_ThrowsOnNotModified_WhereTheTwinAnswers()

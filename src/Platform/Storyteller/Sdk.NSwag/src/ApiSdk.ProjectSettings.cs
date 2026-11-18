@@ -63,6 +63,7 @@ public partial class AccessApiClient
         [409] = SettingsConflictMessage,
         [412] = SettingsPreconditionFailedMessage,
         [413] = SettingsBodyTooLargeMessage,
+        [415] = "The body is application/merge-patch+json or application/json-patch+json (ErrorCode InvalidContentType): a PUT replaces the whole settings, so a partial body would reset every type it leaves out. Send a merge patch with PATCH.",
         [500] = SettingsServerErrorMessage,
     };
 

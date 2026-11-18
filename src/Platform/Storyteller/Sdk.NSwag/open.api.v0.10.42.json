@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.40.8829"
+    "version": "0.10.42.39559"
   },
   "servers": [
     {
@@ -14846,6 +14846,16 @@
               }
             }
           },
+          "415": {
+            "description": "The body is application/merge-patch+json or application/json-patch+json (ErrorCode InvalidContentType): a PUT replaces the whole settings, so a partial body would reset every type it leaves out. Send a merge patch with PATCH.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -18926,7 +18936,7 @@
             "type": "string"
           },
           "Details": {
-            "type": "object"
+            "description": "Structured details of some errors, any JSON value: an object, such as the Version of SettingsPreconditionFailed or the Format, Rule and Path of format.<rule>, or an array, such as the problems of InvalidSettings, each with its Path, Rule and Message."
           },
           "Error": {
             "$ref": "#/components/schemas/ExceptionWrapper"
@@ -20183,7 +20193,8 @@
             "type": "string",
             "description": "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ProtectionKeyInfo": {
         "type": "object",
@@ -21060,6 +21071,7 @@
             "nullable": true
           }
         },
+        "additionalProperties": false,
         "description": "A merge patch of the appearance of one annotation type: a member left out keeps its value, null goes back to its built-in value; a null type goes back to its built-in appearance.",
         "nullable": true
       },
