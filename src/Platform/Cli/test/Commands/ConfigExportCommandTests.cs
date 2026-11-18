@@ -238,7 +238,7 @@ public class ConfigExportCommandTests
         var exitCode = await Execute(Key, "--mask", "all", "-e", "app.env");
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _error.ToString().ShouldBe("The API withheld the secrets of the configuration (step-up-required): the values of secret bindings are their expressions. Nothing was exported. Secrets need a recent sign-in: sign out in the browser first (the admin UI's Sign out ends the browser's session) or approve the code in a private window, then run 'sform account logout' and 'sform account', and repeat the command.\n");
+        _error.ToString().ShouldBe("The API withheld the secrets of the configuration (step-up-required): the values of secret bindings are their expressions. Nothing was exported. Secrets need a recent sign-in: sign out in the browser first (the admin UI's Sign out ends the browser's session), run 'sform account logout' and 'sform account', approve the new code (in a private window if the browser is still signed in), and repeat the command.\n");
         _out.ToString().ShouldBeEmpty();
         _fileSystem.File.Exists(P(@"C:\work\app.env")).ShouldBeFalse();
     }
