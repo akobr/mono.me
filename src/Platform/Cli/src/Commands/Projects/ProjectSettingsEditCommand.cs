@@ -112,6 +112,13 @@ public class ProjectSettingsEditCommand : BaseContextCommand
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
+            // The editor failed on a re-open of a refused draft: the draft is kept as well, and the crash is the outcome.
+            if (refused is not null && result.ExitCode == ExitCodes.ERROR_CRASH)
+            {
+                KeepEdit(projectKey, refused, "Fix it, then save it with");
+                return ExitCodes.ERROR_CRASH;
+            }
+
             return result.ExitCode;
         }
 

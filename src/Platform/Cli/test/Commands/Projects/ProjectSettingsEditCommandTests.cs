@@ -75,6 +75,25 @@ public class ProjectSettingsEditCommandTests
         _fixture.Lines[^1].ShouldBe($"Your edit is in {kept}. Fix it, then save it with: sform project settings set -p org1.proj1 -i \"{kept}\" --replace");
     }
 
+    // The rules refuse the edit, the user re-opens it, and the editor fails: the refused draft is still kept.
+    [Fact]
+    public async Task EditorCrash_AfterARefusedDraft_KeepsTheDraft_AndAnswersTheCrash()
+    {
+        _fixture.SetupRead(ProjectSettingsFixture.Changed());
+        SetupEditor((original, check) =>
+        {
+            var edited = (JObject)original.DeepClone();
+            edited["Types"]!["sbt"]!["Color"] = "pinkish";
+            check!(edited).Document.ShouldBeNull();
+            return new JsonEditResult(null, ExitCodes.ERROR_CRASH);
+        });
+
+        var exitCode = await Command().OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        JObject.Parse(_fixture.FileSystem.File.ReadAllText(KeptFile()))["Types"]!["sbt"]!["Color"]!.Value<string>().ShouldBe("pinkish");
+    }
+
     [Fact]
     public async Task Edit_OfSettingsThatChangedMeanwhile_KeepsTheEdit()
     {
