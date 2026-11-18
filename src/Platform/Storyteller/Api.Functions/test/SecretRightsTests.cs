@@ -194,7 +194,8 @@ public class SecretRightsTests
         request.HasRecentSignIn().ShouldBeTrue();
     }
 
-    // Restore and purge answer per item: the items refused only for the step-up say so, with the step-up message.
+    // Restore and purge answer per item: the items refused only for the step-up say so, with the step-up message. Only the
+    // secret-rights refusal of the service (AccessDenied) is renamed; a refusal with its own code keeps it.
     [Fact]
     public void BulkItems_RefusedForTheStepUp_NameIt()
     {
@@ -205,6 +206,7 @@ public class SecretRightsTests
                 new KeyValueBulkItemResult { Key = "db.password", Outcome = KeyValueBulkOutcome.Forbidden, ErrorCode = ErrorCodes.AccessDenied },
                 new KeyValueBulkItemResult { Key = "db.host", Outcome = KeyValueBulkOutcome.Done },
                 new KeyValueBulkItemResult { Key = "gone", Outcome = KeyValueBulkOutcome.NotFound },
+                new KeyValueBulkItemResult { Key = "other", Outcome = KeyValueBulkOutcome.Forbidden, ErrorCode = ErrorCodes.MtlsRequired, Message = "mTLS" },
             ],
         };
         var stale = Rights(writeWithheldByStepUp: true);
@@ -216,6 +218,7 @@ public class SecretRightsTests
         marked.Items[0].Outcome.ShouldBe(KeyValueBulkOutcome.Forbidden);
         marked.Items[1].ShouldBe(result.Items[1]);
         marked.Items[2].ShouldBe(result.Items[2]);
+        marked.Items[3].ShouldBe(result.Items[3]);
         KeyValueAuthorization.WithStepUpOutcomes(Rights(writeWithheldByStepUp: false), result).ShouldBeSameAs(result);
     }
 
