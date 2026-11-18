@@ -96,6 +96,19 @@ describe('project settings helpers', () => {
     expect(validateProjectSettings({ DefaultTimeZone: '\u0085' }).settings).toEqual({ Types: {} })
   })
 
+  it('refuses a control character in a label or a plural, and names the field', () => {
+    const validation = validateProjectSettings({ Types: { sbt: { Label: 'Com\u001Bpany', Plural: 'Compa\u2028nies' }, cnt: { Label: '\u202EtnemtrapeD' } } })
+
+    expect(validation.problems).toEqual([
+      { path: '$.Types.sbt.Label', rule: 'control-character', message: 'The label contains the character U+001B; control characters, line and paragraph separators and bidirectional controls are not allowed.' },
+      { path: '$.Types.sbt.Plural', rule: 'control-character', message: 'The plural contains the character U+2028; control characters, line and paragraph separators and bidirectional controls are not allowed.' },
+      { path: '$.Types.cnt.Label', rule: 'control-character', message: 'The label contains the character U+202E; control characters, line and paragraph separators and bidirectional controls are not allowed.' },
+    ])
+    // Trimmed at either end before the check; a zero width joiner is not a control.
+    expect(validateProjectSettings({ Types: { sbt: { Label: '\u0009Company\u2029' } } }).settings?.Types.sbt?.Label).toBe('Company')
+    expect(validateProjectSettings({ Types: { sbt: { Label: 'Zero\u200Dwidth' } } }).valid).toBe(true)
+  })
+
   it('reads an object without a prototype, and refuses one that is not JSON data', () => {
     const document = Object.assign(Object.create(null) as object, { DateFormat: 'dd.mm.yyyy' })
 

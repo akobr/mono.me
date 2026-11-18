@@ -19,6 +19,10 @@ public static class ProjectSettingsRules
     // A plural longer than the catalog's limit.
     public const string Plural = "plural";
 
+    // A label or a plural that holds a control character (C0 or C1), a line or paragraph separator (U+2028, U+2029) or a
+    // bidirectional control (U+061C, U+200E, U+200F, U+202A-U+202E, U+2066-U+2069): every client shows the names as text.
+    public const string ControlCharacter = "control-character";
+
     // A plural of a type without a label.
     public const string PluralWithoutLabel = "plural-without-label";
 
@@ -57,7 +61,7 @@ public static class ProjectSettingsRules
     // Every rule id, as the conformance vectors spell them.
     public static IReadOnlyList<string> All { get; } =
     [
-        TypeCode, Label, Plural, PluralWithoutLabel, Color, Icon, TimeZone, DateFormat, UnknownMember, CaseCollision, WrongType, Format,
+        TypeCode, Label, Plural, ControlCharacter, PluralWithoutLabel, Color, Icon, TimeZone, DateFormat, UnknownMember, CaseCollision, WrongType, Format,
     ];
 
     public static ProjectSettingsCheck Normalize(ProjectSettings input)
@@ -183,6 +187,9 @@ public static class ProjectSettingsRules
                 $"The plural has {plural.Length} characters; at most {catalog.PluralMaxLength} are allowed."));
         }
 
+        AddControlCharacter(label, ProjectSettingsText.Property(path, nameof(ProjectTypeAppearance.Label)), "label", problems);
+        AddControlCharacter(plural, ProjectSettingsText.Property(path, nameof(ProjectTypeAppearance.Plural)), "plural", problems);
+
         if (plural is not null && label is null)
         {
             problems.Add(new ProjectSettingsProblem(
@@ -240,6 +247,37 @@ public static class ProjectSettingsRules
 
         problems.Add(new ProjectSettingsProblem(path, rule, message(value)));
         return null;
+    }
+
+    // Checked after trimming, so a white space control at either end (a tab, a line break) is trimmed rather than refused.
+    private static void AddControlCharacter(string? value, string path, string field, List<ProjectSettingsProblem> problems)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        foreach (var character in value)
+        {
+            if (IsControlCharacter(character))
+            {
+                problems.Add(new ProjectSettingsProblem(
+                    path,
+                    ControlCharacter,
+                    $"The {field} contains the character U+{(int)character:X4}; control characters, line and paragraph separators and bidirectional controls are not allowed."));
+                return;
+            }
+        }
+    }
+
+    // char.IsControl is U+0000-U+001F and U+007F-U+009F.
+    private static bool IsControlCharacter(char character)
+    {
+        var code = (int)character;
+        return char.IsControl(character)
+            || code is 0x2028 or 0x2029 or 0x200E or 0x200F or 0x061C
+            || code is >= 0x202A and <= 0x202E
+            || code is >= 0x2066 and <= 0x2069;
     }
 
     // string.Trim removes the characters of char.IsWhiteSpace, which are Unicode's White_Space.

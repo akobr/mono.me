@@ -40,6 +40,17 @@ describe('sanitizeTypeAppearances', () => {
     expect(sanitizeTypeAppearances({ exe: { label: '   ' } })).toEqual({})
   })
 
+  it('drops the control characters the API refuses in a name', () => {
+    expect(
+      sanitizeTypeAppearances({
+        exe: { label: 'Batch\u001B job\u202E', plural: '\u2028Batch\u000A jobs\u0085' },
+        cnt: { label: '\u200E\u2066\u0000' },
+      }),
+    ).toEqual({ exe: { label: 'Batch job', plural: 'Batch jobs' } })
+    // A zero width joiner and a no-break space are not controls.
+    expect(sanitizeTypeAppearances({ exe: { label: 'Batch\u200Djob\u00A0x' } }).exe?.label).toBe('Batch\u200Djob\u00A0x')
+  })
+
   it('drops a plural without a name, because names come as a pair', () => {
     expect(sanitizeTypeAppearances({ exe: { plural: 'Jobs', color: 'red' } })).toEqual({ exe: { color: 'red' } })
   })

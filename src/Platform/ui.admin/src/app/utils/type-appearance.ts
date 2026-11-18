@@ -158,13 +158,21 @@ const iconNames = new Set(typeIcons.map((icon) => icon.name))
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+// What the API refuses in a label or a plural (the rule control-character): C0 and C1 controls, the line and paragraph
+// separators and the bidirectional controls.
+// oxlint-disable-next-line no-control-regex -- the controls are what the rule refuses
+const controlCharacters = /[\u0000-\u001F\u007F-\u009F\u2028\u2029\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g
+
 function cleanName(value: unknown): string | undefined {
-  return typeof value === 'string' ? value.trim().slice(0, maxTypeNameLength).trim() || undefined : undefined
+  return typeof value === 'string'
+    ? value.replace(controlCharacters, '').trim().slice(0, maxTypeNameLength).trim() || undefined
+    : undefined
 }
 
 /**
  * Keeps only what can be shown: known codes, palette colors, bundled icons and trimmed names of at most
- * 40 characters. A plural without a name is dropped (names come as a pair), and so are types with nothing left.
+ * 40 characters without control characters. A plural without a name is dropped (names come as a pair), and so
+ * are types with nothing left.
  */
 export function sanitizeTypeAppearances(value: unknown): TypeAppearances {
   if (!isRecord(value)) {

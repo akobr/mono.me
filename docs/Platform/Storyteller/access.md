@@ -113,6 +113,7 @@ The allowed values are the **catalog of project settings**, `src/Platform/Storyt
 | --- | --- |
 | `type-code` | A key of `Types` that is not a type code, or two keys that differ only in case |
 | `label`, `plural` | A `Label` or a `Plural` longer than 40 UTF-16 code units after trimming |
+| `control-character` | A `Label` or a `Plural` that holds a control character after trimming: a C0 or C1 control (U+0000–U+001F, U+007F–U+009F), the line or paragraph separator (U+2028, U+2029) or a bidirectional control (U+061C, U+200E, U+200F, U+202A–U+202E, U+2066–U+2069); the message names the field and the character |
 | `plural-without-label` | A `Plural` without a `Label` |
 | `color`, `icon`, `time-zone`, `date-format` | A value that is not in the catalog, such as the Windows zone `Central Europe Standard Time` |
 | `unknown-member` | A member the document does not have, such as `Theme` |
@@ -121,7 +122,7 @@ The allowed values are the **catalog of project settings**, `src/Platform/Storyt
 | `format` | A `Format` that is not `2s.project-settings.v1` |
 
 - Member names, type codes, colors, icons, date formats and time zones match in any ASCII case and are stored in the catalog's spelling: `europe/prague` is stored as `Europe/Prague`, `SBT` as `sbt`.
-- Labels and plurals are trimmed. A blank label, plural, time zone or date format means none, and so does `null`. An appearance without any value is removed.
+- Labels and plurals are trimmed of Unicode white space first, so a tab or a line break at either end is removed and only one inside is refused. A blank label, plural, time zone or date format means none, and so does `null`. An appearance without any value is removed.
 - `Version` and `Modified` are ignored, and `Format` may be the marker `2s.project-settings.v1` (the file shape of data sets), so a read or a settings file can be sent back as it is.
 - A problem has `Path` (a JSON path in the canonical spelling, such as `$.Types.sbt.Color`), `Rule` and `Message`.
 

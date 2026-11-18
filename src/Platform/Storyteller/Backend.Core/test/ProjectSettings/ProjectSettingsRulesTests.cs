@@ -145,6 +145,87 @@ public class ProjectSettingsRulesTests
         check.IsValid.ShouldBe(isValid);
     }
 
+    [Theory]
+    [InlineData(0x0000)]
+    [InlineData(0x0009)]
+    [InlineData(0x000A)]
+    [InlineData(0x001B)]
+    [InlineData(0x001F)]
+    [InlineData(0x007F)]
+    [InlineData(0x0085)]
+    [InlineData(0x009F)]
+    [InlineData(0x061C)]
+    [InlineData(0x200E)]
+    [InlineData(0x200F)]
+    [InlineData(0x2028)]
+    [InlineData(0x2029)]
+    [InlineData(0x202A)]
+    [InlineData(0x202E)]
+    [InlineData(0x2066)]
+    [InlineData(0x2069)]
+    public void Normalize_AControlCharacterInALabelOrAPlural_IsRefused(int code)
+    {
+        var inside = $"Com{(char)code}pany";
+
+        var check = ProjectSettingsRules.Normalize(new ProjectSettings
+        {
+            Types = new Dictionary<string, ProjectTypeAppearance>
+            {
+                ["sbt"] = new() { Label = inside },
+                ["cnt"] = new() { Label = "Department", Plural = inside },
+            },
+        });
+
+        check.Settings.ShouldBeNull();
+        check.Problems.Select(problem => (problem.Path, problem.Rule)).ShouldBe(
+            [
+                ("$.Types.sbt.Label", ProjectSettingsRules.ControlCharacter),
+                ("$.Types.cnt.Plural", ProjectSettingsRules.ControlCharacter),
+            ],
+            ignoreOrder: true);
+        check.Problems.Single(problem => problem.Path == "$.Types.sbt.Label").Message.ShouldBe(
+            $"The label contains the character U+{code:X4}; control characters, line and paragraph separators and bidirectional controls are not allowed.");
+        check.Problems.Single(problem => problem.Path == "$.Types.cnt.Plural").Message.ShouldStartWith($"The plural contains the character U+{code:X4};");
+    }
+
+    // The neighbours of the refused ranges, and characters of names that are not controls: a zero width joiner, a no-break space.
+    [Theory]
+    [InlineData(0x00A0)]
+    [InlineData(0x00E9)]
+    [InlineData(0x200D)]
+    [InlineData(0x2027)]
+    [InlineData(0x202F)]
+    [InlineData(0x2065)]
+    [InlineData(0x206A)]
+    public void Normalize_OtherCharacters_AreKept(int code)
+    {
+        var label = $"Com{(char)code}pany";
+
+        var check = ProjectSettingsRules.Normalize(new ProjectSettings
+        {
+            Types = new Dictionary<string, ProjectTypeAppearance> { ["sbt"] = new() { Label = label } },
+        });
+
+        check.Problems.ShouldBeEmpty();
+        check.Settings!.Types["sbt"].Label.ShouldBe(label);
+    }
+
+    // Trimming comes first: a tab, a line break or a separator at either end is white space, not a refused control.
+    [Fact]
+    public void Normalize_AWhiteSpaceControlAtEitherEnd_IsTrimmed()
+    {
+        var check = ProjectSettingsRules.Normalize(new ProjectSettings
+        {
+            Types = new Dictionary<string, ProjectTypeAppearance>
+            {
+                ["sbt"] = new() { Label = $"{(char)0x0A}Company{(char)0x2028}", Plural = $"{(char)0x09}Companies{(char)0x0085}" },
+            },
+        });
+
+        check.Problems.ShouldBeEmpty();
+        check.Settings!.Types["sbt"].ShouldBe(new ProjectTypeAppearance { Label = "Company", Plural = "Companies" });
+    }
+
     [Fact]
     public void Normalize_AppearanceWithoutValues_IsRemoved()
     {
@@ -201,7 +282,7 @@ public class ProjectSettingsRulesTests
     {
         ProjectSettingsRules.All.ShouldBeUnique();
         ProjectSettingsRules.All.ShouldBe(
-            ["type-code", "label", "plural", "plural-without-label", "color", "icon", "time-zone", "date-format", "unknown-member", "case-collision", "type", "format"],
+            ["type-code", "label", "plural", "control-character", "plural-without-label", "color", "icon", "time-zone", "date-format", "unknown-member", "case-collision", "type", "format"],
             ignoreOrder: true);
     }
 }
