@@ -15,6 +15,10 @@ public interface IFederatedIssuerStore
     // Issuer of an existing one.
     Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default);
 
+    // Creates the issuer named issuer.Name, never replaces one: ConflictException when it exists, also when it appeared
+    // after the caller found none (a replace needs the checks of a replace). InvalidInputException and the audit as SetAsync.
+    Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default);
+
     // False when the issuer did not exist; a delete is recorded with the caller.
     Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default);
 }

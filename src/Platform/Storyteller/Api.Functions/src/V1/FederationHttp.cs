@@ -208,7 +208,11 @@ public class FederationHttp
 
         try
         {
-            var stored = await _issuerStore.SetAsync(organization, project, requested, request.GetAccessCaller(), cancellationToken);
+            // Create only when none was found: an issuer that appeared since is not replaced without the checks above.
+            var caller = request.GetAccessCaller();
+            var stored = existing is null
+                ? await _issuerStore.CreateAsync(organization, project, requested, caller, cancellationToken)
+                : await _issuerStore.SetAsync(organization, project, requested, caller, cancellationToken);
             return new OkObjectResult(stored);
         }
         catch (InvalidInputException exception)
