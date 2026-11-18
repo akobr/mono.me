@@ -909,6 +909,22 @@ public sealed class WatchTests : IDisposable
     }
 
     // A policy may change back: after a poll completed, the watch goes on, and holds what it held.
+    // The ancestors of the target are those of every descendant, so the first poll asks for them while the target has
+    // no descendant too: the watch does not complete a poll that it could never add anything after.
+    [Fact]
+    public async Task RequiringActiveAncestors_OfNoDescendants_ARestrictedAncestorOfTheTarget_EndsTheWatch()
+    {
+        _catalog.PutWithAncestors(NorthwindUsage);
+        _catalog.Fail(Northwind, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+
+        var exception = await Should.ThrowAsync<StorytellerConfigurationException>(
+            () => WatchOnceAsync(StorytellerTarget.ExecutionsOf(NorthwindUsage).RequiringActiveAncestors()));
+
+        exception.Key.ShouldBe(FakeCatalog.Full(Northwind));
+        exception.StatusCode.ShouldBe(403);
+        exception.IsTransient.ShouldBeFalse();
+    }
+
     [Fact]
     public async Task RequiringActiveAncestors_ARestrictedAncestor_AfterAPollCompleted_IsLogged_AndKeepsWhatIsHeld()
     {
@@ -1092,16 +1108,30 @@ public sealed class WatchTests : IDisposable
         exception.IsTransient.ShouldBeFalse();
     }
 
-    // As a failed read of a descendant in the one poll: there is no next poll to decide again.
+    // There is no next poll to decide again, and an answer without the descendants under that ancestor would read as a
+    // whole one: the one poll fails, as ListAsync does.
     [Fact]
-    public async Task RequiringActiveAncestors_WithAZeroInterval_AFailedReadOfAnAncestor_LeavesItsDescendantsOut_AndWarns()
+    public async Task RequiringActiveAncestors_WithAZeroInterval_ATransientFailureOfAnAncestor_IsThrown()
     {
         PutExecutions();
         _catalog.Fail(Northwind, HttpStatusCode.ServiceUnavailable);
 
-        var changes = await WatchOnceAsync(Required);
+        var exception = await Should.ThrowAsync<StorytellerConfigurationException>(() => WatchOnceAsync(Required));
 
-        changes.ShouldHaveSingleItem().Annotation.AnnotationKey.ShouldBe(ContosoProd);
+        exception.Key.ShouldBe(FakeCatalog.Full(Northwind));
+        exception.StatusCode.ShouldBe(503);
+        exception.IsTransient.ShouldBeTrue();
+    }
+
+    // With an interval the same failure in the first poll is no end: the next poll decides again.
+    [Fact]
+    public async Task RequiringActiveAncestors_WithAnInterval_ATransientFailureOfAnAncestor_InTheFirstPoll_IsNotThrown()
+    {
+        PutExecutions();
+        _catalog.Fail(Northwind, HttpStatusCode.ServiceUnavailable);
+        await using var probe = Watch(Required);
+
+        (await probe.FirstPollAsync()).ShouldHaveSingleItem().Annotation.AnnotationKey.ShouldBe(ContosoProd);
         Warnings().ShouldHaveSingleItem().Message.ShouldStartWith($"Reading {FakeCatalog.Full(Northwind)} failed (transient); the descendants under it stay as they were");
     }
 

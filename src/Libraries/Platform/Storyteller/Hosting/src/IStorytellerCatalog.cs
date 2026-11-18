@@ -67,7 +67,8 @@ public interface IStorytellerCatalog
     // descendant is Added only under active ancestors, and a held one whose ancestor is inactive or gone is Removed with
     // that ancestor's key and its reason, the nearest one when several are; its own end is named before an ancestor's.
     // A failed read of an ancestor logs a warning and keeps the descendants under it as they are; a definitive one
-    // before any poll completed, of an ancestor the machine may not read too, is thrown. Each enumeration runs its
+    // before any poll completed, of an ancestor the machine may not read too, is thrown, and so is any one in the one
+    // poll of a zero interval. Each enumeration runs its
     // own loop. pollInterval: 30 s when null, with a jitter of ±10 %, counted from the end of a poll; zero polls once;
     // otherwise 1 second to 45 days, or the call throws ArgumentOutOfRangeException. Without the options' Key, an
     // annotation key throws StorytellerConfigurationException at the call. Ends with OperationCanceledException when the

@@ -179,20 +179,30 @@ internal sealed class DescendantPollingSource
     // I reads its own; and the time that tells their status, one for all of them. A read that fails is an answer: what
     // is under that ancestor stays as it was. own: the target's ancestor as the existence check of this poll read it,
     // null once a poll has completed. Until then a definitive failure, a machine that may not read an ancestor
-    // included, fails the poll: polling again would not fix it.
+    // included, fails the poll: polling again would not fix it. The one poll of a zero interval fails with a transient
+    // one too: no next poll decides again, and an answer without those descendants would read as a whole one.
     private async Task<PollAncestors> ReadAncestorsAsync(PollState poll, Dictionary<string, Candidate> candidates, AncestorRead? own, CancellationToken cancellationToken)
     {
         var descendants = candidates.Values.Select(candidate => candidate.Key)
             .Concat(poll.Held.Where(held => !candidates.ContainsKey(held.Key)).Select(held => held.Value.Key));
+
+        // Until a poll has completed, the target's own ancestors too: they are ancestors of every descendant, so a
+        // machine that may not read them ends the watch while the target has no descendants too.
+        if (!poll.HasCompleted)
+        {
+            descendants = descendants.Append(poll.Scope.Ancestor);
+        }
 
         // Every read ends before a cancellation is thrown.
         var reads = await AncestorReader.ReadDistinctAsync(descendants, own, key => ReadAncestorAsync(poll, key, cancellationToken)).ConfigureAwait(false);
         var failed = reads.Values.Where(read => read.IsUndecided).OrderBy(read => read.Key.ToString(), StringComparer.Ordinal).ToList();
 
         // The first one by key, so the same failure ends the watch whatever the order the reads ended in.
-        if (!poll.HasCompleted && failed.FirstOrDefault(read => read.Failure is { IsTransient: false }) is { Failure: { } failure } definitive)
+        var pollsOnce = _pollInterval == TimeSpan.Zero;
+
+        if (!poll.HasCompleted && failed.FirstOrDefault(read => pollsOnce || read.Failure is { IsTransient: false }) is { Failure: { } failure } ending)
         {
-            throw definitive.IsRestricted ? poll.Scope.CannotReadAncestor(definitive.Key, failure) : failure;
+            throw ending.IsRestricted ? poll.Scope.CannotReadAncestor(ending.Key, failure) : failure;
         }
 
         foreach (var read in failed)

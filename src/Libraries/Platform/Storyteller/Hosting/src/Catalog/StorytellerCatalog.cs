@@ -221,7 +221,10 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
             return new Listing(descendants, NoAncestors);
         }
 
-        var ancestors = await ReadAncestorsAsync(descendants, ancestor, limiter, cancellationToken).ConfigureAwait(false);
+        // A target that requires active ancestors also asks for its own: they are ancestors of every descendant, so a
+        // machine that may not read them fails while the target has no descendants too, not only once it has one.
+        var kept = descendants.Select(descendant => descendant.Key);
+        var ancestors = await ReadAncestorsAsync(scope.RequireActiveAncestors ? kept.Append(scope.Ancestor) : kept, ancestor, limiter, cancellationToken).ConfigureAwait(false);
 
         if (!scope.RequireActiveAncestors)
         {
@@ -239,12 +242,12 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
         return new Listing(descendants.Where(descendant => AncestorReader.AreActive(descendant.Key, ancestors, now)).ToList(), ancestors);
     }
 
-    // Every distinct ancestor of the descendants, by full key, each read once, at most MaxConcurrentReads at once.
-    // ancestor: the target's own, which the list read already and which is an ancestor of every descendant.
-    private Task<IReadOnlyDictionary<string, AncestorRead>> ReadAncestorsAsync(IReadOnlyList<Listed> descendants, AncestorRead ancestor, SemaphoreSlim limiter, CancellationToken cancellationToken)
+    // Every distinct ancestor of the keys, by full key, each read once, at most MaxConcurrentReads at once. ancestor:
+    // the target's own, which the list read already and which is an ancestor of every descendant.
+    private Task<IReadOnlyDictionary<string, AncestorRead>> ReadAncestorsAsync(IEnumerable<FullKey> keys, AncestorRead ancestor, SemaphoreSlim limiter, CancellationToken cancellationToken)
     {
         return AncestorReader.ReadDistinctAsync(
-            descendants.Select(descendant => descendant.Key),
+            keys,
             ancestor,
             key => PollReads.LimitAsync(limiter, () => ReadAncestorAsync(key, cancellationToken), cancellationToken));
     }

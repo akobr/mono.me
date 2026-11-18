@@ -764,6 +764,24 @@ public sealed class CatalogTests : IDisposable
         _fixture.AnnotationRequests.Count.ShouldBe(2 + 3 + 7);
     }
 
+    // The ancestors of the target are those of every descendant, so they are asked for while it has none too: the
+    // answer does not depend on whether a descendant exists yet.
+    [Fact]
+    public async Task ListAsync_RequiringActiveAncestors_OfNoDescendants_ARestrictedAncestorOfTheTarget_FailsToo()
+    {
+        _catalog.PutWithAncestors(NorthwindUsage);
+        _catalog.Fail(Northwind, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+
+        var exception = await Should.ThrowAsync<StorytellerConfigurationException>(
+            () => Catalog().ListAsync(StorytellerTarget.ExecutionsOf(NorthwindUsage).RequiringActiveAncestors()));
+
+        exception.Key.ShouldBe(FakeCatalog.Full(Northwind));
+        exception.StatusCode.ShouldBe(403);
+        exception.ErrorCode.ShouldBe("AnnotationRestricted");
+        exception.IsTransient.ShouldBeFalse();
+        (await Catalog().ListAsync(StorytellerTarget.ExecutionsOf(NorthwindUsage))).ShouldBeEmpty();
+    }
+
     // Without the requirement the list asks for what it asked for before; with it, also for each distinct ancestor,
     // once.
     [Fact]
