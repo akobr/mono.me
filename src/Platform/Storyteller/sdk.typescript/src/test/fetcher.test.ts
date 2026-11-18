@@ -397,6 +397,19 @@ describe('storytellerFetch step-up', () => {
     expect(onStepUpRequired).toHaveBeenCalledExactlyOnceWith(error)
   })
 
+  it('fails with the step-up also when onStepUpRequired throws', async () => {
+    const onStepUpRequired = vi.fn(() => {
+      throw new Error('the host failed')
+    })
+    const { fetch } = fakeFetch(stepUp())
+    configure({ fetch, getAccessToken: () => 'token', onStepUpRequired })
+
+    const error = await storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+
+    expect(isStepUpRequired(error)).toBe(true)
+    expect(onStepUpRequired).toHaveBeenCalledOnce()
+  })
+
   it('classifies the retried response the same way', async () => {
     const onUnauthorized = vi.fn()
     const onStepUpRequired = vi.fn()

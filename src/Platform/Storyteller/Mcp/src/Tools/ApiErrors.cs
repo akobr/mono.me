@@ -1,4 +1,3 @@
-
 using ModelContextProtocol.Protocol;
 
 using Newtonsoft.Json.Linq;
@@ -153,7 +152,6 @@ public static class ApiErrors
             _ => (null, null, null, null),
         };
     }
-
 
     private static string DefaultMessage(int status)
     {
