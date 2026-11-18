@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // The access audit of the organization (424-263): every change of members, projects, machines, policies, trusted
-// issuers and shared certificates of the organization and its projects. `audit` is a reserved project name, so this
-// path never hides a project. Only the organization's Owners and Administrators read it; below them the page shows
-// why and asks for nothing.
+// issuers and shared certificates of the organization and its projects. `audit` is a reserved project name, so no new
+// project can be hidden by this path; a project named `audit` created before the name was reserved loses its landing
+// page here, while its views and other pages stay reachable. Only the organization's Owners and Administrators read
+// it; below them the page shows why and asks for nothing.
 const canAdmin = useCan('manageAccess', 'org')
 </script>
 

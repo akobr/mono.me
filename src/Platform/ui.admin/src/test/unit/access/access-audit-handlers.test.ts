@@ -8,6 +8,7 @@ import {
   deleteFederatedIssuer,
   deleteMachineAccess,
   getAccessAudit,
+  getKeyValuePolicy,
   issueSharedCertificate,
   removeMember,
   resetMachineAccess,
@@ -307,6 +308,26 @@ describe('access audit mock: the writes', () => {
     await expectError(() => setKeyValuePolicy('acme', 'shipping', { RequireMtlsForSecretDelivery: false }), 403)
     await expectError(() => setMemberRole('acme.shipping', 'user_01MOCKGRACE', { Role: 'Reader' }), 403)
     expect(await count()).toBe(before)
+  })
+
+  it('stores nothing of a key/value policy update that a later check refuses', async () => {
+    // the policy of the mock is seeded on its first read
+    await getKeyValuePolicy('acme', 'billing')
+    const before = await count()
+    const stored = JSON.stringify(loadDb().keyValuePolicies?.['acme.billing'] ?? null)
+
+    // the levels pass (the same, in another order), the default level does not: the whole update is refused
+    await expectError(
+      () =>
+        setKeyValuePolicy('acme', 'billing', {
+          AllowedProtections: ['Hyok', 'Hsm', 'Standard', 'Public'],
+          DefaultSecretProtection: 'Public',
+        }),
+      400,
+    )
+
+    expect(await count()).toBe(before)
+    expect(JSON.stringify(loadDb().keyValuePolicies?.['acme.billing'] ?? null)).toBe(stored)
   })
 
   it('records a change of the key/value policy by its access view, a recipient without its key, and no verification', async () => {

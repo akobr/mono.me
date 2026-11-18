@@ -168,8 +168,10 @@ const projectHandlers: HttpHandler[] = [
         return denied
       }
       const update = (await request.json()) as KeyValuePolicyUpdate
-      const policy = policyOf(db, projectKey)
-      const before = keyValuePolicyValue(policy)
+      // The update works on a copy, stored only when every check passed: a refused update changes nothing.
+      const stored = policyOf(db, projectKey)
+      const policy = structuredClone(stored)
+      const before = keyValuePolicyValue(stored)
 
       if (update.ExpectedVersion !== undefined && update.ExpectedVersion !== null && update.ExpectedVersion !== policy.Version) {
         return errorResponse(409, `The policy is at version ${policy.Version}, not ${update.ExpectedVersion}.`, 'PolicyVersionMismatch')
@@ -243,6 +245,7 @@ const projectHandlers: HttpHandler[] = [
       }
       policy.Version = (policy.Version ?? 0) + 1
       policy.Modified = stamp(db)
+      ;(db.keyValuePolicies ??= {})[projectKey] = policy
       recordAudit(db, projectKey, { Operation: 'PolicyChange', Detail: `Allowed: ${(policy.AllowedProtections ?? []).join(', ')}` })
       recordPolicyChange(db, projectKey, before, policy)
       return HttpResponse.json(policy)
