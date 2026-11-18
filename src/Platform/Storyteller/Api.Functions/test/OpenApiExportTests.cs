@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 using System.Text.Json;
 
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.OpenApi.Filters;
 using _42.Platform.Storyteller.Api.Security;
@@ -859,7 +860,7 @@ public class OpenApiExportTests
         }
 
         ResponseNames(get.Operation).ShouldBe(["200", "304", "401", "403", "404", "500"], ignoreOrder: true);
-        ResponseNames(put.Operation).ShouldBe(["200", "400", "401", "403", "404", "409", "412", "413", "500"], ignoreOrder: true);
+        ResponseNames(put.Operation).ShouldBe(["200", "400", "401", "403", "404", "409", "412", "413", "415", "500"], ignoreOrder: true);
         ResponseNames(patch.Operation).ShouldBe(["200", "400", "401", "403", "404", "409", "412", "413", "415", "500"], ignoreOrder: true);
         get.Operation.GetProperty("responses").GetProperty("304").GetProperty("headers").TryGetProperty("ETag", out _).ShouldBeTrue();
         HeaderParameters(get.Operation).ShouldBe([Definitions.Parameters.IfNoneMatch]);
@@ -875,6 +876,10 @@ public class OpenApiExportTests
         var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
         PropertyNames(schemas, nameof(ProjectSettings)).ShouldBe(["Types", "DefaultTimeZone", "DateFormat", "Version", "Modified"], ignoreOrder: true);
         PropertyNames(schemas, nameof(ProjectTypeAppearance)).ShouldBe(["Label", "Plural", "Color", "Icon"], ignoreOrder: true);
+
+        // a type has its four members only, in a write and in a patch; Types stays a map of the type codes
+        schemas.GetProperty(nameof(ProjectTypeAppearance)).GetProperty("additionalProperties").GetBoolean().ShouldBeFalse();
+        schemas.GetProperty(ProjectSettingsDocumentFilter.AppearancePatchSchema).GetProperty("additionalProperties").GetBoolean().ShouldBeFalse();
         var appearance = schemas.GetProperty(nameof(ProjectTypeAppearance)).GetProperty("properties");
         appearance.GetProperty("Color").TryGetProperty("enum", out _).ShouldBeFalse();
         appearance.GetProperty("Color").GetProperty("description").GetString()!.ShouldContain("conformance/project-settings.json");
@@ -895,6 +900,7 @@ public class OpenApiExportTests
             .GetProperty("$ref").GetString().ShouldBe("#/components/schemas/" + ProjectSettingsDocumentFilter.AppearancePatchSchema);
         var type = schemas.GetProperty(ProjectSettingsDocumentFilter.AppearancePatchSchema);
         type.GetProperty("nullable").GetBoolean().ShouldBeTrue();
+        mergePatch.GetProperty("properties").GetProperty("Types").GetProperty("additionalProperties").ValueKind.ShouldBe(JsonValueKind.Object);
         type.GetProperty("properties").EnumerateObject().Select(member => (member.Name, member.Value.GetProperty("nullable").GetBoolean()))
             .ShouldBe([("Label", true), ("Plural", true), ("Color", true), ("Icon", true)]);
 
@@ -904,6 +910,21 @@ public class OpenApiExportTests
             .Where(parameter => parameter.GetProperty("in").GetString() == "header")
             .Select(parameter => parameter.GetProperty("name").GetString())
             .ToList();
+    }
+
+    // Details are an object for some errors and an array for others (the problems of InvalidSettings): a schema without a
+    // type, any JSON value, which NSwag maps to object and Orval to unknown.
+    [Fact]
+    public async Task Document_ErrorResponseDetails_AreAnyJsonValue()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var details = document.RootElement.GetProperty("components").GetProperty("schemas")
+            .GetProperty(nameof(ErrorResponse)).GetProperty("properties").GetProperty(nameof(ErrorResponse.Details));
+
+        details.EnumerateObject().Select(member => member.Name).ShouldBe(["description"]);
+        details.GetProperty("description").GetString().ShouldBe(ErrorResponseDocumentFilter.DetailsDescription);
     }
 
     // These handlers read their JSON bodies themselves, not through [FromBody], so [OpenApiRequestBody] alone documents

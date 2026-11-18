@@ -9,6 +9,7 @@ namespace _42.Platform.Storyteller.Api.OpenApi.Filters;
 // instead of listing its values as enums, so the SDKs carry no second copy of the colors, icons, date formats and time
 // zones. The merge patch has every member optional and nullable (RFC 7396: null removes), also the members of a type,
 // which ProjectTypeAppearanceMergePatch states: a reference to ProjectTypeAppearance cannot be nullable in OpenAPI 3.0.
+// A type, in a write and in a patch, has no members but its four (additionalProperties false).
 public class ProjectSettingsDocumentFilter : IDocumentFilter
 {
     public const string AppearancePatchSchema = "ProjectTypeAppearanceMergePatch";
@@ -49,6 +50,9 @@ public class ProjectSettingsDocumentFilter : IDocumentFilter
         if (schemas.TryGetValue(nameof(ProjectTypeAppearance), out var appearance))
         {
             Describe(appearance, AppearanceMembers);
+
+            // the API refuses any other member of a type (unknown-member); Types itself stays a map of the type codes
+            appearance.AdditionalPropertiesAllowed = false;
         }
 
         if (!schemas.TryGetValue(nameof(ProjectSettingsMergePatch), out var patch) || patch.Properties is null)
@@ -69,6 +73,7 @@ public class ProjectSettingsDocumentFilter : IDocumentFilter
         {
             Type = "object",
             Nullable = true,
+            AdditionalPropertiesAllowed = false,
             Description = "A merge patch of the appearance of one annotation type: a member left out keeps its value, null goes back to its built-in value; a null type goes back to its built-in appearance.",
             Properties = AppearanceMembers.ToDictionary(
                 member => member.Key,

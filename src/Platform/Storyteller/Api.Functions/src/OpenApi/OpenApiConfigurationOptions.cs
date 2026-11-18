@@ -49,5 +49,6 @@ public class OpenApiConfigurationOptions : DefaultOpenApiConfigurationOptions
         new DateOnlySchemaDocumentFilter(),
         new ByteArraySchemaDocumentFilter(),
         new ForbiddenResponseDocumentFilter(),
+        new ErrorResponseDocumentFilter(),
     ];
 }

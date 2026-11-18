@@ -87,6 +87,7 @@ public class ProjectSettingsHttp
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConflictProjectSettings)]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailedProjectSettings)]
     [OpenApiResponseWithBody(HttpStatusCode.RequestEntityTooLarge, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBodyTooLargeProjectSettings)]
+    [OpenApiResponseWithBody(HttpStatusCode.UnsupportedMediaType, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The body is application/merge-patch+json or application/json-patch+json (ErrorCode InvalidContentType): a PUT replaces the whole settings, so a partial body would reset every type it leaves out. Send a merge patch with PATCH.")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetProjectSettings(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.ProjectSettings)]
@@ -100,6 +101,18 @@ public class ProjectSettingsHttp
         if (!ProjectSettingsConditions.TryRead(request, out var condition, out var conditionError))
         {
             return conditionError!;
+        }
+
+        // A patch sent to the PUT would replace the settings with its few members and reset every type it leaves out.
+        if (IsPatch(request))
+        {
+            return new ObjectResult(new ErrorResponse($"A PUT replaces the whole project settings with an {Definitions.ContentTypes.Json} body; send a merge patch ({Definitions.ContentTypes.MergePatch}) with PATCH.")
+            {
+                ErrorCode = ErrorCodes.InvalidContentType,
+            })
+            {
+                StatusCode = (int)HttpStatusCode.UnsupportedMediaType,
+            };
         }
 
         var (body, bodyError) = await ReadBodyAsync(request);
@@ -218,6 +231,15 @@ public class ProjectSettingsHttp
         return MediaTypeHeaderValue.TryParse(contentType, out var mediaType)
             && (mediaType.MediaType.Equals(Definitions.ContentTypes.MergePatch, StringComparison.OrdinalIgnoreCase)
                 || mediaType.MediaType.Equals(Definitions.ContentTypes.Json, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // application/merge-patch+json or application/json-patch+json: a body that changes settings rather than holds them.
+    private static bool IsPatch(HttpRequestData request)
+    {
+        return request.Headers.TryGetValues(HeaderNames.ContentType, out var values)
+            && MediaTypeHeaderValue.TryParse(string.Join(",", values), out var mediaType)
+            && (mediaType.MediaType.Equals(Definitions.ContentTypes.MergePatch, StringComparison.OrdinalIgnoreCase)
+                || mediaType.MediaType.Equals(Definitions.ContentTypes.JsonPatch, StringComparison.OrdinalIgnoreCase));
     }
 
     // The body without its byte order mark, or the 413 of a body above RequestBodyLimits.ProjectSettings. A body of

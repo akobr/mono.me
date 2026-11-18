@@ -391,6 +391,40 @@ public class ProjectSettingsHttpTests
         settings.Calls.ShouldBeEmpty();
     }
 
+    // A PUT replaces every member, so a patch sent to it would reset every type it leaves out.
+    [Theory]
+    [InlineData("application/merge-patch+json")]
+    [InlineData("application/merge-patch+json; charset=utf-8")]
+    [InlineData("APPLICATION/JSON-PATCH+JSON")]
+    public async Task Put_OfAPatchMediaType_IsUnsupported(string contentType)
+    {
+        var settings = new FakeProjectSettings();
+        var request = WithContext(BodyRequest("PUT", """{ "Types": { "sbt": { "Color": "pink" } } }""", contentType));
+
+        var result = await Http(settings, new RoleAccess(AccountRole.Administrator)).SetProjectSettings(request, Org, Project);
+
+        var unsupported = result.ShouldBeOfType<ObjectResult>();
+        unsupported.StatusCode.ShouldBe((int)HttpStatusCode.UnsupportedMediaType);
+        var error = unsupported.Value.ShouldBeOfType<ErrorResponse>();
+        error.ErrorCode.ShouldBe(ErrorCodes.InvalidContentType);
+        error.Message.ShouldBe("A PUT replaces the whole project settings with an application/json body; send a merge patch (application/merge-patch+json) with PATCH.");
+        settings.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("application/json")]
+    [InlineData("application/json; charset=utf-8")]
+    [InlineData(null)]
+    public async Task Put_OfJsonOrWithoutAMediaType_IsTaken(string? contentType)
+    {
+        var settings = new FakeProjectSettings();
+        var request = WithContext(BodyRequest("PUT", """{ "Types": { "sbt": { "Color": "pink" } } }""", contentType));
+
+        var result = await Http(settings, new RoleAccess(AccountRole.Administrator)).SetProjectSettings(request, Org, Project);
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<ProjectSettings>().Types["sbt"].Color.ShouldBe("pink");
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("[]")]
@@ -447,9 +481,11 @@ public class ProjectSettingsHttpTests
 
     private static TestHttpRequestData MergePatchRequest(string body) => PatchRequest(body, "application/merge-patch+json");
 
-    private static TestHttpRequestData PatchRequest(string body, string? contentType)
+    private static TestHttpRequestData PatchRequest(string body, string? contentType) => BodyRequest("PATCH", body, contentType);
+
+    private static TestHttpRequestData BodyRequest(string method, string body, string? contentType)
     {
-        var request = TestRequests.User("PATCH", body);
+        var request = TestRequests.User(method, body);
         request.Headers.Remove(HeaderNames.ContentType);
 
         if (contentType is not null)

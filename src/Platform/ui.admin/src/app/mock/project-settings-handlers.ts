@@ -98,6 +98,12 @@ function isMergePatch(request: Request): boolean {
   return !type || type === mergePatch || type === 'application/json'
 }
 
+// A patch sent to the PUT, which would reset every type it leaves out, as the API refuses it.
+function isPatch(request: Request): boolean {
+  const type = request.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase()
+  return type === mergePatch || type === 'application/json-patch+json'
+}
+
 export const projectSettingsHandlers: HttpHandler[] = [
   http.get(
     `${api}/:org/:project/settings`,
@@ -134,6 +140,13 @@ export const projectSettingsHandlers: HttpHandler[] = [
       const condition = conditionOf(request)
       if (condition instanceof Response) {
         return condition
+      }
+      if (isPatch(request)) {
+        return errorResponse(
+          415,
+          `A PUT replaces the whole project settings with an application/json body; send a merge patch (${mergePatch}) with PATCH.`,
+          'InvalidContentType',
+        )
       }
 
       const text = await request.text()
