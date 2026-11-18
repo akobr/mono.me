@@ -3,15 +3,15 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.50.58415
+ * OpenAPI spec version: 0.10.55.3770
  */
-import type { ErrorResponseDetails } from "./errorResponseDetails";
 import type { ExceptionWrapper } from "./exceptionWrapper";
 
 export interface ErrorResponse {
   Message?: string;
   Hint?: string;
   ErrorCode?: string;
-  Details?: ErrorResponseDetails;
+  /** Structured details of some errors, any JSON value: an object, such as the Version of SettingsPreconditionFailed or the Format, Rule and Path of format.<rule>, or an array, such as the problems of InvalidSettings, each with its Path, Rule and Message. */
+  Details?: unknown;
   Error?: ExceptionWrapper;
 }

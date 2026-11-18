@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.50.58415
+ * OpenAPI spec version: 0.10.55.3770
  */
 import * as zod from "zod";
 
@@ -158,6 +158,8 @@ export const CreateAccountResponse = zod.object({
     .optional(),
 });
 
+export const getAccessPointsResponseSettingsModifiedByKindDefault = `Account`;
+
 export const GetAccessPointsResponseItem = zod.object({
   Key: zod.string().optional(),
   AccessMap: zod
@@ -200,6 +202,77 @@ export const GetAccessPointsResponseItem = zod.object({
     })
     .optional(),
   Description: zod.string().optional(),
+  Settings: zod
+    .object({
+      Types: zod
+        .record(
+          zod.string(),
+          zod.object({
+            Label: zod
+              .string()
+              .optional()
+              .describe(
+                "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+              ),
+            Plural: zod
+              .string()
+              .optional()
+              .describe(
+                "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+              ),
+            Color: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+              ),
+            Icon: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+              ),
+          }),
+        )
+        .optional()
+        .describe(
+          "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+        ),
+      DefaultTimeZone: zod
+        .string()
+        .optional()
+        .describe(
+          "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+        ),
+      DateFormat: zod
+        .string()
+        .optional()
+        .describe(
+          "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+        ),
+      Version: zod
+        .int()
+        .optional()
+        .describe(
+          "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+        ),
+      Modified: zod
+        .object({
+          At: zod.iso.datetime({ offset: true }).optional(),
+          By: zod
+            .object({
+              Kind: zod
+                .enum(["Account", "Machine", "System"])
+                .default(getAccessPointsResponseSettingsModifiedByKindDefault),
+              Id: zod.string().optional(),
+              Name: zod.string().optional(),
+              Via: zod.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 export const GetAccessPointsResponse = zod.array(GetAccessPointsResponseItem);
 
@@ -209,6 +282,8 @@ export const CreateAccessPointBody = zod.object({
   ProjectDescription: zod.string().optional(),
   OwnerId: zod.string().optional(),
 });
+
+export const createAccessPointResponseSettingsModifiedByKindDefault = `Account`;
 
 export const CreateAccessPointResponse = zod.object({
   Key: zod.string().optional(),
@@ -252,11 +327,89 @@ export const CreateAccessPointResponse = zod.object({
     })
     .optional(),
   Description: zod.string().optional(),
+  Settings: zod
+    .object({
+      Types: zod
+        .record(
+          zod.string(),
+          zod.object({
+            Label: zod
+              .string()
+              .optional()
+              .describe(
+                "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+              ),
+            Plural: zod
+              .string()
+              .optional()
+              .describe(
+                "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+              ),
+            Color: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+              ),
+            Icon: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+              ),
+          }),
+        )
+        .optional()
+        .describe(
+          "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+        ),
+      DefaultTimeZone: zod
+        .string()
+        .optional()
+        .describe(
+          "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+        ),
+      DateFormat: zod
+        .string()
+        .optional()
+        .describe(
+          "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+        ),
+      Version: zod
+        .int()
+        .optional()
+        .describe(
+          "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+        ),
+      Modified: zod
+        .object({
+          At: zod.iso.datetime({ offset: true }).optional(),
+          By: zod
+            .object({
+              Kind: zod
+                .enum(["Account", "Machine", "System"])
+                .default(
+                  createAccessPointResponseSettingsModifiedByKindDefault,
+                ),
+              Id: zod.string().optional(),
+              Name: zod.string().optional(),
+              Via: zod.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
+/**
+ * An organization or a project, with its members and policies, and for a project its description and settings (the defaults, Version 0, when none were set). Needs a user with the Administrator role.
+ */
 export const GetAccessPointParams = zod.object({
   key: zod.string().describe("The key of requested access point."),
 });
+
+export const getAccessPointResponseSettingsModifiedByKindDefault = `Account`;
 
 export const GetAccessPointResponse = zod.object({
   Key: zod.string().optional(),
@@ -300,6 +453,77 @@ export const GetAccessPointResponse = zod.object({
     })
     .optional(),
   Description: zod.string().optional(),
+  Settings: zod
+    .object({
+      Types: zod
+        .record(
+          zod.string(),
+          zod.object({
+            Label: zod
+              .string()
+              .optional()
+              .describe(
+                "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+              ),
+            Plural: zod
+              .string()
+              .optional()
+              .describe(
+                "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+              ),
+            Color: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+              ),
+            Icon: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+              ),
+          }),
+        )
+        .optional()
+        .describe(
+          "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+        ),
+      DefaultTimeZone: zod
+        .string()
+        .optional()
+        .describe(
+          "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+        ),
+      DateFormat: zod
+        .string()
+        .optional()
+        .describe(
+          "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+        ),
+      Version: zod
+        .int()
+        .optional()
+        .describe(
+          "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+        ),
+      Modified: zod
+        .object({
+          At: zod.iso.datetime({ offset: true }).optional(),
+          By: zod
+            .object({
+              Kind: zod
+                .enum(["Account", "Machine", "System"])
+                .default(getAccessPointResponseSettingsModifiedByKindDefault),
+              Id: zod.string().optional(),
+              Name: zod.string().optional(),
+              Via: zod.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -312,6 +536,8 @@ export const UpdateAccessPointParams = zod.object({
 export const UpdateAccessPointBody = zod.object({
   Description: zod.string().optional(),
 });
+
+export const updateAccessPointResponseSettingsModifiedByKindDefault = `Account`;
 
 export const UpdateAccessPointResponse = zod.object({
   Key: zod.string().optional(),
@@ -355,12 +581,86 @@ export const UpdateAccessPointResponse = zod.object({
     })
     .optional(),
   Description: zod.string().optional(),
+  Settings: zod
+    .object({
+      Types: zod
+        .record(
+          zod.string(),
+          zod.object({
+            Label: zod
+              .string()
+              .optional()
+              .describe(
+                "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+              ),
+            Plural: zod
+              .string()
+              .optional()
+              .describe(
+                "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+              ),
+            Color: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+              ),
+            Icon: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+              ),
+          }),
+        )
+        .optional()
+        .describe(
+          "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+        ),
+      DefaultTimeZone: zod
+        .string()
+        .optional()
+        .describe(
+          "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+        ),
+      DateFormat: zod
+        .string()
+        .optional()
+        .describe(
+          "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+        ),
+      Version: zod
+        .int()
+        .optional()
+        .describe(
+          "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+        ),
+      Modified: zod
+        .object({
+          At: zod.iso.datetime({ offset: true }).optional(),
+          By: zod
+            .object({
+              Kind: zod
+                .enum(["Account", "Machine", "System"])
+                .default(
+                  updateAccessPointResponseSettingsModifiedByKindDefault,
+                ),
+              Id: zod.string().optional(),
+              Name: zod.string().optional(),
+              Via: zod.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
- * Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
+ * Every project where the caller has a role, with the role, the description and the settings (the defaults, Version 0, when none were set), ordered by key. The members and the policies of a project are not included.
  */
 export const getProjectsResponseRoleDefault = `None`;
+export const getProjectsResponseSettingsModifiedByKindDefault = `Account`;
 
 export const GetProjectsResponseItem = zod.object({
   Key: zod.string().optional(),
@@ -375,6 +675,77 @@ export const GetProjectsResponseItem = zod.object({
     ])
     .default(getProjectsResponseRoleDefault),
   Description: zod.string().optional(),
+  Settings: zod
+    .object({
+      Types: zod
+        .record(
+          zod.string(),
+          zod.object({
+            Label: zod
+              .string()
+              .optional()
+              .describe(
+                "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+              ),
+            Plural: zod
+              .string()
+              .optional()
+              .describe(
+                "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+              ),
+            Color: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+              ),
+            Icon: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+              ),
+          }),
+        )
+        .optional()
+        .describe(
+          "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+        ),
+      DefaultTimeZone: zod
+        .string()
+        .optional()
+        .describe(
+          "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+        ),
+      DateFormat: zod
+        .string()
+        .optional()
+        .describe(
+          "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+        ),
+      Version: zod
+        .int()
+        .optional()
+        .describe(
+          "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+        ),
+      Modified: zod
+        .object({
+          At: zod.iso.datetime({ offset: true }).optional(),
+          By: zod
+            .object({
+              Kind: zod
+                .enum(["Account", "Machine", "System"])
+                .default(getProjectsResponseSettingsModifiedByKindDefault),
+              Id: zod.string().optional(),
+              Name: zod.string().optional(),
+              Via: zod.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 export const GetProjectsResponse = zod.array(GetProjectsResponseItem);
 
@@ -398,6 +769,8 @@ export const GrantUserAccessBody = zod.object({
     ])
     .default(grantUserAccessBodyRoleDefault),
 });
+
+export const grantUserAccessResponseSettingsModifiedByKindDefault = `Account`;
 
 export const GrantUserAccessResponse = zod.object({
   Key: zod.string().optional(),
@@ -441,6 +814,77 @@ export const GrantUserAccessResponse = zod.object({
     })
     .optional(),
   Description: zod.string().optional(),
+  Settings: zod
+    .object({
+      Types: zod
+        .record(
+          zod.string(),
+          zod.object({
+            Label: zod
+              .string()
+              .optional()
+              .describe(
+                "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+              ),
+            Plural: zod
+              .string()
+              .optional()
+              .describe(
+                "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+              ),
+            Color: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+              ),
+            Icon: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+              ),
+          }),
+        )
+        .optional()
+        .describe(
+          "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+        ),
+      DefaultTimeZone: zod
+        .string()
+        .optional()
+        .describe(
+          "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+        ),
+      DateFormat: zod
+        .string()
+        .optional()
+        .describe(
+          "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+        ),
+      Version: zod
+        .int()
+        .optional()
+        .describe(
+          "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+        ),
+      Modified: zod
+        .object({
+          At: zod.iso.datetime({ offset: true }).optional(),
+          By: zod
+            .object({
+              Kind: zod
+                .enum(["Account", "Machine", "System"])
+                .default(grantUserAccessResponseSettingsModifiedByKindDefault),
+              Id: zod.string().optional(),
+              Name: zod.string().optional(),
+              Via: zod.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -463,6 +907,8 @@ export const RevokeUserAccessBody = zod.object({
     ])
     .default(revokeUserAccessBodyRoleDefault),
 });
+
+export const revokeUserAccessResponseSettingsModifiedByKindDefault = `Account`;
 
 export const RevokeUserAccessResponse = zod.object({
   Key: zod.string().optional(),
@@ -506,6 +952,77 @@ export const RevokeUserAccessResponse = zod.object({
     })
     .optional(),
   Description: zod.string().optional(),
+  Settings: zod
+    .object({
+      Types: zod
+        .record(
+          zod.string(),
+          zod.object({
+            Label: zod
+              .string()
+              .optional()
+              .describe(
+                "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+              ),
+            Plural: zod
+              .string()
+              .optional()
+              .describe(
+                "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+              ),
+            Color: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+              ),
+            Icon: zod
+              .string()
+              .optional()
+              .describe(
+                "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+              ),
+          }),
+        )
+        .optional()
+        .describe(
+          "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+        ),
+      DefaultTimeZone: zod
+        .string()
+        .optional()
+        .describe(
+          "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+        ),
+      DateFormat: zod
+        .string()
+        .optional()
+        .describe(
+          "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+        ),
+      Version: zod
+        .int()
+        .optional()
+        .describe(
+          "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+        ),
+      Modified: zod
+        .object({
+          At: zod.iso.datetime({ offset: true }).optional(),
+          By: zod
+            .object({
+              Kind: zod
+                .enum(["Account", "Machine", "System"])
+                .default(revokeUserAccessResponseSettingsModifiedByKindDefault),
+              Id: zod.string().optional(),
+              Name: zod.string().optional(),
+              Via: zod.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const GetMachineAccessesParams = zod.object({
@@ -1633,6 +2150,399 @@ export const RemoveMemberParams = zod.object({
 });
 
 export const RemoveMemberResponse = zod.void();
+
+/**
+ * The settings of the project: the names, colors and icons of its annotation types, the time zone new annotations start in and the date format, for every client to show the project the same way. When nothing was set: Types {}, no DefaultTimeZone (UTC), no DateFormat (yyyy-mm-dd) and Version 0. Every member of the project reads them, also a machine restricted to an annotation; the ETag is the Version in quotes.
+ */
+export const GetProjectSettingsParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+});
+
+export const GetProjectSettingsHeader = zod.object({
+  "If-None-Match": zod
+    .string()
+    .optional()
+    .describe(
+      "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
+    ),
+});
+
+export const getProjectSettingsResponseModifiedByKindDefault = `Account`;
+
+export const GetProjectSettingsResponse = zod.object({
+  Types: zod
+    .record(
+      zod.string(),
+      zod.object({
+        Label: zod
+          .string()
+          .optional()
+          .describe(
+            "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+          ),
+        Plural: zod
+          .string()
+          .optional()
+          .describe(
+            "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+          ),
+        Color: zod
+          .string()
+          .optional()
+          .describe(
+            "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+          ),
+        Icon: zod
+          .string()
+          .optional()
+          .describe(
+            "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+          ),
+      }),
+    )
+    .optional()
+    .describe(
+      "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+    ),
+  DefaultTimeZone: zod
+    .string()
+    .optional()
+    .describe(
+      "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+    ),
+  DateFormat: zod
+    .string()
+    .optional()
+    .describe(
+      "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+    ),
+  Version: zod
+    .int()
+    .optional()
+    .describe(
+      "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+    ),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getProjectSettingsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version, Modified and Format in the body are ignored, so a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.
+ */
+export const SetProjectSettingsParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+});
+
+export const SetProjectSettingsHeader = zod.object({
+  "If-Match": zod
+    .string()
+    .optional()
+    .describe(
+      '* or one or more entity tags of reads of the settings (their Version in quotes, such as "7"). The write happens only when the settings are at one of these versions (* matches any, as the settings always exist); otherwise 412 (ErrorCode SettingsPreconditionFailed, Details.Version is the current version). The comparison is strong, so a weak tag never matches. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition), and so is If-None-Match, as the settings always exist.',
+    ),
+});
+
+export const setProjectSettingsBodyModifiedByKindDefault = `Account`;
+
+export const SetProjectSettingsBody = zod.object({
+  Types: zod
+    .record(
+      zod.string(),
+      zod.object({
+        Label: zod
+          .string()
+          .optional()
+          .describe(
+            "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+          ),
+        Plural: zod
+          .string()
+          .optional()
+          .describe(
+            "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+          ),
+        Color: zod
+          .string()
+          .optional()
+          .describe(
+            "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+          ),
+        Icon: zod
+          .string()
+          .optional()
+          .describe(
+            "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+          ),
+      }),
+    )
+    .optional()
+    .describe(
+      "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+    ),
+  DefaultTimeZone: zod
+    .string()
+    .optional()
+    .describe(
+      "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+    ),
+  DateFormat: zod
+    .string()
+    .optional()
+    .describe(
+      "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+    ),
+  Version: zod
+    .int()
+    .optional()
+    .describe(
+      "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+    ),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setProjectSettingsBodyModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+export const setProjectSettingsResponseModifiedByKindDefault = `Account`;
+
+export const SetProjectSettingsResponse = zod.object({
+  Types: zod
+    .record(
+      zod.string(),
+      zod.object({
+        Label: zod
+          .string()
+          .optional()
+          .describe(
+            "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+          ),
+        Plural: zod
+          .string()
+          .optional()
+          .describe(
+            "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+          ),
+        Color: zod
+          .string()
+          .optional()
+          .describe(
+            "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+          ),
+        Icon: zod
+          .string()
+          .optional()
+          .describe(
+            "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+          ),
+      }),
+    )
+    .optional()
+    .describe(
+      "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+    ),
+  DefaultTimeZone: zod
+    .string()
+    .optional()
+    .describe(
+      "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+    ),
+  DateFormat: zod
+    .string()
+    .optional()
+    .describe(
+      "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+    ),
+  Version: zod
+    .int()
+    .optional()
+    .describe(
+      "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+    ),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setProjectSettingsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Changes members of the settings of the project, merged on the server against their current state. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json; application/json is taken too): a member left out keeps its value, null removes it (a type goes back to its built-in appearance, DefaultTimeZone to UTC, DateFormat to yyyy-mm-dd), Types merge type by type and the members of a type one by one; member names and type codes match case-insensitively. The result is checked as a full write; a patch that changes nothing keeps the version. Needs a user with the Administrator role.
+ */
+export const PatchProjectSettingsParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+});
+
+export const PatchProjectSettingsHeader = zod.object({
+  "If-Match": zod
+    .string()
+    .optional()
+    .describe(
+      '* or one or more entity tags of reads of the settings (their Version in quotes, such as "7"). The write happens only when the settings are at one of these versions (* matches any, as the settings always exist); otherwise 412 (ErrorCode SettingsPreconditionFailed, Details.Version is the current version). The comparison is strong, so a weak tag never matches. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition), and so is If-None-Match, as the settings always exist.',
+    ),
+});
+
+export const PatchProjectSettingsBody = zod.object({
+  Types: zod
+    .record(
+      zod.string(),
+      zod
+        .object({
+          Label: zod
+            .string()
+            .nullish()
+            .describe(
+              "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+            ),
+          Plural: zod
+            .string()
+            .nullish()
+            .describe(
+              "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+            ),
+          Color: zod
+            .string()
+            .nullish()
+            .describe(
+              "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+            ),
+          Icon: zod
+            .string()
+            .nullish()
+            .describe(
+              "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+            ),
+        })
+        .nullable()
+        .describe(
+          "A merge patch of the appearance of one annotation type: a member left out keeps its value, null goes back to its built-in value; a null type goes back to its built-in appearance.",
+        ),
+    )
+    .nullish()
+    .describe(
+      "The changes of the appearance of annotation types, keyed by type code (rst, unt, sbt, usg, cnt, exe, uxe; any case). A type left out keeps its appearance; a null type goes back to its built-in appearance, a null member of a type to its built-in value.",
+    ),
+  DefaultTimeZone: zod
+    .string()
+    .nullish()
+    .describe(
+      "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+    ),
+  DateFormat: zod
+    .string()
+    .nullish()
+    .describe(
+      "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+    ),
+});
+
+export const patchProjectSettingsResponseModifiedByKindDefault = `Account`;
+
+export const PatchProjectSettingsResponse = zod.object({
+  Types: zod
+    .record(
+      zod.string(),
+      zod.object({
+        Label: zod
+          .string()
+          .optional()
+          .describe(
+            "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+          ),
+        Plural: zod
+          .string()
+          .optional()
+          .describe(
+            "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
+          ),
+        Color: zod
+          .string()
+          .optional()
+          .describe(
+            "One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.",
+          ),
+        Icon: zod
+          .string()
+          .optional()
+          .describe(
+            "One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.",
+          ),
+      }),
+    )
+    .optional()
+    .describe(
+      "The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.",
+    ),
+  DefaultTimeZone: zod
+    .string()
+    .optional()
+    .describe(
+      "The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.",
+    ),
+  DateFormat: zod
+    .string()
+    .optional()
+    .describe(
+      "How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.",
+    ),
+  Version: zod
+    .int()
+    .optional()
+    .describe(
+      "Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.",
+    ),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(patchProjectSettingsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
 
 /**
  * Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.50.58415
+ * OpenAPI spec version: 0.10.55.3770
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -47,6 +47,8 @@ import type {
   MemberRoleUpdate,
   OAuthErrorResponse,
   Permission,
+  ProjectSettings,
+  ProjectSettingsMergePatch,
   ProjectSummary,
   PublicJsonWebKeySet,
   SharedCertificate,
@@ -568,6 +570,9 @@ export const getGetAccessPointUrl = (key: string) => {
   return `/v1/access/points/${encodeURIComponent(String(key))}`;
 };
 
+/**
+ * An organization or a project, with its members and policies, and for a project its description and settings (the defaults, Version 0, when none were set). Needs a user with the Administrator role.
+ */
 export const getAccessPoint = async (
   key: string,
   options?: Parameters<typeof storytellerFetch>[1],
@@ -775,7 +780,7 @@ export const getGetProjectsUrl = () => {
 };
 
 /**
- * Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
+ * Every project where the caller has a role, with the role, the description and the settings (the defaults, Version 0, when none were set), ordered by key. The members and the policies of a project are not included.
  */
 export const getProjects = async (
   options?: Parameters<typeof storytellerFetch>[1],
@@ -4576,6 +4581,386 @@ export const useRemoveMember = <
   TContext
 > => {
   return useMutation(getRemoveMemberMutationOptions(options), queryClient);
+};
+export const getGetProjectSettingsUrl = (
+  organization: string,
+  project: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/settings`;
+};
+
+/**
+ * The settings of the project: the names, colors and icons of its annotation types, the time zone new annotations start in and the date format, for every client to show the project the same way. When nothing was set: Types {}, no DefaultTimeZone (UTC), no DateFormat (yyyy-mm-dd) and Version 0. Every member of the project reads them, also a machine restricted to an annotation; the ETag is the Version in quotes.
+ */
+export const getProjectSettings = async (
+  organization: string,
+  project: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<ProjectSettings> => {
+  return storytellerFetch<ProjectSettings>(
+    getGetProjectSettingsUrl(organization, project),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetProjectSettingsQueryKey = (
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+) => {
+  return ["v1", organization, project, "settings"] as const;
+};
+
+export const getGetProjectSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProjectSettings>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProjectSettings>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetProjectSettingsQueryKey(organization, project);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProjectSettings>>
+  > = ({ signal }) =>
+    getProjectSettings(toValue(organization), toValue(project), {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(organization) !== null &&
+        toValue(organization) !== undefined &&
+        toValue(project) !== null &&
+        toValue(project) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProjectSettings>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetProjectSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProjectSettings>>
+>;
+export type GetProjectSettingsQueryError = ErrorType<void | ErrorResponse>;
+
+export function useGetProjectSettings<
+  TData = Awaited<ReturnType<typeof getProjectSettings>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProjectSettings>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetProjectSettingsQueryOptions(
+    organization,
+    project,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getSetProjectSettingsUrl = (
+  organization: string,
+  project: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/settings`;
+};
+
+/**
+ * Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version, Modified and Format in the body are ignored, so a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.
+ */
+export const setProjectSettings = async (
+  organization: string,
+  project: string,
+  projectSettings: ProjectSettings,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<ProjectSettings> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<ProjectSettings>(
+    getSetProjectSettingsUrl(organization, project),
+    {
+      ...options,
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(projectSettings),
+    },
+  );
+};
+
+export const getSetProjectSettingsMutationKey = () =>
+  ["setProjectSettings"] as const;
+
+export const getSetProjectSettingsMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setProjectSettings>>,
+    TError,
+    SetProjectSettingsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setProjectSettings>>,
+  TError,
+  SetProjectSettingsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetProjectSettingsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setProjectSettings>>,
+    SetProjectSettingsMutationVariables
+  > = (props) => {
+    const { organization, project, data } = props ?? {};
+
+    return setProjectSettings(organization, project, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetProjectSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setProjectSettings>>
+>;
+export type SetProjectSettingsMutationBody = BodyType<ProjectSettings>;
+export type SetProjectSettingsMutationError = ErrorType<ErrorResponse | void>;
+export type SetProjectSettingsMutationVariables = {
+  organization: string;
+  project: string;
+  data: BodyType<ProjectSettings>;
+};
+
+export const useSetProjectSettings = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setProjectSettings>>,
+      TError,
+      SetProjectSettingsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof setProjectSettings>>,
+  TError,
+  SetProjectSettingsMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getSetProjectSettingsMutationOptions(options),
+    queryClient,
+  );
+};
+export const getPatchProjectSettingsUrl = (
+  organization: string,
+  project: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/settings`;
+};
+
+/**
+ * Changes members of the settings of the project, merged on the server against their current state. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json; application/json is taken too): a member left out keeps its value, null removes it (a type goes back to its built-in appearance, DefaultTimeZone to UTC, DateFormat to yyyy-mm-dd), Types merge type by type and the members of a type one by one; member names and type codes match case-insensitively. The result is checked as a full write; a patch that changes nothing keeps the version. Needs a user with the Administrator role.
+ */
+export const patchProjectSettings = async (
+  organization: string,
+  project: string,
+  projectSettingsMergePatch: ProjectSettingsMergePatch,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<ProjectSettings> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<ProjectSettings>(
+    getPatchProjectSettingsUrl(organization, project),
+    {
+      ...options,
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/merge-patch+json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(projectSettingsMergePatch),
+    },
+  );
+};
+
+export const getPatchProjectSettingsMutationKey = () =>
+  ["patchProjectSettings"] as const;
+
+export const getPatchProjectSettingsMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchProjectSettings>>,
+    TError,
+    PatchProjectSettingsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof patchProjectSettings>>,
+  TError,
+  PatchProjectSettingsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPatchProjectSettingsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof patchProjectSettings>>,
+    PatchProjectSettingsMutationVariables
+  > = (props) => {
+    const { organization, project, data } = props ?? {};
+
+    return patchProjectSettings(organization, project, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PatchProjectSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchProjectSettings>>
+>;
+export type PatchProjectSettingsMutationBody =
+  BodyType<ProjectSettingsMergePatch>;
+export type PatchProjectSettingsMutationError = ErrorType<ErrorResponse | void>;
+export type PatchProjectSettingsMutationVariables = {
+  organization: string;
+  project: string;
+  data: BodyType<ProjectSettingsMergePatch>;
+};
+
+export const usePatchProjectSettings = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof patchProjectSettings>>,
+      TError,
+      PatchProjectSettingsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof patchProjectSettings>>,
+  TError,
+  PatchProjectSettingsMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getPatchProjectSettingsMutationOptions(options),
+    queryClient,
+  );
 };
 export const getExchangeUserTokenUrl = () => {
   return `/v1/access/token`;

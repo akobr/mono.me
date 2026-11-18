@@ -3,12 +3,14 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.50.58415
+ * OpenAPI spec version: 0.10.55.3770
  */
+import type { ProjectSettings } from "./projectSettings";
 import type { ProjectSummaryRole } from "./projectSummaryRole";
 
 export interface ProjectSummary {
   Key?: string;
   Role?: ProjectSummaryRole;
   Description?: string;
+  Settings?: ProjectSettings;
 }

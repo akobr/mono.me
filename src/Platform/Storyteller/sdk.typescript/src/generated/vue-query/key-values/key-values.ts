@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.50.58415
+ * OpenAPI spec version: 0.10.55.3770
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -3090,7 +3090,7 @@ export const getGetKeyValueAuditUrl = (
 };
 
 /**
- * The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy or the keys, and the aggregated binding reads. Never a value. Administrator only.
+ * The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy, the keys or the project settings, and the aggregated binding reads. Never a value. Administrator only.
  */
 export const getKeyValueAudit = async (
   organization: string,

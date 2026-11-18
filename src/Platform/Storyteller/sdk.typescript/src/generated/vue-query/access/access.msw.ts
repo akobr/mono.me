@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.50.58415
+ * OpenAPI spec version: 0.10.55.3770
  */
 import { faker } from "@faker-js/faker";
 
@@ -25,6 +25,7 @@ import type {
   MachineAccess,
   MachineAuthenticationPolicy,
   MachineTokenResponse,
+  ProjectSettings,
   ProjectSummary,
   PublicJsonWebKeySet,
   SharedCertificate,
@@ -235,6 +236,74 @@ export const getGetAccessPointsResponseMock = (): AccessPoint[] =>
       faker.string.alpha({ length: { min: 10, max: 20 } }),
       undefined,
     ]),
+    Settings: faker.helpers.arrayElement([
+      {
+        Types: faker.helpers.arrayElement([
+          {
+            [faker.string.alphanumeric(5)]: {
+              Label: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Plural: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Color: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Icon: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+          },
+          undefined,
+        ]),
+        DefaultTimeZone: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        DateFormat: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+        Modified: faker.helpers.arrayElement([
+          {
+            At: faker.helpers.arrayElement([
+              faker.date.past().toISOString().slice(0, 19) + "Z",
+              undefined,
+            ]),
+            By: faker.helpers.arrayElement([
+              {
+                Kind: faker.helpers.arrayElement([
+                  "Account",
+                  "Machine",
+                  "System",
+                ] as const),
+                Id: faker.helpers.arrayElement([
+                  faker.string.alpha({ length: { min: 10, max: 20 } }),
+                  undefined,
+                ]),
+                Name: faker.helpers.arrayElement([
+                  faker.string.alpha({ length: { min: 10, max: 20 } }),
+                  undefined,
+                ]),
+                Via: faker.helpers.arrayElement([
+                  faker.string.alpha({ length: { min: 10, max: 20 } }),
+                  undefined,
+                ]),
+              },
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
+      undefined,
+    ]),
   }));
 
 export const getCreateAccessPointResponseMock = (
@@ -277,6 +346,74 @@ export const getCreateAccessPointResponseMock = (
   ]),
   Description: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Settings: faker.helpers.arrayElement([
+    {
+      Types: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: {
+            Label: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Plural: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Color: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Icon: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+        },
+        undefined,
+      ]),
+      DefaultTimeZone: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DateFormat: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   ...overrideResponse,
@@ -324,6 +461,74 @@ export const getGetAccessPointResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
+  Settings: faker.helpers.arrayElement([
+    {
+      Types: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: {
+            Label: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Plural: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Color: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Icon: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+        },
+        undefined,
+      ]),
+      DefaultTimeZone: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DateFormat: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
   ...overrideResponse,
 });
 
@@ -369,6 +574,74 @@ export const getUpdateAccessPointResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
+  Settings: faker.helpers.arrayElement([
+    {
+      Types: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: {
+            Label: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Plural: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Color: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Icon: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+        },
+        undefined,
+      ]),
+      DefaultTimeZone: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DateFormat: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
   ...overrideResponse,
 });
 
@@ -391,6 +664,74 @@ export const getGetProjectsResponseMock = (): ProjectSummary[] =>
     ] as const),
     Description: faker.helpers.arrayElement([
       faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    Settings: faker.helpers.arrayElement([
+      {
+        Types: faker.helpers.arrayElement([
+          {
+            [faker.string.alphanumeric(5)]: {
+              Label: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Plural: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Color: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Icon: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+          },
+          undefined,
+        ]),
+        DefaultTimeZone: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        DateFormat: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+        Modified: faker.helpers.arrayElement([
+          {
+            At: faker.helpers.arrayElement([
+              faker.date.past().toISOString().slice(0, 19) + "Z",
+              undefined,
+            ]),
+            By: faker.helpers.arrayElement([
+              {
+                Kind: faker.helpers.arrayElement([
+                  "Account",
+                  "Machine",
+                  "System",
+                ] as const),
+                Id: faker.helpers.arrayElement([
+                  faker.string.alpha({ length: { min: 10, max: 20 } }),
+                  undefined,
+                ]),
+                Name: faker.helpers.arrayElement([
+                  faker.string.alpha({ length: { min: 10, max: 20 } }),
+                  undefined,
+                ]),
+                Via: faker.helpers.arrayElement([
+                  faker.string.alpha({ length: { min: 10, max: 20 } }),
+                  undefined,
+                ]),
+              },
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
       undefined,
     ]),
   }));
@@ -437,6 +778,74 @@ export const getGrantUserAccessResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
+  Settings: faker.helpers.arrayElement([
+    {
+      Types: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: {
+            Label: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Plural: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Color: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Icon: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+        },
+        undefined,
+      ]),
+      DefaultTimeZone: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DateFormat: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
   ...overrideResponse,
 });
 
@@ -480,6 +889,74 @@ export const getRevokeUserAccessResponseMock = (
   ]),
   Description: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Settings: faker.helpers.arrayElement([
+    {
+      Types: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: {
+            Label: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Plural: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Color: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Icon: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+        },
+        undefined,
+      ]),
+      DefaultTimeZone: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DateFormat: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   ...overrideResponse,
@@ -1872,6 +2349,213 @@ export const getSetMemberRoleResponseMock = (
   ...overrideResponse,
 });
 
+export const getGetProjectSettingsResponseMock = (
+  overrideResponse: Partial<Extract<ProjectSettings, object>> = {},
+): ProjectSettings => ({
+  Types: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: {
+        Label: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Plural: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Color: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Icon: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+      },
+    },
+    undefined,
+  ]),
+  DefaultTimeZone: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  DateFormat: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getSetProjectSettingsResponseMock = (
+  overrideResponse: Partial<Extract<ProjectSettings, object>> = {},
+): ProjectSettings => ({
+  Types: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: {
+        Label: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Plural: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Color: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Icon: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+      },
+    },
+    undefined,
+  ]),
+  DefaultTimeZone: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  DateFormat: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getPatchProjectSettingsResponseMock = (
+  overrideResponse: Partial<Extract<ProjectSettings, object>> = {},
+): ProjectSettings => ({
+  Types: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: {
+        Label: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Plural: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Color: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Icon: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+      },
+    },
+    undefined,
+  ]),
+  DefaultTimeZone: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  DateFormat: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
 export const getExchangeUserTokenResponseMock = (
   overrideResponse: Partial<Extract<UserTokenResponse, object>> = {},
 ): UserTokenResponse => ({
@@ -2907,6 +3591,78 @@ export const getRemoveMemberMockHandler = (
   );
 };
 
+export const getGetProjectSettingsMockHandler = (
+  overrideResponse?:
+    | ProjectSettings
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<ProjectSettings> | ProjectSettings),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/:organization/:project/settings",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetProjectSettingsResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getSetProjectSettingsMockHandler = (
+  overrideResponse?:
+    | ProjectSettings
+    | ((
+        info: Parameters<Parameters<typeof http.put>[1]>[0],
+      ) => Promise<ProjectSettings> | ProjectSettings),
+  options?: RequestHandlerOptions,
+) => {
+  return http.put(
+    "*/api/v1/:organization/:project/settings",
+    async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getSetProjectSettingsResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getPatchProjectSettingsMockHandler = (
+  overrideResponse?:
+    | ProjectSettings
+    | ((
+        info: Parameters<Parameters<typeof http.patch>[1]>[0],
+      ) => Promise<ProjectSettings> | ProjectSettings),
+  options?: RequestHandlerOptions,
+) => {
+  return http.patch(
+    "*/api/v1/:organization/:project/settings",
+    async (info: Parameters<Parameters<typeof http.patch>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getPatchProjectSettingsResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getExchangeUserTokenMockHandler = (
   overrideResponse?:
     | UserTokenResponse
@@ -2974,5 +3730,8 @@ export const getAccessMock = () => [
   getGetMembersMockHandler(),
   getSetMemberRoleMockHandler(),
   getRemoveMemberMockHandler(),
+  getGetProjectSettingsMockHandler(),
+  getSetProjectSettingsMockHandler(),
+  getPatchProjectSettingsMockHandler(),
   getExchangeUserTokenMockHandler(),
 ];
