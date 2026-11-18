@@ -688,23 +688,43 @@ public class CosmosAccessService : IAccessService
         await MachineAccessService.DeleteMachineAccessAsync(machineAccess.ToMachineAccess(), organization, project);
 
         // Delete the machine access entity, with its record: a delete that fails here is recorded when it is retried.
-        using var response = await repository.Container.CreateTransactionalBatch(partitionKey)
-            .DeleteItem(appId)
-            .CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.MachineDeleted, caller)
-            {
-                Target = AccessAuditTarget.Machine(appId),
-                OldValue = MachineValue(machineAccess),
-            }))
-            .ExecuteAsync();
-
-        if (response.Failed(HttpStatusCode.NotFound))
+        // The machine is read again after the credential's cleanup and deleted with that ETag, so the record describes
+        // the version that was deleted; a write in between (rules, a renewal) reads it once more.
+        for (var attempt = 1; ; attempt++)
         {
-            // Already deleted between our read and delete — idempotent.
-            return false;
-        }
+            var (latest, eTag) = await repository.Container.TryReadItemWithETagAsync(
+                appId,
+                partitionKey,
+                stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
 
-        response.ThrowIfFailed($"Deleting the machine access {appId}");
-        return true;
+            if (latest is null)
+            {
+                // Already deleted between our read and delete — idempotent.
+                return false;
+            }
+
+            using var response = await repository.Container.CreateTransactionalBatch(partitionKey)
+                .DeleteItem(appId, new TransactionalBatchItemRequestOptions { IfMatchEtag = eTag })
+                .CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.MachineDeleted, caller)
+                {
+                    Target = AccessAuditTarget.Machine(appId),
+                    OldValue = MachineValue(latest),
+                }))
+                .ExecuteAsync();
+
+            if (response.Failed(HttpStatusCode.NotFound))
+            {
+                return false;
+            }
+
+            if (response.Failed(HttpStatusCode.PreconditionFailed) && attempt < 3)
+            {
+                continue;
+            }
+
+            response.ThrowIfFailed($"Deleting the machine access {appId}");
+            return true;
+        }
     }
 
     public async Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId)

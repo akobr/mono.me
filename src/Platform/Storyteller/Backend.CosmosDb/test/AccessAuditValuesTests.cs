@@ -193,6 +193,46 @@ public class AccessAuditValuesTests
     }
 
     [Fact]
+    public void Issuer_TheRequiredClaimsInAnotherOrder_AreNoChange_AnotherValueIs()
+    {
+        var issuer = new FederatedIssuer
+        {
+            Name = "github",
+            Issuer = "https://token.actions.githubusercontent.com",
+            RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["repository_owner_id"] = ["42"], ["environment"] = ["prod"] },
+        };
+        var reordered = issuer with
+        {
+            RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["environment"] = ["prod"], ["repository_owner_id"] = ["42"] },
+        };
+        var changed = issuer with
+        {
+            RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["environment"] = ["dev"], ["repository_owner_id"] = ["42"] },
+        };
+
+        AccessAuditValues.Issuer(reordered).Should().Be(AccessAuditValues.Issuer(issuer));
+        AccessAuditValues.Issuer(changed).Should().NotBe(AccessAuditValues.Issuer(issuer));
+    }
+
+    [Fact]
+    public void MachineAuthentication_TheEnabledKindsAreASet_TheDefaultAndLifetimeCount()
+    {
+        var policy = new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate],
+            CredentialKind = MachineCredentialKind.ApiKey,
+            CertificateLifetimeDays = 30,
+        };
+
+        AccessAuditValues.MachineAuthentication(policy with { EnabledCredentialKinds = [MachineCredentialKind.Certificate, MachineCredentialKind.ApiKey, MachineCredentialKind.ApiKey] })
+            .Should().Be(AccessAuditValues.MachineAuthentication(policy));
+        AccessAuditValues.MachineAuthentication(policy with { CredentialKind = MachineCredentialKind.Certificate })
+            .Should().NotBe(AccessAuditValues.MachineAuthentication(policy));
+        AccessAuditValues.MachineAuthentication(policy with { CertificateLifetimeDays = 60 })
+            .Should().NotBe(AccessAuditValues.MachineAuthentication(policy));
+    }
+
+    [Fact]
     public void KeyValuePolicy_TheAllowedLevelsInAnotherOrder_AreNoChange()
     {
         var policy = new KeyValuePolicy { AllowedProtections = [KeyValueProtection.Public, KeyValueProtection.Standard] };
