@@ -11,7 +11,9 @@ const stepUp = useStepUpStore()
 
 // An invitation is a deferred grant: it needs a recent sign-in (424-264), asked for before the dialog is filled in.
 async function invite() {
-  if (await stepUp.ensureRecentSignIn()) {
+  // for the organization of the click: the page stays when the switcher moves on while the sign-in is checked
+  const org = context.org
+  if ((await stepUp.ensureRecentSignIn()) && org === context.org) {
     inviting.value = true
   }
 }

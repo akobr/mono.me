@@ -1,8 +1,9 @@
-import { onBeforeUnmount, toValue, watch, type MaybeRefOrGetter } from 'vue'
+import { onBeforeUnmount, shallowReactive, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, type RouteLocationNormalized } from 'vue-router'
 import { useEventListener } from '@vueuse/core'
 
-const dirtySources = new Set<() => boolean>()
+// Reactive, so a warning that reads hasUnsavedChanges() follows a dialog that mounts or goes while it is shown.
+const dirtySources = shallowReactive(new Set<() => boolean>())
 
 /** True when any mounted editor or dialog has unsaved changes (the step-up's warning, 424-264). */
 export function hasUnsavedChanges(): boolean {

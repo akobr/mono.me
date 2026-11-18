@@ -7,8 +7,9 @@ import { setupServer } from 'msw/node'
 import { configureStoryteller, deleteKeyValue, getKeyValue, setMemberRole } from '@42for.net/2splatform.sdk'
 import type { AuthService, StepUpReturn } from '@/boot/auth'
 import { setBootState } from '@/boot/state'
+import InviteDialog from '@/components/access/InviteDialog.vue'
 import MembersTable from '@/components/access/MembersTable.vue'
-import OneTimeSecretDialog from '@/components/access/OneTimeSecretDialog.vue'
+import OneTimeSecretDialog, { type OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 import TrustedIssuerDialog from '@/components/access/TrustedIssuerDialog.vue'
 import ConfigurationResolved from '@/components/configuration/ConfigurationResolved.vue'
 import KeyValueBulkBar from '@/components/key-values/KeyValueBulkBar.vue'
@@ -20,11 +21,12 @@ import StepUpDialog from '@/components/shell/StepUpDialog.vue'
 import { isSignInStale, isSignInTooOld, signedInSince, useStepUpStore } from '@/composables/useStepUp'
 import { hasUnsavedChanges, leaveWithoutPrompt } from '@/composables/useUnsavedChanges'
 import { mockHandlers } from '@/mock/all-handlers'
-import { createSeed, loadDb } from '@/mock/db'
+import { createSeed, loadDb, saveDb } from '@/mock/db'
 import { setStaleSignIn } from '@/mock/step-up'
 import ProjectMachinesPage from '@/pages/[org]/[project]/machines.vue'
 import ProjectMembersPage from '@/pages/[org]/[project]/members.vue'
 import OrganizationMembersPage from '@/pages/[org]/members.vue'
+import { useContextStore } from '@/stores/context'
 import { mountScreen, settle } from '../../helpers'
 
 // The step-up of the admin UI (424-264): one confirmation however many requests failed, max_age=0 back to the same
@@ -104,6 +106,8 @@ afterEach(() => {
   mounted.splice(0).forEach((view) => view.host.unmount())
   server.resetHandlers()
   setStaleSignIn(false)
+  // the fake sign-in never leaves the page: the browser asks before unsaved changes go again
+  leaveWithoutPrompt(false)
   document.body.innerHTML = ''
 })
 
@@ -291,13 +295,76 @@ describe('the step-up coordinator', () => {
     expect(button('Sign in again')).toBeDefined()
   })
 
-  it('compares with the start when the sign-in before the step-up is not known', () => {
+  // The start is the browser's clock: a sign-in time before it proves nothing when the clock runs ahead.
+  it('compares with the start when the sign-in before the step-up is not known, and only a newer time counts', () => {
     const returned = { startedAt: 10_000, returnedAt: 20_000 }
 
-    expect(signedInSince(returned, 9_000)).toBe(false)
+    expect(signedInSince(returned, 9_000)).toBeUndefined()
     expect(signedInSince(returned, 11_000)).toBe(true)
     expect(signedInSince({ ...returned, previousAuthTime: 5_000 }, 6_000)).toBe(true)
     expect(signedInSince(returned, undefined)).toBe(false)
+  })
+
+  // A browser clock ahead of the provider's puts a fresh sign-in before the start: that is no failed sign-in.
+  it('offers Sign in again, not the loop guard, when the return cannot tell whether the sign-in moved', async () => {
+    auth.stepUpReturn = { startedAt: Date.now() - 20_000, returnedAt: Date.now() }
+    auth.authTime = Date.now() - 90_000
+    await mountDialog()
+
+    await useStepUpStore().ask()
+    await settle()
+
+    expect(useStepUpStore().mode).toBe('confirm')
+    expect(button('Sign in again')).toBeDefined()
+  })
+
+  it('warns of credentials shown once that arrive while the confirmation is open, before its sign-in', async () => {
+    const secret = ref<OneTimeSecret>()
+    const host = defineComponent({ setup: () => () => h(OneTimeSecretDialog, { secret: secret.value }) })
+    await mountDialog(host)
+    const stepUp = useStepUpStore()
+
+    await stepUp.ask()
+    await settle()
+    expect(text()).not.toContain(lostChanges)
+
+    // the certificate of a request that was still on its way
+    secret.value = { title: 'Shared certificate issued', id: 'thumbprint-1', certificate: 'cGZ4', certificatePassword: 'p4ss' }
+    await settle()
+    expect(text()).toContain(lostChanges)
+
+    // the first click shows the warning rather than leaving at once; the next one signs in
+    confirmationButton('Sign in again')!.click()
+    await settle()
+    expect(auth.signIn).not.toHaveBeenCalled()
+    expect(stepUp.open).toBe(true)
+    confirmationButton('Sign in again')!.click()
+    await settle()
+    expect(auth.signIn).toHaveBeenCalledOnce()
+  })
+
+  it('holds the confirmation back while a loop of requests runs, and opens it once after', async () => {
+    setStaleSignIn(true)
+    await mountDialog()
+    const stepUp = useStepUpStore()
+    const seen: boolean[] = []
+
+    // the bulk Delete: the secret is refused for the step-up, the public pair after it is deleted
+    await stepUp.deferWhile(async () => {
+      for (const key of ['db.password', 'db.host']) {
+        await deleteKeyValue('acme', 'billing', 'default', key).catch(() => undefined)
+        await settle()
+        seen.push(stepUp.open)
+      }
+    })
+    await settle()
+
+    expect(seen).toEqual([false, false])
+    expect(stepUp.open).toBe(true)
+    expect(dialogs()).toHaveLength(1)
+    const pairs = loadDb().keyValues!['acme/billing/default']!.pairs
+    expect(pairs['db.host']!.Deleted).toBeDefined()
+    expect(pairs['db.password']!.Deleted).toBeUndefined()
   })
 
   it('says after the return that a change is not repeated, once', async () => {
@@ -644,6 +711,115 @@ describe('the screens', () => {
     const pairs = loadDb().keyValues!['acme/billing/default']!.pairs
     expect(pairs['db.host']!.Deleted).toBeUndefined()
     expect(pairs['db.password']!.Deleted).toBeDefined()
+  })
+
+  it('does not repeat a pending View of a version while the key is HYOK', async () => {
+    const views: string[] = []
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/key-values/:key/versions/:version', ({ request }) => {
+        views.push(new URL(request.url).pathname)
+      }),
+    )
+    // the current version is client-encrypted; version 1 is still a Standard secret (a read seeds the view's pairs)
+    await getKeyValue('acme', 'billing', 'default', 'db.password')
+    const db = loadDb()
+    const stored = db.keyValues!['acme/billing/default']!.pairs['db.password']!
+    stored.Versions.at(-1)!.Protection = 'Hyok'
+    saveDb(db)
+    auth.stepUpReturn = recentReturn()
+    sessionStorage.setItem(revealKey, JSON.stringify({ scope: 'acme/billing/default', key: 'db.password', version: 1 }))
+
+    await mountDialog(KeyValueVersions, { keyName: 'db.password' })
+    await vi.waitFor(() => expect(text()).toContain('encrypted on the client'))
+    await settle()
+
+    expect(views).toEqual([])
+    expect(text()).not.toContain('s3cret-billing-1')
+    expect(sessionStorage.getItem(revealKey)).toBeNull()
+  })
+
+  it('imports into the view of the click, or nowhere when the page moved while the sign-in was checked', async () => {
+    const imports: string[] = []
+    server.use(
+      http.post('*/api/v1/:org/:project/:view/key-values/import', ({ request }) => {
+        imports.push(new URL(request.url).pathname)
+      }),
+    )
+    let answer: (time: number) => void = () => {}
+    auth.getAuthTime = () => new Promise<number>((resolve) => (answer = resolve))
+    await mountDialog(KeyValueImportDialog, { open: true })
+    await type(
+      document.body.querySelector('textarea'),
+      JSON.stringify({ Items: [{ Key: 'db.password', Protection: 'Standard', Value: 'n3w-s3cret' }] }),
+    )
+    button('Next')!.click()
+    await settle()
+
+    button('Check')!.click()
+    await settle()
+    useContextStore().set({ org: 'acme', project: 'billing', view: 'staging' })
+    answer(Date.now())
+    await settle()
+
+    expect(imports).toEqual([])
+    expect(text()).toContain('The page moved away from acme/billing/default: nothing was sent.')
+  })
+
+  it('asks when New key gets a secret level only while that dialog still has it once the sign-in was checked', async () => {
+    let answer: (time: number) => void = () => {}
+    auth.getAuthTime = () => new Promise<number>((resolve) => (answer = resolve))
+    const { host, open } = opened(KeyValueCreateDialog)
+    await mountDialog(host)
+    open.value = true
+    await settle()
+
+    // "Secret", then Cancel while the sign-in is checked
+    document.body.querySelector<HTMLButtonElement>('[role="switch"]')!.click()
+    await settle()
+    open.value = false
+    await settle()
+    answer(Date.now() - 20 * minute)
+    await settle()
+
+    expect(useStepUpStore().open).toBe(false)
+  })
+
+  it('keeps a role change of a member to one while the sign-in is checked', async () => {
+    const changes: string[] = []
+    server.use(
+      http.put('*/api/v1/access/points/:key/members/:accountId', async ({ request }) => {
+        changes.push(((await request.clone().json()) as { Role: string }).Role)
+      }),
+    )
+    const view = await mountDialog(MembersTable, { accessPointKey: 'acme.billing' })
+    await settle(10)
+    let answer: (time: number) => void = () => {}
+    auth.getAuthTime = () => new Promise<number>((resolve) => (answer = resolve))
+
+    const grace = view.host
+      .findAllComponents({ name: 'Select' })
+      .find((select) => select.attributes('aria-label')?.includes('Grace') || select.html().includes('Grace'))
+    grace!.vm.$emit('update:modelValue', 'Reader')
+    await settle()
+    grace!.vm.$emit('update:modelValue', 'ContributorWithSecrets')
+    await settle()
+    answer(Date.now())
+
+    await vi.waitFor(() => expect(changes).toHaveLength(1))
+    await settle()
+    expect(changes).toEqual(['Reader'])
+  })
+
+  it('counts a changed expiry of an invitation as unsaved changes, with no address entered yet', async () => {
+    const invite = opened(InviteDialog, { accessPointKey: 'acme.billing' })
+    const view = await mountDialog(invite.host, {}, '/acme/billing/members', createSeed('default').account!.AccessMap as Record<string, string>)
+    invite.open.value = true
+    await settle()
+    expect(hasUnsavedChanges()).toBe(false)
+
+    view.host.findComponent({ name: 'InputNumber' }).vm.$emit('update:modelValue', 14)
+    await settle()
+    expect(hasUnsavedChanges()).toBe(true)
   })
 
   it('asks when New key gets a secret level with a stale sign-in, and says the typed key is lost', async () => {

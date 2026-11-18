@@ -63,6 +63,9 @@ const annotationKey = ref('')
 const kind = ref<MachineCredentialKind>()
 const lifetime = ref<number>(365)
 const useSharedCertificate = ref(false)
+// The kind and lifetime the dialog opened with (the project policy's), which the step-up's warning does not count as picks.
+const defaultKind = ref<MachineCredentialKind>()
+const defaultLifetime = ref(365)
 const rules = ref<RuleDraft[]>([])
 const saving = ref(false)
 const failure = ref<string>()
@@ -90,6 +93,8 @@ watch(open, (value) => {
     applyPreset(scopePresets[0]!)
     kind.value = props.policy?.CredentialKind ?? kindItems.value[0]
     lifetime.value = props.policy?.CertificateLifetimeDays ?? 365
+    defaultKind.value = kind.value
+    defaultLifetime.value = lifetime.value
     useSharedCertificate.value = false
     rules.value = [ruleDraft(undefined, tokenEndpoint.value)]
     preselectIssuer()
@@ -99,13 +104,22 @@ watch(open, (value) => {
   }
 })
 
-// What was typed (the annotation, the subjects and claims of the rules), which the step-up's confirmation says its
-// sign-in loses (424-264).
+// What was typed (the annotation, the subjects and claims of the rules) and what was picked (scopes other than Runtime
+// reader, another credential kind or lifetime, a shared certificate), which the step-up's confirmation says its sign-in
+// loses (424-264). The kind and the lifetime that the project policy preselects are defaults, not picks.
 const typed = (text: string) => text.trim().length > 0
+const sameScopes = (left: readonly MachineScope[], right: readonly MachineScope[]) =>
+  left.toSorted().join() === right.toSorted().join()
+const picked = () =>
+  !sameScopes([...runtime.value, ...management.value], scopePresets[0]!.scopes) ||
+  kind.value !== defaultKind.value ||
+  lifetime.value !== defaultLifetime.value ||
+  useSharedCertificate.value
 useDirtySource(
   () =>
     open.value &&
     (typed(annotationKey.value) ||
+      picked() ||
       rules.value.some((rule) => typed(rule.subject) || rule.claims.some((row) => typed(row.claim) || typed(row.value)))),
 )
 
@@ -131,8 +145,11 @@ watch(
     if (!kind.value) {
       kind.value = policy.CredentialKind ?? kindItems.value[0]
       lifetime.value = policy.CertificateLifetimeDays ?? lifetime.value
+      defaultKind.value = kind.value
+      defaultLifetime.value = lifetime.value
     } else if (!kindItems.value.includes(kind.value)) {
       kind.value = policy.CredentialKind ?? kindItems.value[0]
+      defaultKind.value = kind.value
     }
   },
 )

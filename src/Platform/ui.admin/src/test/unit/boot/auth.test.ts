@@ -1,6 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AuthConfiguration } from '@42for.net/2splatform.sdk'
 import type { AppConfig } from '@/boot/app-config'
-import { authTimeOf, createAuth, signInState, stepUpReturnOf, withMaxAge, type AuthService } from '@/boot/auth'
+import {
+  authConfigurationCacheMs,
+  authTimeOf,
+  createAuth,
+  loadAuthConfiguration,
+  signInState,
+  stepUpReturnOf,
+  withMaxAge,
+  type AuthService,
+} from '@/boot/auth'
+
+// The discovery's request, for the reads the cache does not answer.
+const discovery = vi.hoisted(() => ({ get: vi.fn(async (): Promise<unknown> => ({ Provider: 'AuthKit', ClientId: 'client_test' })) }))
+vi.mock('@42for.net/2splatform.sdk', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@42for.net/2splatform.sdk')>()),
+  getAuthConfiguration: discovery.get,
+}))
 
 const host = vi.hoisted(() => ({ local: true }))
 
@@ -55,12 +72,13 @@ const tokenWith = (claims: Record<string, unknown>) =>
 
 const config: AppConfig = { apiBaseUrl: 'http://api.test/api', environmentName: 'test' }
 
+/** GET v1/auth/configuration in the sessionStorage cache, read now. */
+const cacheDiscovery = (appConfig: AppConfig, configuration: AuthConfiguration, storedAt = Date.now()) =>
+  sessionStorage.setItem(`2s-admin:auth-configuration:${appConfig.apiBaseUrl}`, JSON.stringify({ storedAt, configuration }))
+
 /** The AuthKit service, with GET v1/auth/configuration answered from its sessionStorage cache. */
 async function authKitService(appConfig: AppConfig = config): Promise<AuthService> {
-  sessionStorage.setItem(
-    `2s-admin:auth-configuration:${appConfig.apiBaseUrl}`,
-    JSON.stringify({ Provider: 'AuthKit', ClientId: 'client_test' }),
-  )
+  cacheDiscovery(appConfig, { Provider: 'AuthKit', ClientId: 'client_test' })
 
   const boot = await createAuth(appConfig)
   if (boot.status !== 'ready') {
@@ -101,10 +119,7 @@ describe('AuthKit service', () => {
     })
 
     it('refuses to start without a custom domain or the opt-in', async () => {
-      sessionStorage.setItem(
-        `2s-admin:auth-configuration:${config.apiBaseUrl}`,
-        JSON.stringify({ Provider: 'AuthKit', ClientId: 'client_test' }),
-      )
+      cacheDiscovery(config, { Provider: 'AuthKit', ClientId: 'client_test' })
 
       const boot = await createAuth(config)
 
@@ -147,14 +162,34 @@ describe('AuthKit service', () => {
   })
 
   it('keeps the discovery in the boot result, for the step-up of the screens', async () => {
-    sessionStorage.setItem(
-      `2s-admin:auth-configuration:${config.apiBaseUrl}`,
-      JSON.stringify({ Provider: 'AuthKit', ClientId: 'client_test', StepUp: { Enabled: true, MaxAge: 600 } }),
-    )
+    cacheDiscovery(config, { Provider: 'AuthKit', ClientId: 'client_test', StepUp: { Enabled: true, MaxAge: 600 } })
 
     const boot = await createAuth(config)
 
     expect(boot).toMatchObject({ status: 'ready', authConfiguration: { StepUp: { Enabled: true, MaxAge: 600 } } })
+  })
+
+  // An API deployment that turns its step-up on reaches an open tab: the cache has a bounded lifetime.
+  it('reads the discovery again once its cache is older than its lifetime, or in an older format', async () => {
+    const now = Date.now()
+    discovery.get.mockClear()
+    discovery.get.mockResolvedValue({ Provider: 'AuthKit', ClientId: 'client_test', StepUp: { Enabled: true, MaxAge: 600 } })
+    const key = `2s-admin:auth-configuration:${config.apiBaseUrl}`
+
+    cacheDiscovery(config, { Provider: 'AuthKit', ClientId: 'client_test' }, now - authConfigurationCacheMs + 60_000)
+    expect((await loadAuthConfiguration(config)).StepUp).toBeUndefined()
+    expect(discovery.get).not.toHaveBeenCalled()
+
+    cacheDiscovery(config, { Provider: 'AuthKit', ClientId: 'client_test' }, now - authConfigurationCacheMs - 1)
+    expect((await loadAuthConfiguration(config)).StepUp).toEqual({ Enabled: true, MaxAge: 600 })
+    expect(discovery.get).toHaveBeenCalledOnce()
+    // the fresh response is cached again
+    expect(JSON.parse(sessionStorage.getItem(key)!)).toMatchObject({ configuration: { StepUp: { Enabled: true } } })
+
+    // the format of the previous version, without the time it was read
+    sessionStorage.setItem(key, JSON.stringify({ Provider: 'AuthKit', ClientId: 'client_test' }))
+    expect((await loadAuthConfiguration(config)).StepUp).toEqual({ Enabled: true, MaxAge: 600 })
+    expect(discovery.get).toHaveBeenCalledTimes(2)
   })
 
   it('signs in as before without maxAge', async () => {
@@ -183,9 +218,14 @@ describe('AuthKit service', () => {
     authkit.client.getAccessToken.mockResolvedValue(tokenWith({ auth_time: 1_700_000_000 }))
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_900_000)
     const auth = await authKitService()
+    // a request of the page: its token's auth_time is the sign-in before the step-up
+    await auth.getAccessToken()
+    authkit.client.getAccessToken.mockClear()
 
     await auth.signIn({ returnTo: '/acme/billing/default/key-values?key=db.password', loginHint: 'ada@example.com', maxAge: 0 })
 
+    // no token request on the way out: its refresh could fail and start a plain sign-in over the step-up's
+    expect(authkit.client.getAccessToken).not.toHaveBeenCalled()
     expect(authkit.client.signIn).not.toHaveBeenCalled()
     expect(authkit.client.getSignInUrl).toHaveBeenCalledExactlyOnceWith({
       state: {

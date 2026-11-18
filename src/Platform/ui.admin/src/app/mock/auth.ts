@@ -1,24 +1,21 @@
 import { signInState, stepUpReturnOf, type AuthService } from '@/boot/auth'
 import { safeReturnTo } from '@/utils/return-to'
 import { mockUser } from './db'
-import { isStaleSignIn, setStaleSignIn } from './step-up'
+import { setStaleSignIn, staleSignInTime } from './step-up'
 
 const sessionKey = '2s-admin:mock-session'
 const returnToKey = '2s-admin:mock-return-to'
 const stepUpKey = '2s-admin:mock-step-up'
 
-/** How old the sign-in of a stale mock session is: well past the mock API's window of 10 minutes. */
-const staleAgeMs = 60 * 60_000
-
 /**
  * Fake sign-in for the e2e mode. The user is signed in unless the tab signed out (or a test set the session
  * key to "signed-out"); signing in goes through /callback like the real redirect. The sign-in is always recent, unless
- * window.storytellerMock.staleSignIn() made it stale; a sign-in with maxAge (the step-up) makes it recent again and
- * brings its marker back like the AuthKit state.
+ * window.storytellerMock.staleSignIn() made it stale (an hour old, the same time until it changes); a sign-in with
+ * maxAge (the step-up) makes it recent again and brings its marker back like the AuthKit state.
  */
 export function createMockAuth(): AuthService {
   const signedIn = () => sessionStorage.getItem(sessionKey) !== 'signed-out'
-  const getAuthTime = async () => (signedIn() ? Date.now() - (isStaleSignIn() ? staleAgeMs : 0) : undefined)
+  const getAuthTime = async () => (signedIn() ? (staleSignInTime() ?? Date.now()) : undefined)
 
   // The state of the redirect that brought the page here, read once per page like the AuthKit callback.
   const stored = sessionStorage.getItem(stepUpKey)

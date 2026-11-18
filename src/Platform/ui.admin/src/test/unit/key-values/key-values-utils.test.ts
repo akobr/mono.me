@@ -134,6 +134,22 @@ describe('useRevealedValue', () => {
     expect(revealed.loading.value).toBe(false)
   })
 
+  // An aborted request never reaches the SDK's step-up hook: the confirmation does not open on a page that moved on.
+  it('aborts a reveal that is asked again or hidden on the way', () => {
+    const signals: AbortSignal[] = []
+    const revealed = useRevealedValue((signal) => {
+      signals.push(signal)
+      return new Promise<string>(() => {})
+    })
+
+    void revealed.reveal()
+    void revealed.reveal()
+    expect(signals.map((signal) => signal.aborted)).toEqual([true, false])
+
+    revealed.hide()
+    expect(signals[1]!.aborted).toBe(true)
+  })
+
   it('gives each reveal its own error, and none to a reveal dropped on the way', async () => {
     const answers: ((error: Error) => void)[] = []
     const revealed = useRevealedValue(() => new Promise<string>((_, reject) => answers.push(reject)))

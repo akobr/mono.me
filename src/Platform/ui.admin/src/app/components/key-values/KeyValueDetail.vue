@@ -89,12 +89,12 @@ watch(
 const dirty = computed(() => (settingNew.value ? newValue.value.length > 0 : draft.value !== original.value))
 useUnsavedChanges(dirty, { ignore: (to, from) => (to.params as { key?: string }).key !== (from.params as { key?: string }).key })
 
-const revealed = useRevealedValue(async () => {
+const revealed = useRevealedValue(async (signal) => {
   if (!context.scope) {
     return undefined
   }
   const { org, project, view } = context.scope
-  const fresh = await getKeyValue(org, project, view, props.keyName, { reveal: true, includeDeleted: true })
+  const fresh = await getKeyValue(org, project, view, props.keyName, { reveal: true, includeDeleted: true }, { signal })
   return fresh.Value ?? undefined
 })
 

@@ -79,11 +79,16 @@ async function changeRole(member: AccessPointMember, role: AccountRoleName) {
   // The confirmation may stay open while the table moves to another organization or project: the change is for the
   // one it was asked on, or for none.
   const accessPointKey = props.accessPointKey
-  if (!(await stepUp.ensureRecentSignIn()) || accessPointKey !== props.accessPointKey) {
+  // The row is busy from the selection on, the sign-in check included: a second selection meanwhile would send its role
+  // in parallel, and the stored role could be either.
+  if (busy.value === member.AccountId) {
     return
   }
   busy.value = member.AccountId
   try {
+    if (!(await stepUp.ensureRecentSignIn()) || accessPointKey !== props.accessPointKey) {
+      return
+    }
     await setMemberRole(accessPointKey, member.AccountId!, { Role: role })
     toast.add({
       title: `${member.Name ?? member.AccountId} is now ${role}`,

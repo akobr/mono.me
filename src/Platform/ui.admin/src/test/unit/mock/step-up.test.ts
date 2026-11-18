@@ -245,6 +245,11 @@ describe('the mock sign-in', () => {
 
     expect((await auth.getAuthTime())!).toBeLessThan(Date.now() - 30 * 60_000)
     expect(auth.getStepUpReturn()).toBeUndefined()
+    // the same time with every read until the state changes, however the clock moves
+    const stale = await auth.getAuthTime()
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 5_000)
+    expect(await auth.getAuthTime()).toBe(stale)
+    vi.mocked(Date.now).mockRestore()
 
     // a plain sign-in reuses the session: still stale
     await auth.signIn({ returnTo: '/acme' })

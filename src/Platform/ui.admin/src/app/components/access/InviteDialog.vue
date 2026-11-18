@@ -21,8 +21,10 @@ const queryClient = useQueryClient()
 const toast = useToast()
 
 const emails = ref<string[]>([])
-const role = ref<AssignableRole>('Reader')
-const days = ref(7)
+const defaultRole: AssignableRole = 'Reader'
+const defaultDays = 7
+const role = ref<AssignableRole>(defaultRole)
+const days = ref(defaultDays)
 const sending = ref(false)
 const empty = ref(false)
 const failures = ref<{ email: string; message: string }[]>([])
@@ -36,10 +38,16 @@ watch(open, (value) => {
   }
 })
 
-// The addresses entered, also one still being typed, which the step-up's confirmation says its sign-in loses (424-264).
-// Read when the confirmation asks, so the text of the input needs no reactivity.
+// The addresses entered, also one still being typed, and a role or expiry other than the defaults, which the step-up's
+// confirmation says its sign-in loses (424-264). Read when the confirmation opens (no typing behind it), so the text of
+// the input needs no reactivity.
 useDirtySource(
-  () => open.value && (emails.value.length > 0 || (tagsInput.value?.inputRef?.value.trim() ?? '') !== ''),
+  () =>
+    open.value &&
+    (emails.value.length > 0 ||
+      (tagsInput.value?.inputRef?.value.trim() ?? '') !== '' ||
+      role.value !== defaultRole ||
+      days.value !== defaultDays),
 )
 
 // Every commit of the tags input (a typed address, a pasted list, the text left when sending) goes through

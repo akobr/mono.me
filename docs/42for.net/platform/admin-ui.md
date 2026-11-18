@@ -47,11 +47,12 @@ Some actions need a recent sign-in, not only an open session: revealing, setting
 
 - Confirming signs you in again. The sign-in page asks you to authenticate even while you are still signed in, with a second factor where the environment requires one, and brings you back to the page you were on.
 - The page loads again, so what you were reading shows with its secret values, and a reveal you asked for is repeated once. A change is never repeated for you: the toast **You signed in again** reminds you to repeat it if it did not finish.
-- Unsaved changes on the page are lost, and the dialog says so first. Before you type something the sign-in would lose, such as a new secret value, a new machine, an invitation or a role change, the UI checks your sign-in and asks first.
+- Unsaved changes on the page are lost, and the dialog says so first. Credentials shown once that appear while it is open count too: the dialog adds the note, and your next click on **Sign in again** goes. Before you type something the sign-in would lose, such as a new secret value, a new machine, an invitation or a role change, the UI checks your sign-in and asks first.
+- A bulk delete deletes every key it can first and keeps the others selected, then asks once.
 - Cancelling leaves the screen and its error as they are.
 - When the new sign-in still does not count, the dialog says **Your sign-in could not be confirmed** and asks you to sign out and sign in again, instead of sending you to the sign-in page once more.
 
-**Resolved** of a configuration says **Secret values are hidden** when your role gives them but your sign-in is too old: they stay as their bindings until you confirm it's you, from the same alert.
+**Resolved** of a configuration says **Secret values are hidden** when your role gives them but your sign-in is too old: they stay as their bindings until you confirm it's you, from the same alert. The age of your sign-in is an estimate by your browser's clock: close to the end of the window the alert says **Secret values may be hidden**, and a clock that is far off can be wrong either way.
 
 ## The catalog
 
