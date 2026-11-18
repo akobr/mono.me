@@ -215,7 +215,10 @@ public sealed class CosmosProjectSettingsService : IProjectSettingsService
     }
 
     // Best effort: the settings are stored, so a failed append is logged and the write still succeeds (a retry of the
-    // request would change nothing and write no event).
+    // request would change nothing and write no event). The append deliberately goes without the caller's token, as the
+    // other audit appends do: a request canceled after the replace still records the change it made. So no cancellation
+    // of the caller reaches the catch; an OperationCanceledException there is a timeout of the append, logged as any
+    // other failure.
     private async Task AuditAsync(string organization, string project, KeyValueCaller caller, ProjectSettings before, ProjectSettings after, DateTimeOffset now)
     {
         if (_audit is null)
