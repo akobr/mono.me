@@ -220,7 +220,13 @@ async function failOnStepUp(current: StorytellerConfig, response: Response, atte
 
   // The clone read the whole body; the response's own copy of it is not needed.
   discard(response)
-  current.onStepUpRequired?.(error)
+  // A hook that fails must not hide the step-up from the caller, whose own handling needs its error.
+  try {
+    current.onStepUpRequired?.(error)
+  } catch {
+    // the request fails with the step-up below
+  }
+
   throw error
 }
 
