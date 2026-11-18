@@ -548,7 +548,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var account = await Access.GetAccountAsync(memberId);
         account!.AccessMap.Should().HaveCount(1).And.Contain(pointKey, AccountRole.Reader);
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().HaveCount(2).And.Contain(OwnerId, AccountRole.Owner).And.Contain(memberId, AccountRole.Reader);
-        (await Access.GetProjectsAsync(memberId)).Should().Equal(new ProjectSummary { Key = pointKey, Role = AccountRole.Reader, Description = "The exhibition." });
+        (await Access.GetProjectsAsync(memberId)).Should().Equal(new ProjectSummary { Key = pointKey, Role = AccountRole.Reader, Description = "The exhibition.", Settings = new ProjectSettings() });
         (await Access.GetAccessPointsAsync(memberId)).Should().BeEmpty();
 
         var pointETag = await ReadETagAsync($"apt.{pointKey}");
