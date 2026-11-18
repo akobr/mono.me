@@ -27,8 +27,8 @@ public class ProjectSettingsDocumentFilter : IDocumentFilter
 
     private static readonly Dictionary<string, string> AppearanceMembers = new(StringComparer.Ordinal)
     {
-        [nameof(ProjectTypeAppearance.Label)] = "The singular name of the type, such as Company: trimmed, at most 40 characters; absent for the built-in name.",
-        [nameof(ProjectTypeAppearance.Plural)] = "The plural, only with a Label: trimmed, at most 40 characters; clients derive it from the label when it is absent.",
+        [nameof(ProjectTypeAppearance.Label)] = "The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.",
+        [nameof(ProjectTypeAppearance.Plural)] = "The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.",
         [nameof(ProjectTypeAppearance.Color)] = "One of the colors of " + Catalog + ", such as pink, in any case; absent for the built-in color.",
         [nameof(ProjectTypeAppearance.Icon)] = "One of the icons of " + Catalog + ", such as i-lucide-building-2, in any case; absent for the built-in icon.",
     };
@@ -84,7 +84,7 @@ public class ProjectSettingsDocumentFilter : IDocumentFilter
         {
             Type = "object",
             Nullable = true,
-            Description = SettingsMembers[nameof(ProjectSettings.Types)] + " A null type goes back to its built-in appearance, a null member of a type to its built-in value.",
+            Description = "The changes of the appearance of annotation types, keyed by type code (rst, unt, sbt, usg, cnt, exe, uxe; any case). A type left out keeps its appearance; a null type goes back to its built-in appearance, a null member of a type to its built-in value.",
             AdditionalProperties = new OpenApiSchema
             {
                 Reference = new OpenApiReference { Type = ReferenceType.Schema, Id = AppearancePatchSchema },
