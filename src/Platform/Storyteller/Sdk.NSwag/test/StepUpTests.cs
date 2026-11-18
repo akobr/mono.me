@@ -35,6 +35,9 @@ public class StepUpTests
     [InlineData("Bearer error=\"insufficient_user_authentication\", max_age=120", 120)]
     [InlineData("Bearer error=\"insufficient_user_authentication\", max_age=\"45\"", 45)]
     [InlineData("Bearer error=\"insufficient_user_authentication\"", null)]
+    [InlineData("Bearer error=insufficient_user_authentication, error_description=\"not max_age=5, see \\\"max_age=7\\\"\", max_age=\"300\"", 300)]
+    [InlineData("Bearer error_description=\"max_age=5\", error=\"insufficient_user_authentication\"", null)]
+    [InlineData("Bearer realm=\"api\", error=\"insufficient_user_authentication\", x_max_age=9, max_age=60", 60)]
     public void Challenge_Alone_IsAStepUp(string challenge, int? seconds)
     {
         var exception = new ApiException("401", 401, string.Empty, Headers(challenge), null);
@@ -55,6 +58,18 @@ public class StepUpTests
 
         exception.IsStepUpRequired(out var maxAge).ShouldBeFalse();
         exception.IsStepUpRequired().ShouldBeFalse();
+
+        maxAge.ShouldBeNull();
+    }
+
+    // The error is read as a parameter: a description that mentions the step-up's error names no step-up.
+    [Fact]
+    public void Challenge_MentioningTheErrorOnlyInItsDescription_IsNoStepUp()
+    {
+        var challenge = "Bearer error=\"invalid_token\", error_description=\"not insufficient_user_authentication\", max_age=60";
+        var exception = new ApiException("no", 401, string.Empty, Headers(challenge), null);
+
+        exception.IsStepUpRequired(out var maxAge).ShouldBeFalse();
 
         maxAge.ShouldBeNull();
     }
