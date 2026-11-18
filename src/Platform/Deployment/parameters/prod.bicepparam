@@ -41,11 +41,12 @@ param deploymentPrincipalId = '2a9df1b7-89a4-42e5-b007-5fe1763b8898'
 // and the API would report nothing. Not a secret: it only lets a sender add events to the project.
 param sentryDsn = 'https://d5046cb672ec2f66209c56807d4611e8@o4512431543549952.ingest.de.sentry.io/4512431550890064'
 
-// The step-up of users (Auth:StepUp): empty leaves both settings out, so the API's defaults apply (on under AuthKit, a
-// sign-in counts for 10 minutes). stepUpEnabled = 'false' is the escape hatch when a client cannot satisfy it;
-// stepUpMaxAge takes a TimeSpan such as '00:15:00' (1.00:00:00 for 24 hours). Both can change any time (decisions).
+// The step-up of users (Auth:StepUp): empty and null leave both settings out, so the API's defaults apply (on under
+// AuthKit, a sign-in counts for 10 minutes). stepUpEnabled = 'false' is the escape hatch when a client cannot satisfy
+// it; stepUpMaxAgeSeconds takes 60 to 86400 (900 for 15 minutes), and the build refuses anything else. Both can change
+// any time (decisions).
 param stepUpEnabled = ''
-param stepUpMaxAge = ''
+param stepUpMaxAgeSeconds = null
 
 param ownerObjectId = readEnvironmentVariable('PLATFORM_OWNER_OBJECT_ID')
 param ownerEmail = readEnvironmentVariable('PLATFORM_OWNER_EMAIL')

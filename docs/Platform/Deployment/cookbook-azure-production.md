@@ -334,7 +334,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | `Sentry__Dsn` | the API reports its errors to the Sentry project `2s-api` (step 14), next to Application Insights; without it, nothing is sent ([error reporting](../Storyteller/error-reporting.md)) |
 | `Exhibition__Organization`, `__Project`, `__Owner` | not set at first, so the deployment has no exhibition; added together after the seed of the exhibition (below) |
 
-The [step-up](../Storyteller/authentication.md#recent-sign-in-step-up) needs no setting: under AuthKit, secrets, role changes and machine credentials need a sign-in of the last 10 minutes. `Auth__StepUp__MaxAge` (a `TimeSpan`, e.g. `00:15:00`) changes the window, and `Auth__StepUp__Enabled=false` turns it off when a client cannot satisfy it; the templates set them through `stepUpMaxAge` and `stepUpEnabled` ([decisions](decisions.md#can-change-any-time-no-need-to-decide-now)).
+The [step-up](../Storyteller/authentication.md#recent-sign-in-step-up) needs no setting: under AuthKit, secrets, role changes and machine credentials need a sign-in of the last 10 minutes. `Auth__StepUp__MaxAge` (a `TimeSpan`, e.g. `00:15:00`) changes the window, and `Auth__StepUp__Enabled=false` turns it off when a client cannot satisfy it; the templates set them through `stepUpMaxAgeSeconds` (60 to 86400, written as the `TimeSpan`) and `stepUpEnabled` ([decisions](decisions.md#can-change-any-time-no-need-to-decide-now)).
 
 Invitation emails need the WorkOS management key. When you want them, store it and add the setting:
 
@@ -590,7 +590,7 @@ The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with
 
 | Check | How | Expected |
 | --- | --- | --- |
-| Discovery | `curl -s https://api.2s.42for.net/api/v1/auth/configuration` | `200`, `"Provider":"AuthKit"`, `"AuthKitDomain":"https://auth.42for.net"`, `"StepUp":{"Enabled":true,"MaxAge":600}` |
+| Discovery | `curl -s https://api.2s.42for.net/api/v1/auth/configuration` | `200`, `"Provider":"AuthKit"`, `"AuthKitDomain":"https://<subdomain>.authkit.app"` (the `authKitDomain` of `prod.bicepparam`; `https://auth.42for.net` only after the custom domain, step 13), `"StepUp":{"Enabled":true,"MaxAge":600}` |
 | HTTPS only | `curl -sI http://api.2s.42for.net/api/v1/auth/configuration` | a redirect to HTTPS |
 | CORS | `curl -sI -X OPTIONS -H "Origin: https://app.2s.42for.net" -H "Access-Control-Request-Method: GET" https://api.2s.42for.net/api/v1/auth/configuration` | `Access-Control-Allow-Origin: https://app.2s.42for.net` |
 | Sign-in | open `https://app.2s.42for.net`, sign in with your production account | the organization `42dotnet` is listed |

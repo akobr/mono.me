@@ -367,7 +367,7 @@ From an up-to-date `main` (with the parameter commits) at the repository root:
 git switch main; git pull
 ```
 
-**Deploy the admin UI (11.3) together with the API (11.1), or first**, whenever the API brings the [step-up](../Storyteller/authentication.md#rollout-of-the-step-up) for the first time: an admin UI from before it answers the step-up with a plain sign-in redirect, which keeps the old sign-in, so nobody gets through to secrets, roles or machines. If a client cannot satisfy it, `stepUpEnabled = 'false'` in `parameters/prod.bicepparam` and a run of `main.bicep` turn it off (what-if: only `+ Auth__StepUp__Enabled` in `prod-2s-api-fa/appsettings`).
+**Deploy the admin UI (11.3) together with the API (11.1), or first**, whenever the API brings the [step-up](../Storyteller/authentication.md#rollout-of-the-step-up) for the first time: an admin UI from before it answers the step-up with a plain sign-in redirect, which keeps the old sign-in, so nobody gets through to secrets, roles or machines. If a client cannot satisfy it, `stepUpEnabled = 'false'` in `parameters/prod.bicepparam` and a run of `main.bicep` turn it off (what-if: only `Auth__StepUp__Enabled` in `prod-2s-api-fa/appsettings`: `+` while the setting is absent, `~` from `true` to `false` when production already sets `stepUpEnabled = 'true'`).
 
 Each build-and-deploy below is **one script block** (`& { … }`): paste it whole. In it, a failing command (`$PSNativeCommandUseErrorActionPreference`, PowerShell 7.4+: a nonzero exit of `dotnet`, `npm` or `az` throws) stops the whole block, so an old or half-built output is never deployed. Lines pasted one by one would not stop: the console runs the next line after an error. A cleanup that can't delete an old output stops the block too; only a missing path is skipped.
 
@@ -590,6 +590,6 @@ To turn the exhibition off, remove the three parameters and run `main.bicep` aga
 ## Later
 
 - Every later infrastructure change: what-if, then create, from an up-to-date checkout, with the two `PLATFORM_OWNER_*` variables. The template owns the app settings: add a setting to `modules/functions.bicep`, never in the portal.
-- The step-up window or its escape hatch: `stepUpMaxAge` (a `TimeSpan`, `1.00:00:00` for 24 hours) and `stepUpEnabled` in `parameters/prod.bicepparam`, through a pull request, what-if (only `Auth__StepUp__*` in `prod-2s-api-fa/appsettings`), then create.
+- The step-up window or its escape hatch: `stepUpMaxAgeSeconds` (60 to 86400; the build refuses anything else) and `stepUpEnabled` in `parameters/prod.bicepparam`, through a pull request, what-if (only `Auth__StepUp__*` in `prod-2s-api-fa/appsettings`), then create.
 - Rotating the Cosmos DB key: cookbook, step 7.
 - The workflows `platform-infrastructure.yml` and `platform-deploy.yml` replace phases 2–8 and 11 later (spec, section 10).

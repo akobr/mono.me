@@ -69,8 +69,10 @@ param exhibitionOwner string
 ])
 param stepUpEnabled string
 
-@description('Auth__StepUp__MaxAge as a TimeSpan in whole seconds (hh:mm:ss, 1.00:00:00 for 24 hours); the setting is left out while it is empty (00:10:00).')
-param stepUpMaxAge string
+@description('Auth__StepUp__MaxAge in seconds, 60 to 86400; the setting is left out while it is null (10 minutes).')
+@minValue(60)
+@maxValue(86400)
+param stepUpMaxAgeSeconds int?
 
 @description('The machine credential kinds turned off until mTLS exists.')
 param disabledCredentialKinds string[]
@@ -166,7 +168,13 @@ var exhibitionSettings = empty(exhibitionOrganization) || empty(exhibitionProjec
 // The step-up of users (Auth:StepUp): only what is set, so the API's defaults apply otherwise.
 var stepUpEnabledSetting = empty(stepUpEnabled) ? {} : { Auth__StepUp__Enabled: stepUpEnabled }
 
-var stepUpMaxAgeSetting = empty(stepUpMaxAge) ? {} : { Auth__StepUp__MaxAge: stepUpMaxAge }
+// Written as the TimeSpan the API reads: hh:mm:ss, and 1.00:00:00 for 24 hours (24:00:00 would be 24 days).
+var stepUpMaxAge = stepUpMaxAgeSeconds ?? 0
+var stepUpMaxAgeTimeSpan = stepUpMaxAge == 86400
+  ? '1.00:00:00'
+  : '${padLeft(string(stepUpMaxAge / 3600), 2, '0')}:${padLeft(string((stepUpMaxAge % 3600) / 60), 2, '0')}:${padLeft(string(stepUpMaxAge % 60), 2, '0')}'
+
+var stepUpMaxAgeSetting = stepUpMaxAgeSeconds == null ? {} : { Auth__StepUp__MaxAge: stepUpMaxAgeTimeSpan }
 
 resource plan 'Microsoft.Web/serverfarms@2025-03-01' = {
   name: planName

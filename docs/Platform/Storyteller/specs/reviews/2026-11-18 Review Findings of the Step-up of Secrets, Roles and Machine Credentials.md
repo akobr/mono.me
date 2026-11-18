@@ -56,3 +56,14 @@ A local `coderabbit review --agent` of the branch found seven more; all held and
 - **One-time credentials.** `OneTimeSecretDialog` counts as unsaved while it is open, for the shared certificates and the machines alike.
 - **A Reveal's own error.** `useRevealedValue.reveal` returns the error of that reveal while it is the current one; `KeyValueDetail` remembers the step-up from it, never from the shared error of another reveal.
 - **A storage that refuses the pending Reveal** no longer leaves the confirmation redirecting: the sign-in goes on, and only the repeated Reveal is lost.
+
+### 7. The review of PR #203 after the rebase on the access audit
+
+CodeRabbit's second review of the PR (commit `e42fc03f7`) had 10 Major threads and 64 Minor comments (15 in the review body, 49 in two follow-up comments). Each was checked against the code; 60 are fixed, 14 left with a reason in the reply to each.
+
+- **API.** `IFederatedIssuerStore.ReplaceAsync` (replace-only, 409 when the issuer is gone), so a replace never undoes a concurrent delete. Permanent delete and purge refuse a key with any secret version (a COUNT query, only for callers without the secret-write right); a Replace import checks the right on the version it deletes, and import items refused for the step-up carry `StepUpRequired`. The refusals a new sign-in cannot fix come before the step-up where the handler already has the data (a missing machine on reset, a changed `Issuer`, a missing or non-Federated machine for rules, a project without shared certificates); the members routes keep the service's role checks after it (documented). An explicit `Enabled: true` holds for a request without a judgement in Debug builds too.
+- **Clients.** The .NET SDK keeps the scheme of each challenge (the error counts only in Bearer or DPoP); the TypeScript SDK bounds the step-up probe (5 s) and handles a rejecting async hook; `config set -r` says the configuration is stored; MCP retries refused bulk items by their keys.
+- **Admin UI.** The step-up sign-in reads the last token's `auth_time` without a refresh; scopes are captured before every sign-in check; the bulk Delete opens one confirmation after the loop; the unsaved-changes warning is live and counts settings and one-time credentials; discovery expires after 5 minutes.
+- **Deployment.** `stepUpMaxAge` (a string) became `stepUpMaxAgeSeconds` (`int?`, `@minValue(60)`, `@maxValue(86400)`), so the build and the deployment refuse a window the API would not start with; the template writes the `TimeSpan`.
+- **Left.** The generated `ApiSdk.g.cs` (stream reads and the bodyless 401 belong in the NSwag template), the Undo deletes targets across the redirect, the hint's `returnedAt` (kept on purpose), the members' role checks before the step-up, and three mock orders that mirror the API.
+- The OpenAPI snapshot is `0.10.50` (replacing `0.10.49` of this branch), and both SDKs are regenerated from it.
