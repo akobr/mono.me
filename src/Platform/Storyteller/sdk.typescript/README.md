@@ -87,15 +87,15 @@ Content-Type: application/json; charset=utf-8
 {"Message":"This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.","ErrorCode":"StepUpRequired","Details":{"MaxAge":600}}
 ```
 
-A token refresh keeps the time of the last sign-in (`auth_time`), so a refresh cannot answer it, and a plain sign-in redirect that reuses the provider's session cannot either. The fetcher tells a step-up `401` apart from the others by its body, read on a clone within the request's deadline:
+A token refresh keeps the time of the last sign-in (`auth_time`), so a refresh cannot answer it, and a plain sign-in redirect that reuses the provider's session cannot either. The fetcher tells a step-up `401` apart from the others by its JSON body, read on a clone within the request's deadline and at most 5 seconds; a body that does not arrive by then is no step-up, and the read of the clone is cancelled when either limit ends it:
 
-- a step-up `401` is neither refreshed nor retried, and `onUnauthorized` is not called; `onStepUpRequired(error)` is called, then the request fails with that `StorytellerError`. The answer to the retry after an ordinary `401` is checked the same way;
+- a step-up `401` is neither refreshed nor retried, and `onUnauthorized` is not called; `onStepUpRequired(error)` is called, not awaited (what it throws or rejects with is ignored), then the request fails with that `StorytellerError`. The answer to the retry after an ordinary `401` is checked the same way;
 - `isStepUpRequired(error)` is true for it (status `401`, `errorCode` `StepUpRequired`, also `stepUpRequiredCode`), and `stepUpMaxAge(error)` gives `Details.MaxAge` in seconds;
-- every other `401` takes the usual path: one retry with `forceRefresh: true`, then `onUnauthorized`.
+- every other `401` takes the usual path. With `getAccessToken` configured, that is one retry with `forceRefresh: true`, and `onUnauthorized` only when the retry also answers an ordinary `401`. Without `getAccessToken` (a caller that sends its own `Authorization` header, for example) there is no retry, the request fails with the `401` at once, and `onUnauthorized` is not called.
 
 The remedy is a new sign-in at the provider that forces a re-authentication: for AuthKit, the authorization URL with `max_age` (`max_age=0` always asks). Then repeat the operation. A browser cannot read `WWW-Authenticate` of a cross-origin response, which is why the body repeats `MaxAge`.
 
-`restoreKeyValues` and `purgeKeyValues` answer `200`; an item the API refused for the step-up has `Outcome: 'Forbidden'`, `ErrorCode: 'StepUpRequired'` and the step-up message. A resolved read stays a `200` and leaves the secret bindings unresolved, with `step-up-required` in `X-2S-Secrets-Withheld` (`secretsWithheld` of the [conditional reads](#conditional-reads), when the header is readable). `GET v1/auth/configuration` (`getAuthConfiguration`) tells a client in advance: `StepUp.Enabled`, and `StepUp.MaxAge` in seconds. Machines never need a step-up.
+`restoreKeyValues` and `purgeKeyValues` answer `200`; an item the API refused for the step-up has `Outcome: 'Forbidden'`, `ErrorCode: 'StepUpRequired'` and the step-up message. A resolved read stays a `200` and leaves the secret bindings unresolved, with `step-up-required` in `X-2S-Secrets-Withheld` (`secretsWithheld` of the [conditional reads](#conditional-reads), when the header is readable). A conditional read that sends back the `ETag` of such a `200` can get a `304` with the same header: the cached document is still the unresolved one, so check `secretsWithheld` also when `notModified` is true. `GET v1/auth/configuration` (`getAuthConfiguration`) tells a client in advance: `StepUp.Enabled`, and `StepUp.MaxAge` in seconds. Machines never need a step-up.
 
 ## Development
 
@@ -112,7 +112,7 @@ npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 npm run prepare:local  # npm ci and npm run build, each only when its inputs changed (--force: always)
 ```
 
-To generate from a specific document: `SPEC=../open.api.v0.10.49.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.49.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.49.48581` → `0.10.49`).
+To generate from a specific document: `SPEC=../open.api.v0.10.50.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.50.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.50.58415` → `0.10.50`).
 
 Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer) corrects the document:
 
@@ -269,7 +269,7 @@ The effective and the resolved read of a configuration answer with a weak `ETag`
 | `etag` | the `ETag` as sent, weak prefix included; pass it back unchanged |
 | `value` | the body of a `200` |
 | `cacheControl` | `no-store` on a resolved read by a caller that may read secrets, otherwise `private, no-cache` |
-| `secretsWithheld` | why the resolved read left the secret bindings as written (`@…`), whether or not the document has any (`SecretsWithheldReason`): `mtls-required` for a machine with `Secrets.Read` but no mTLS when the project delivers secrets only over mTLS (`RequireMtlsForSecretDelivery`), `actor-restricted` for a user acting through an actor that may not reveal secrets, `step-up-required` for a user whose role reads secrets but whose sign-in is older than the [step-up](#step-up-a-recent-sign-in) window; any other value is a reason of a newer API |
+| `secretsWithheld` | why the resolved read left the secret bindings as written (`@…`), whether or not the document has any (`SecretsWithheldReason`): `mtls-required` for a machine with `Secrets.Read` but no mTLS when the project delivers secrets only over mTLS (`RequireMtlsForSecretDelivery`), `actor-restricted` for a user acting through an actor that may not reveal secrets, `step-up-required` for a user whose role reads secrets but whose sign-in is older than the [step-up](#step-up-a-recent-sign-in) window; any other value is a reason of a newer API. Set on a `200` and on a `304`, whose cached document was withheld the same way |
 
 ```ts
 import { getResolvedConfigurationConditional, type Configuration } from '@42for.net/2splatform.sdk'

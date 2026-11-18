@@ -539,7 +539,13 @@ public class InlinePropertiesTests
         }.OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        error.ToString().ShouldStartWith("Warning: the API withheld the secrets of the configuration (step-up-required): the values of secret bindings are their expressions. Secrets need a recent sign-in:");
+        // The write is stored: the remedy reads it again after the new sign-in and never repeats the write.
+        error.ToString().ShouldBe(
+            "Warning: the API withheld the secrets of the configuration (step-up-required): the values of secret bindings are their expressions. "
+            + "The configuration is stored. Its secrets need a recent sign-in: sign out in the browser first (the admin UI's Sign out ends the browser's session), "
+            + "run 'sform account logout' and 'sform account', approve the new code (in a private window if the browser is still signed in), "
+            + "and read it with 'sform story config exe.app -r'; do not repeat the write.\n");
+        error.ToString().ShouldNotContain("repeat the command");
     }
 
     [Fact]

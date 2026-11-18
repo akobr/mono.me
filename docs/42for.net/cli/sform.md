@@ -34,9 +34,9 @@ Every other command uses the stored session and refreshes it silently. `sform ac
 
 1. Sign out in the browser first (**Sign out** in the admin UI ends the browser's session).
 2. Run `sform account logout`, then `sform account`, and approve the new code; in a private window if you did not sign out in the browser.
-3. Repeat the command.
+3. Repeat the command. After `sform story config set -r`, whose write is stored by then, read the configuration with `sform story config <key> -r` instead of repeating the write.
 
-Machines never need it. An older `sform` prints its general refusal for the same answer; the remedy is the same.
+Machines never need it. An older `sform` prints its general refusal for the same answer; the remedy is the same. A refusal that stays right after a new sign-in means that the tokens of the platform's identity provider do not carry the time of the sign-in (`auth_time`), for example Entra ID with the step-up turned on: no sign-in helps then, and only the platform's administrator can change it.
 
 `sform account set -p <organization>.<project>` picks the default project and view of the commands without `-p` and `-v`; without `-p` it offers your projects to choose from, in a terminal. They are kept with your other preferences in `sform.settings.json`, see [Settings](#settings).
 
@@ -288,6 +288,11 @@ Without `Secrets.Read` or such a sign-in, the export stops with exit code `2` on
 sform account machine machine-auth                              # the enabled kinds, the default kind and the lifetime
 sform account machine machine-auth -k api-key -k certificate    # the kinds it printed, and certificate
 sform account machine create -r --scope secrets-read -k certificate -o storyteller.pfx
+```
+
+Upload only once `machine create` succeeded (exit code `0`) and printed the password. Any other exit code, such as `44` for a sign-in that is not recent, leaves no new certificate, and a `storyteller.pfx` left from before is not it: sign in again and run `machine create` again first.
+
+``` bash
 base64 -w0 storyteller.pfx | gh secret set STORYTELLER_CERTIFICATE_BASE64
 gh secret set STORYTELLER_CERTIFICATE_PASSWORD                  # paste the password that machine create printed
 rm storyteller.pfx

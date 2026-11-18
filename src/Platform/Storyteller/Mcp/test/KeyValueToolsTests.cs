@@ -265,7 +265,8 @@ public class KeyValueToolsTests
         result.IsError.ShouldNotBe(true);
         result.Text().ShouldStartWith(ApiErrors.StepUpItemsNotice + "\n{");
         ApiErrors.StepUpItemsNotice.ShouldContain("StepUpRequired");
-        ApiErrors.StepUpItemsNotice.ShouldEndWith(ApiErrors.StepUpRemedy);
+        ApiErrors.StepUpItemsNotice.ShouldContain(ApiErrors.SignOutFirst);
+        ApiErrors.StepUpItemsNotice.ShouldContain("retry only those items: pass their keys in 'keys' (at most 100 per call), not the original 'keyPrefix'");
         var content = result.StructuredContent!.Value;
         content.EnumerateObject().First().Name.ShouldBe(KeyValueTools.StepUpNoticeProperty);
         var refused = content.GetProperty("Items")[1];

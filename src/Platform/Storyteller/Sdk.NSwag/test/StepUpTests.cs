@@ -77,10 +77,40 @@ public class StepUpTests
         maxAge.ShouldBeNull();
     }
 
-    // A step-up named by its code takes the window of the only challenge, and of no challenge when there are several.
+    // The error names the step-up only in an OAuth challenge: a gateway's Basic challenge with it is no step-up.
+    [Theory]
+    [InlineData("Basic realm=\"gateway\", error=\"insufficient_user_authentication\", max_age=60")]
+    [InlineData("Negotiate, Basic error=\"insufficient_user_authentication\"")]
+    [InlineData("Digest realm=\"x\", nonce=\"abc==\", error=insufficient_user_authentication")]
+    public void Error_OfAnotherScheme_IsNoStepUp(string challenge)
+    {
+        var exception = new ApiException("401", 401, string.Empty, Headers(challenge), null);
+
+        exception.IsStepUpRequired(out var maxAge).ShouldBeFalse();
+
+        maxAge.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("DPoP error=\"insufficient_user_authentication\", max_age=90", 90)]
+    [InlineData("Negotiate YIIabc==, bearer error=\"insufficient_user_authentication\", max_age=\"45\"", 45)]
+    public void Error_OfAnOAuthScheme_IsAStepUp(string challenge, int seconds)
+    {
+        var exception = new ApiException("401", 401, string.Empty, Headers(challenge), null);
+
+        exception.IsStepUpRequired(out var maxAge).ShouldBeTrue();
+
+        maxAge.ShouldBe(TimeSpan.FromSeconds(seconds));
+    }
+
+    // A step-up named by its code takes the window of the only challenge, when it is an OAuth one, and of no challenge
+    // when there are several, those without parameters counted.
     [Theory]
     [InlineData("Bearer max_age=\"120\"", 120)]
     [InlineData("Bearer realm=\"a\", max_age=120, Basic realm=\"b\"", 300)]
+    [InlineData("Bearer max_age=\"120\", Negotiate", 300)]
+    [InlineData("Negotiate, Bearer max_age=\"120\"", 300)]
+    [InlineData("Basic max_age=\"120\"", 300)]
     public void Code_WithChallengesThatNameNoStepUp_TakesTheWindowOfTheOnlyOne(string challenge, int seconds)
     {
         var body = """{ "ErrorCode": "StepUpRequired", "Details": { "MaxAge": 300 } }""";
@@ -101,6 +131,49 @@ public class StepUpTests
         exception.IsStepUpRequired(out var maxAge).ShouldBeTrue();
 
         maxAge.ShouldBe(TimeSpan.FromMinutes(15));
+    }
+
+    // A typed Details of the caller's own (an anonymous object) holds an Int32, not the Int64 of parsed JSON.
+    [Theory]
+    [InlineData(600, 600)]
+    [InlineData((short)90, 90)]
+    [InlineData(600u, 600)]
+    [InlineData(600ul, 600)]
+    public void TypedErrorResponse_WithAnIntegerOfAnyType_TakesTheWindowOfItsDetails(object value, int seconds)
+    {
+        var result = new ErrorResponse { ErrorCode = "StepUpRequired", Details = new Dictionary<string, object> { ["MaxAge"] = value } };
+        var exception = new ApiException<ErrorResponse>("401", 401, string.Empty, Headers(), result, null);
+
+        exception.IsStepUpRequired(out var maxAge).ShouldBeTrue();
+
+        maxAge.ShouldBe(TimeSpan.FromSeconds(seconds));
+    }
+
+    [Fact]
+    public void TypedErrorResponse_WithAnAnonymousDetails_TakesItsWindow()
+    {
+        var result = new ErrorResponse { ErrorCode = "StepUpRequired", Details = new { MaxAge = 600 } };
+        var exception = new ApiException<ErrorResponse>("401", 401, string.Empty, Headers(), result, null);
+
+        exception.IsStepUpRequired(out var maxAge).ShouldBeTrue();
+
+        maxAge.ShouldBe(TimeSpan.FromMinutes(10));
+    }
+
+    // A string, a fraction, a negative or an overflowing number is no window.
+    [Theory]
+    [InlineData("600")]
+    [InlineData(600.5)]
+    [InlineData(-1)]
+    [InlineData(ulong.MaxValue)]
+    public void TypedErrorResponse_WithAMaxAgeThatIsNoWindow_HasNone(object value)
+    {
+        var result = new ErrorResponse { ErrorCode = "StepUpRequired", Details = new Dictionary<string, object> { ["MaxAge"] = value } };
+        var exception = new ApiException<ErrorResponse>("401", 401, string.Empty, Headers(), result, null);
+
+        exception.IsStepUpRequired(out var maxAge).ShouldBeTrue();
+
+        maxAge.ShouldBeNull();
     }
 
     // Whatever a proxy makes of the answer, the detection never throws: a window no TimeSpan holds, or a code that is

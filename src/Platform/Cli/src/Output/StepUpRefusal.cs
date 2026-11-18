@@ -11,8 +11,11 @@ internal static class StepUpRefusal
 {
     public const string ErrorCode = StepUp.ErrorCode;
 
-    // The steps of a new sign-in, as the end of a sentence.
-    public const string Remedy = "sign out in the browser first (the admin UI's Sign out ends the browser's session), run 'sform account logout' and 'sform account', approve the new code (in a private window if the browser is still signed in), and repeat the command.";
+    // The steps of a new sign-in, as the middle of a sentence.
+    public const string SignInSteps = "sign out in the browser first (the admin UI's Sign out ends the browser's session), run 'sform account logout' and 'sform account', approve the new code (in a private window if the browser is still signed in)";
+
+    // The steps of a new sign-in and the repeat of a command that only reads or was refused, as the end of a sentence.
+    public const string Remedy = SignInSteps + ", and repeat the command.";
 
     public const string Hint = "To sign in again, " + Remedy;
 

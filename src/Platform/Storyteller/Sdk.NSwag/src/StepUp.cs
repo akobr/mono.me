@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Text;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -24,17 +24,8 @@ public static class StepUp
     // Far beyond any window the API sends (at most a day), far below what TimeSpan overflows at.
     private const long MaxWindowSeconds = 366L * 24 * 60 * 60;
 
-    // An auth-param of a challenge (RFC 9110, 11.2): a name, then a token or a quoted string. Matched from left to right, a
-    // quoted value is consumed whole, so a parameter named inside another one's value (error_description) is never read.
-    private static readonly Regex AuthParameter = new(
-        """(?<name>[A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*=\s*(?:"(?<quoted>(?:[^"\\]|\\.)*)"|(?<token>[^\s,"]+))""",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1));
-
-    private static readonly Regex QuotedPair = new(
-        """\\(.)""",
-        RegexOptions.CultureInvariant | RegexOptions.Singleline,
-        TimeSpan.FromSeconds(1));
+    // The schemes of OAuth access tokens (RFC 6750, RFC 9449), the only ones whose error names the step-up (RFC 9470).
+    private static readonly string[] OAuthSchemes = ["Bearer", "DPoP"];
 
     // "10 minutes", "1 hour", "90 seconds": the largest unit that divides the window, as the API writes it.
     public static string DescribeWindow(TimeSpan duration)
@@ -56,8 +47,8 @@ public static class StepUp
         return exception.IsStepUpRequired(out _);
     }
 
-    // A 401 that names the step-up by its error code (the typed body or the JSON text) or by its challenge. maxAge is the
-    // window the API names, from the challenge or the body, or null when neither says.
+    // A 401 that names the step-up by its error code (the typed body or the JSON text) or by its OAuth challenge. maxAge is
+    // the window the API names, from the challenge or the body, or null when neither says.
     public static bool IsStepUpRequired(this ApiException exception, out TimeSpan? maxAge)
     {
         ArgumentNullException.ThrowIfNull(exception);
@@ -72,17 +63,20 @@ public static class StepUp
         var challenges = GetChallenges(exception.Headers);
         var byCode = string.Equals(GetErrorCode(exception, body), ErrorCode, StringComparison.Ordinal);
 
-        // The challenge that names the step-up; with none, the only challenge there is (a step-up named by its code).
-        var stepUpChallenge = challenges.FirstOrDefault(parameters =>
-            parameters.TryGetValue("error", out var error) && string.Equals(error, ChallengeError, StringComparison.OrdinalIgnoreCase));
+        // The OAuth challenge that names the step-up; with none, the only challenge there is, when it is an OAuth one (a
+        // step-up named by its code). The error of another scheme (Basic of a gateway) names no step-up of the API.
+        var stepUpChallenge = challenges.FirstOrDefault(challenge =>
+            IsOAuth(challenge)
+            && challenge.Parameters.TryGetValue("error", out var error)
+            && string.Equals(error, ChallengeError, StringComparison.OrdinalIgnoreCase));
 
         if (!byCode && stepUpChallenge is null)
         {
             return false;
         }
 
-        var challenge = stepUpChallenge ?? (challenges.Count == 1 ? challenges[0] : null);
-        maxAge = GetChallengeMaxAge(challenge) ?? GetBodyMaxAge(body) ?? GetTypedMaxAge(exception);
+        var only = challenges.Count == 1 && IsOAuth(challenges[0]) ? challenges[0] : null;
+        maxAge = GetChallengeMaxAge(stepUpChallenge ?? only) ?? GetBodyMaxAge(body) ?? GetTypedMaxAge(exception);
         return true;
     }
 
@@ -123,12 +117,19 @@ public static class StepUp
         }
     }
 
-    // The challenges of every WWW-Authenticate line, each as its parameters (the first value of a name, unquoted). A new
-    // challenge starts where anything but commas and spaces stands between two parameters: its scheme ("Bearer"). A header
-    // that takes longer than the timeout to read names no challenge: the detection never throws in an error handler.
-    private static List<Dictionary<string, string>> GetChallenges(IReadOnlyDictionary<string, IEnumerable<string>>? headers)
+    private static bool IsOAuth(Challenge challenge)
     {
-        var challenges = new List<Dictionary<string, string>>();
+        return OAuthSchemes.Contains(challenge.Scheme, StringComparer.OrdinalIgnoreCase);
+    }
+
+    // The challenges of every WWW-Authenticate line (RFC 9110, 11.6.1), each with its scheme and its parameters (the first
+    // value of a name, unquoted), the challenges without parameters included. A token followed by "=" and a value is a
+    // parameter of the current challenge; any other token starts a challenge, and a token68 after its scheme is skipped.
+    // A quoted value is read whole, so a parameter named inside another one's value (error_description) is never read.
+    // The parser is linear and never throws in an error handler, whatever a proxy sends.
+    private static List<Challenge> GetChallenges(IReadOnlyDictionary<string, IEnumerable<string>>? headers)
+    {
+        var challenges = new List<Challenge>();
 
         if (headers is null)
         {
@@ -137,42 +138,151 @@ public static class StepUp
 
         var lines = headers
             .Where(header => string.Equals(header.Key, WwwAuthenticateHeader, StringComparison.OrdinalIgnoreCase))
-            .SelectMany(header => header.Value);
+            .SelectMany(header => header.Value ?? []);
 
-        try
+        foreach (var line in lines)
         {
-            foreach (var line in lines)
+            if (line is not null)
             {
-                Dictionary<string, string>? current = null;
-                var end = 0;
-
-                foreach (Match match in AuthParameter.Matches(line))
-                {
-                    if (current is null || line.AsSpan(end, match.Index - end).Trim(", \t").Length > 0)
-                    {
-                        current = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                        challenges.Add(current);
-                    }
-
-                    var value = match.Groups["quoted"].Success
-                        ? QuotedPair.Replace(match.Groups["quoted"].Value, "$1")
-                        : match.Groups["token"].Value;
-                    current.TryAdd(match.Groups["name"].Value, value);
-                    end = match.Index + match.Length;
-                }
+                ReadChallenges(line, challenges);
             }
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            return [];
         }
 
         return challenges;
     }
 
-    private static TimeSpan? GetChallengeMaxAge(Dictionary<string, string>? challenge)
+    private static void ReadChallenges(string line, List<Challenge> challenges)
     {
-        if (challenge is null || !challenge.TryGetValue("max_age", out var value))
+        Challenge? current = null;
+        var position = 0;
+
+        while (true)
+        {
+            position = Skip(line, position, ", \t");
+
+            if (position >= line.Length)
+            {
+                return;
+            }
+
+            var tokenEnd = SkipWhile(line, position, IsTokenChar);
+
+            if (tokenEnd == position)
+            {
+                // A stray quoted string or another character is skipped.
+                position = line[position] == '"' ? ReadQuoted(line, position, out _) : position + 1;
+                continue;
+            }
+
+            var name = line[position..tokenEnd];
+            var equals = Skip(line, tokenEnd, " \t");
+
+            if (current is not null
+                && equals < line.Length
+                && line[equals] == '='
+                && TryReadValue(line, Skip(line, equals + 1, " \t"), out var value, out var valueEnd))
+            {
+                current.Parameters.TryAdd(name, value);
+                position = valueEnd;
+                continue;
+            }
+
+            current = new Challenge(name);
+            challenges.Add(current);
+            position = SkipToken68(line, tokenEnd);
+        }
+    }
+
+    // A token or a quoted string; nothing, a list separator or another "=" (of a token68) is no value.
+    private static bool TryReadValue(string line, int position, out string value, out int end)
+    {
+        value = string.Empty;
+        end = position;
+
+        if (position >= line.Length)
+        {
+            return false;
+        }
+
+        if (line[position] == '"')
+        {
+            end = ReadQuoted(line, position, out value);
+            return true;
+        }
+
+        end = SkipWhile(line, position, character => character is not (' ' or '\t' or ',' or '"'));
+
+        if (end == position || line[position] == '=')
+        {
+            return false;
+        }
+
+        value = line[position..end];
+        return true;
+    }
+
+    // From the opening quote: the unquoted text, and the position after the closing quote (or the end of the line).
+    private static int ReadQuoted(string line, int position, out string value)
+    {
+        var text = new StringBuilder();
+        var index = position + 1;
+
+        while (index < line.Length && line[index] != '"')
+        {
+            if (line[index] == '\\' && index + 1 < line.Length)
+            {
+                index++;
+            }
+
+            text.Append(line[index]);
+            index++;
+        }
+
+        value = text.ToString();
+        return Math.Min(index + 1, line.Length);
+    }
+
+    // After a scheme: a token68 ("YIIabc==") runs up to a comma or the end of the line, a parameter name does not.
+    private static int SkipToken68(string line, int schemeEnd)
+    {
+        var start = Skip(line, schemeEnd, " \t");
+        var end = SkipWhile(line, start, character => char.IsAsciiLetterOrDigit(character) || character is '-' or '.' or '_' or '~' or '+' or '/');
+
+        if (end == start)
+        {
+            return schemeEnd;
+        }
+
+        end = SkipWhile(line, end, character => character == '=');
+        var next = Skip(line, end, " \t");
+
+        return next >= line.Length || line[next] == ',' ? next : schemeEnd;
+    }
+
+    private static int Skip(string line, int position, string characters)
+    {
+        return SkipWhile(line, position, character => characters.Contains(character, StringComparison.Ordinal));
+    }
+
+    private static int SkipWhile(string line, int position, Func<char, bool> predicate)
+    {
+        while (position < line.Length && predicate(line[position]))
+        {
+            position++;
+        }
+
+        return position;
+    }
+
+    // tchar of RFC 9110, 5.6.2.
+    private static bool IsTokenChar(char character)
+    {
+        return char.IsAsciiLetterOrDigit(character) || "!#$%&'*+-.^_`|~".Contains(character, StringComparison.Ordinal);
+    }
+
+    private static TimeSpan? GetChallengeMaxAge(Challenge? challenge)
+    {
+        if (challenge is null || !challenge.Parameters.TryGetValue("max_age", out var value))
         {
             return null;
         }
@@ -186,12 +296,36 @@ public static class StepUp
         return seconds >= 0 && seconds <= MaxWindowSeconds ? TimeSpan.FromSeconds(seconds) : null;
     }
 
+    // An integer of any CLR type: parsed JSON holds an Int64, a typed Details (new { MaxAge = 600 }) an Int32. A string, a
+    // fraction or a number no Int64 holds (a BigInteger) gives no window.
     private static TimeSpan? GetBodyMaxAge(JObject? body)
     {
-        return body?["Details"] is JObject details
-            && details["MaxAge"] is JValue { Type: JTokenType.Integer, Value: long seconds }
-            ? ToWindow(seconds)
-            : null;
+        if (body?["Details"] is not JObject details || details["MaxAge"] is not JValue { Type: JTokenType.Integer, Value: { } value })
+        {
+            return null;
+        }
+
+        long? seconds = value switch
+        {
+            long number => number,
+            int number => number,
+            short number => number,
+            sbyte number => number,
+            byte number => number,
+            ushort number => number,
+            uint number => number,
+            ulong number when number <= long.MaxValue => (long)number,
+            _ => null,
+        };
+
+        return seconds is { } window ? ToWindow(window) : null;
+    }
+
+    private sealed class Challenge(string scheme)
+    {
+        public string Scheme { get; } = scheme;
+
+        public Dictionary<string, string> Parameters { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }
 

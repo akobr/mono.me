@@ -154,7 +154,8 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
     [Description(
         "Restores soft-deleted pairs to their latest version, without a new version: up to 100 keys, or the deleted keys "
         + "under a prefix (at most 1,000). " + KeyValueText.Outcomes + " Outcomes: Done, Unchanged, NotFound, Forbidden or "
-        + "Failed. Public pairs need Contributor; a secret needs ContributorWithSecrets, otherwise its outcome is Forbidden.")]
+        + "Failed. Public pairs need Contributor; a secret needs ContributorWithSecrets, otherwise its outcome is Forbidden, "
+        + "and a recent sign-in of the person, otherwise Forbidden with ErrorCode StepUpRequired.")]
     public async Task<CallToolResult> RestoreKeyValues(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
@@ -170,7 +171,9 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
     [Description(
         "Removes soft-deleted pairs with every version for good, before their retention ends: up to 100 keys, or the "
         + "deleted keys under a prefix (an empty prefix means every deleted key of the view). Active keys are not touched. "
-        + "Permanent, there is no restore. " + KeyValueText.Outcomes + " Outcomes: Done, NotFound or Failed. Administrator only.")]
+        + "Permanent, there is no restore. " + KeyValueText.Outcomes + " Outcomes: Done, NotFound, Forbidden or Failed. "
+        + "Administrator only; a secret also needs a recent sign-in of the person, otherwise its outcome is Forbidden with "
+        + "ErrorCode StepUpRequired.")]
     public async Task<CallToolResult> PurgeKeyValues(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,

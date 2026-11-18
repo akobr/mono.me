@@ -19,7 +19,7 @@ Use the version that generated `src/ApiSdk.g.cs` (its header names it); another 
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.10.49.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true /GenerateOptionalParameters:true /ParameterDateTimeFormat:o
+nswag openapi2csclient /input:open.api.v0.10.50.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true /GenerateOptionalParameters:true /ParameterDateTimeFormat:o
 ```
 
 `/ParameterDateTimeFormat:o` writes a time of a query (`from` and `to` of the audits) in the round-trip format, with its offset and fractions of a second; the default `s` drops both, so a time with an offset other than zero was read as UTC. `/GenerateOptionalParameters:true` gives each operation one method: the parameters the document marks optional (query, header, and a body it does not mark `required`) come last with `= null`, and `cancellationToken` with `= default`. A required body therefore comes before the optional parameters (`ImportKeyValuesAsync(organization, project, view, body, mode, dryRun, keyPrefix)`, `StartViewImportAsync(organization, project, view, body, include, …)`). Leave out what you don't send, and pass a later argument by name: `GetConfigurationAsync(organization, project, view, key, cancellationToken: cancellationToken)`. The compiler also lets you leave out a body the document does not mark `required`, but the client then sends the JSON `null`, which most operations answer with `400`.
@@ -134,7 +134,7 @@ The generated `SetAnnotationAsync(organization, project, view, key, body, if_Mat
 
 ## Step-up
 
-The API needs a recent sign-in of a user for secret values, role and member changes and machine credentials ([Recent sign-in](../../../../docs/Platform/Storyteller/authentication.md#recent-sign-in-step-up)). A user whose sign-in is older than the window gets `401` with the `ErrorCode` `StepUpRequired`, the window in `Details.MaxAge` and `WWW-Authenticate: Bearer error="insufficient_user_authentication", max_age`. The operations that answer it document that `401` with an `ErrorResponse`, so the generated methods throw `ApiException<ErrorResponse>` for it; any other `401` has no body and stays a plain `ApiException`. `StepUp.cs` tells them apart:
+The API needs a recent sign-in of a user for secret values, role and member changes and machine credentials ([Recent sign-in](../../../../docs/Platform/Storyteller/authentication.md#recent-sign-in-step-up)). A user whose sign-in is older than the window gets `401` with the `ErrorCode` `StepUpRequired`, the window in `Details.MaxAge` and `WWW-Authenticate: Bearer error="insufficient_user_authentication", max_age`. The operations that answer it document that `401` with an `ErrorResponse`, so the generated methods throw `ApiException<ErrorResponse>` for it; any other `401` has no body and stays a plain `ApiException`, whose message is the generated "Response was null which was not expected.": tell it by `StatusCode`, which it keeps with the headers. `StepUp.cs` tells them apart:
 
 ```csharp
 catch (ApiException e) when (e.IsStepUpRequired(out var maxAge))
@@ -143,10 +143,10 @@ catch (ApiException e) when (e.IsStepUpRequired(out var maxAge))
 }
 ```
 
-* `IsStepUpRequired(out TimeSpan? maxAge)` is true for a `401` whose error code is `StepUpRequired`, in the typed result or in the JSON text of a plain `ApiException`, or whose `WWW-Authenticate` names `insufficient_user_authentication` (`StepUp.ErrorCode`, `StepUp.ChallengeError`). `maxAge` is the challenge's `max_age`, quoted or not, else `Details.MaxAge`, else `null`. `IsStepUpRequired()` drops the window.
+* `IsStepUpRequired(out TimeSpan? maxAge)` is true for a `401` whose error code is `StepUpRequired`, in the typed result or in the JSON text of a plain `ApiException`, or whose `WWW-Authenticate` names `insufficient_user_authentication` in a `Bearer` or `DPoP` challenge (`StepUp.ErrorCode`, `StepUp.ChallengeError`; the same error in another scheme, such as a gateway's `Basic`, is no step-up). `maxAge` is the `max_age` of that challenge, quoted or not, or of the only challenge when the code alone names the step-up and that challenge is `Bearer` or `DPoP` (a challenge without parameters counts too), else `Details.MaxAge` (an integer of any type, also of a typed `Details` the caller built), else `null`. `IsStepUpRequired()` drops the window.
 * A refresh of the token does not help: it keeps the time of the sign-in.
 * Machines never get it, so the [machine credentials](#machine-credentials) and their handler are not affected.
-* `SecretsWithheldReasons` holds the values of `X-2S-Secrets-Withheld`: `MtlsRequired`, `ActorRestricted` and `StepUpRequired`. A resolved read under the step-up answers `200` with the secret bindings unresolved and `step-up-required`.
+* `SecretsWithheldReasons` holds the values of `X-2S-Secrets-Withheld`: `MtlsRequired`, `ActorRestricted` and `StepUpRequired`. A resolved read under the step-up that returns a body answers `200` with the secret bindings unresolved and `step-up-required`. A conditional read that sends back the `ETag` of such a `200` can get `304` with the same header and no body (`IsNotModified`): the cached document is still the unresolved one, so keep it and check `SecretsWithheld` on the `304` too.
 
 ## Credentials
 
