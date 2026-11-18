@@ -111,6 +111,16 @@ describe('the mock API with a stale sign-in', () => {
         { dryRun: true },
       ),
     )
+    // so is an import that makes an active secret public
+    await expectStepUp(() =>
+      importKeyValues(
+        org,
+        project,
+        view,
+        { Format: '2s.key-values.v1', Items: [{ Key: 'db.password', Protection: 'Public', Value: 'x' }] },
+        { dryRun: true },
+      ),
+    )
 
     expect((await setKeyValue(org, project, view, 'new.public', { Protection: 'Public', Value: 'x' })).Version).toBe(1)
     expect((await exportKeyValues(org, project, view, {})).Items?.length).toBeGreaterThan(0)

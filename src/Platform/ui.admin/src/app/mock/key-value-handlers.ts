@@ -878,13 +878,21 @@ const viewHandlers: HttpHandler[] = [
       if (secretsNeeded) {
         return errorResponse(403, 'The document carries secret values; the caller has no rights to secrets.', 'AccessDenied')
       }
-      // A secret value to write, or (Replace) a secret to delete: a write of secrets.
+      // A secret value to write, a value of another level over an active secret, or (Replace) a secret to delete: a
+      // write of secrets, as the API's plan finds it.
+      const secretReplaces = items.some((item) => {
+        const stored = store.pairs[normalizeKey(item.Key ?? '')]
+        return item.Value != null && !isSecret(item.Protection) && !!stored && !stored.Deleted && isSecret(latest(stored).Protection)
+      })
+      if (secretReplaces && !hasSecretRights(db, projectKey)) {
+        return errorResponse(403, 'The import writes or deletes secrets; the caller has no rights to secrets.', 'AccessDenied')
+      }
       const secretDeletes =
         mode === 'Replace' &&
         Object.values(store.pairs).some(
           (stored) => !stored.Deleted && stored.Key.toLowerCase().startsWith(prefix) && isSecret(latest(stored).Protection) && !items.some((item) => normalizeKey(item.Key ?? '') === normalizeKey(stored.Key)),
         )
-      if ((items.some((item) => isSecret(item.Protection) && item.Value != null) || secretDeletes) && stepUpWithheld(db, projectKey)) {
+      if ((items.some((item) => isSecret(item.Protection) && item.Value != null) || secretReplaces || secretDeletes) && stepUpWithheld(db, projectKey)) {
         return stepUpResponse()
       }
 
