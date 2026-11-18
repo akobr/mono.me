@@ -68,6 +68,13 @@ public class ProjectSettingsCommand : BaseContextCommand
             return isJson ? Console.WriteApiErrorLine(e) : Console.WriteApiError(e);
         }
 
+        // A JSON export that cannot be written is refused before the JSON reaches the standard output.
+        if (isJson && !string.IsNullOrWhiteSpace(ExportFilePath) && ExportProblem(ExportFilePath) is { } problem)
+        {
+            Console.WriteErrorLine($"The settings were not exported: {problem}");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
         if (isJson)
         {
             WriteOut(JsonConvert.SerializeObject(settings, Formatting.Indented));
@@ -88,32 +95,39 @@ public class ProjectSettingsCommand : BaseContextCommand
             {
                 Console.WriteJsonToFile(document, ExportFilePath, _fileSystem);
             }
-            else if (!ExportForPrograms(document, ExportFilePath))
+            else
             {
-                return ExitCodes.ERROR_WRONG_INPUT;
+                ExportForPrograms(document, ExportFilePath);
             }
         }
 
         return ExitCodes.SUCCESS;
     }
 
-    // The export of the JSON mode: the standard output carries the JSON only, so the file is written without a prompt and
-    // its notices are plain lines on the error output. A folder at the path is refused.
-    private bool ExportForPrograms(object document, string filePath)
+    // Why the JSON mode cannot write the export there: a folder at the path, or a missing folder of the file.
+    private string? ExportProblem(string filePath)
     {
         if (_fileSystem.Directory.Exists(filePath))
         {
-            Console.WriteErrorLine($"The settings were not exported: '{filePath}' is a folder.");
-            return false;
+            return $"'{filePath}' is a folder.";
         }
 
+        var folder = _fileSystem.Path.GetDirectoryName(_fileSystem.Path.GetFullPath(filePath));
+        return string.IsNullOrEmpty(folder) || _fileSystem.Directory.Exists(folder)
+            ? null
+            : $"the folder '{folder}' does not exist.";
+    }
+
+    // The export of the JSON mode, checked by ExportProblem first: the standard output carries the JSON only, so the file
+    // is written without a prompt and its notices are plain lines on the error output.
+    private void ExportForPrograms(object document, string filePath)
+    {
         if (_fileSystem.File.Exists(filePath))
         {
             Console.WriteErrorLine($"The file '{_fileSystem.Path.GetFileName(filePath)}' already exists and is rewritten.");
         }
 
         _fileSystem.File.WriteAllText(filePath, JsonConvert.SerializeObject(document));
-        return true;
     }
 
     // Plain text on the standard output, for programs: in UTF-8, so every label comes out as it is.

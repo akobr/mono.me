@@ -152,8 +152,16 @@ public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProject
                 var refused = exception is ApiException { StatusCode: 401 or 403 or 404 };
                 var failed = (refused || entry is null
                     ? new ProjectSettingsCacheEntry { BaseUrl = _baseUrl, Project = project }
-                    : entry) with { FailedAt = now };
-                TryWriteCache(cache.With(failed));
+                    : entry) with { FailedAt = _timeProvider.GetUtcNow() };
+
+                // Another run (a set, an edit, a read that succeeded) may have written the entry meanwhile: keep its.
+                var latest = ReadCache();
+                var current = latest.Find(_baseUrl, project);
+                if (current?.ETag == entry?.ETag && current?.FetchedAt == entry?.FetchedAt && current?.FailedAt == entry?.FailedAt)
+                {
+                    TryWriteCache(latest.With(failed));
+                }
+
                 return StaleOrBuiltIn(failed);
             }
         }
