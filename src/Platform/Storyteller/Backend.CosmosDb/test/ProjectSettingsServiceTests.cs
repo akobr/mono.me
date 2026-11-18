@@ -289,9 +289,9 @@ public class ProjectSettingsServiceTests(Startup startup)
         var project = await CreateProjectAsync("Described.");
         var pointKey = $"{Organization}.{project}";
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(memberId, pointKey, AccountRole.Reader));
-        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.Certificate });
-        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 }, Cancellation);
+        await Access.GrantPermissionAsync(Permission(memberId, pointKey, AccountRole.Reader), AccessCaller.System);
+        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.Certificate }, AccessCaller.System);
+        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 }, AccessCaller.System, Cancellation);
 
         await Settings.SetAsync(Organization, project, Company(), ProjectSettingsCondition.None, Admin, Cancellation);
 
@@ -313,16 +313,16 @@ public class ProjectSettingsServiceTests(Startup startup)
         var memberId = await CreateBareAccountAsync();
         var expected = (await Settings.SetAsync(Organization, project, Company(), ProjectSettingsCondition.None, Admin, Cancellation)).Settings;
 
-        await Access.GrantPermissionAsync(Permission(memberId, pointKey, AccountRole.Contributor));
+        await Access.GrantPermissionAsync(Permission(memberId, pointKey, AccountRole.Contributor), AccessCaller.System);
         await ShouldKeepAsync();
 
-        await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Described." });
+        await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Described." }, AccessCaller.System);
         await ShouldKeepAsync();
 
-        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 }, Cancellation);
+        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 }, AccessCaller.System, Cancellation);
         await ShouldKeepAsync();
 
-        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey });
+        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey }, AccessCaller.System);
         await ShouldKeepAsync();
 
         var core = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetCore().Container;
@@ -349,7 +349,7 @@ public class ProjectSettingsServiceTests(Startup startup)
         {
             if (replace == 1)
             {
-                await Access.GrantPermissionAsync(Permission(memberId, pointKey, AccountRole.Reader));
+                await Access.GrantPermissionAsync(Permission(memberId, pointKey, AccountRole.Reader), AccessCaller.System);
             }
         });
         using var client = interceptor.CreateClient(CosmosOptions);
@@ -370,7 +370,7 @@ public class ProjectSettingsServiceTests(Startup startup)
         var pointKey = $"{Organization}.{project}";
         var memberIds = new[] { await CreateBareAccountAsync(), await CreateBareAccountAsync() };
         var interceptor = new ReplaceInterceptor($"apt.{pointKey}", replace =>
-            Access.GrantPermissionAsync(Permission(memberIds[replace - 1], pointKey, AccountRole.Reader)));
+            Access.GrantPermissionAsync(Permission(memberIds[replace - 1], pointKey, AccountRole.Reader), AccessCaller.System));
         using var client = interceptor.CreateClient(CosmosOptions);
 
         var write = () => SettingsOn(client).SetAsync(Organization, project, Company(), ProjectSettingsCondition.None, Admin, Cancellation);
@@ -431,8 +431,8 @@ public class ProjectSettingsServiceTests(Startup startup)
         var described = await CreateProjectAsync();
         var plain = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(memberId, $"{Organization}.{described}", AccountRole.Reader));
-        await Access.GrantPermissionAsync(Permission(memberId, $"{Organization}.{plain}", AccountRole.Reader));
+        await Access.GrantPermissionAsync(Permission(memberId, $"{Organization}.{described}", AccountRole.Reader), AccessCaller.System);
+        await Access.GrantPermissionAsync(Permission(memberId, $"{Organization}.{plain}", AccountRole.Reader), AccessCaller.System);
         var expected = (await Settings.SetAsync(Organization, described, Company(), ProjectSettingsCondition.None, Admin, Cancellation)).Settings;
 
         var projects = (await Access.GetProjectsAsync(memberId)).ToDictionary(summary => summary.Key);
@@ -503,7 +503,7 @@ public class ProjectSettingsServiceTests(Startup startup)
             Name = "Owner",
             Organization = Organization,
             Project = "base",
-        });
+        }, AccessCaller.System);
     }
 
     private async Task<string> CreateProjectAsync(string description = null)
@@ -516,7 +516,7 @@ public class ProjectSettingsServiceTests(Startup startup)
             Project = project,
             ProjectDescription = description,
             OwnerId = OwnerId,
-        });
+        }, AccessCaller.System);
         return project;
     }
 
