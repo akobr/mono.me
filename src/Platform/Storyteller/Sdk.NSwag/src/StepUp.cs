@@ -69,15 +69,19 @@ public static class StepUp
         }
 
         var body = ReadBody(exception);
-        var challenge = GetChallenge(exception.Headers);
+        var challenges = GetChallenges(exception.Headers);
         var byCode = string.Equals(GetErrorCode(exception, body), ErrorCode, StringComparison.Ordinal);
-        var byChallenge = string.Equals(GetChallengeParameter(challenge, "error"), ChallengeError, StringComparison.OrdinalIgnoreCase);
 
-        if (!byCode && !byChallenge)
+        // The challenge that names the step-up; with none, the only challenge there is (a step-up named by its code).
+        var stepUpChallenge = challenges.FirstOrDefault(parameters =>
+            parameters.TryGetValue("error", out var error) && string.Equals(error, ChallengeError, StringComparison.OrdinalIgnoreCase));
+
+        if (!byCode && stepUpChallenge is null)
         {
             return false;
         }
 
+        var challenge = stepUpChallenge ?? (challenges.Count == 1 ? challenges[0] : null);
         maxAge = GetChallengeMaxAge(challenge) ?? GetBodyMaxAge(body) ?? GetTypedMaxAge(exception);
         return true;
     }
@@ -119,55 +123,61 @@ public static class StepUp
         }
     }
 
-    private static string? GetChallenge(IReadOnlyDictionary<string, IEnumerable<string>>? headers)
+    // The challenges of every WWW-Authenticate line, each as its parameters (the first value of a name, unquoted). A new
+    // challenge starts where anything but commas and spaces stands between two parameters: its scheme ("Bearer"). A header
+    // that takes longer than the timeout to read names no challenge: the detection never throws in an error handler.
+    private static List<Dictionary<string, string>> GetChallenges(IReadOnlyDictionary<string, IEnumerable<string>>? headers)
     {
+        var challenges = new List<Dictionary<string, string>>();
+
         if (headers is null)
         {
-            return null;
+            return challenges;
         }
 
-        var values = headers
+        var lines = headers
             .Where(header => string.Equals(header.Key, WwwAuthenticateHeader, StringComparison.OrdinalIgnoreCase))
-            .SelectMany(header => header.Value)
-            .ToList();
-
-        return values.Count == 0 ? null : string.Join(", ", values);
-    }
-
-    private static TimeSpan? GetChallengeMaxAge(string? challenge)
-    {
-        return long.TryParse(GetChallengeParameter(challenge, "max_age"), NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
-            ? ToWindow(seconds)
-            : null;
-    }
-
-    // The value of the first parameter of that name, unquoted; null when the challenge has none. A header that takes longer
-    // than the timeout to read names no parameter: the detection never throws in an error handler.
-    private static string? GetChallengeParameter(string? challenge, string name)
-    {
-        if (challenge is null)
-        {
-            return null;
-        }
+            .SelectMany(header => header.Value);
 
         try
         {
-            foreach (Match match in AuthParameter.Matches(challenge))
+            foreach (var line in lines)
             {
-                if (string.Equals(match.Groups["name"].Value, name, StringComparison.OrdinalIgnoreCase))
+                Dictionary<string, string>? current = null;
+                var end = 0;
+
+                foreach (Match match in AuthParameter.Matches(line))
                 {
-                    return match.Groups["quoted"].Success
+                    if (current is null || line.AsSpan(end, match.Index - end).Trim(", \t").Length > 0)
+                    {
+                        current = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        challenges.Add(current);
+                    }
+
+                    var value = match.Groups["quoted"].Success
                         ? QuotedPair.Replace(match.Groups["quoted"].Value, "$1")
                         : match.Groups["token"].Value;
+                    current.TryAdd(match.Groups["name"].Value, value);
+                    end = match.Index + match.Length;
                 }
             }
         }
         catch (RegexMatchTimeoutException)
         {
+            return [];
+        }
+
+        return challenges;
+    }
+
+    private static TimeSpan? GetChallengeMaxAge(Dictionary<string, string>? challenge)
+    {
+        if (challenge is null || !challenge.TryGetValue("max_age", out var value))
+        {
             return null;
         }
 
-        return null;
+        return long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) ? ToWindow(seconds) : null;
     }
 
     // A window no TimeSpan holds is no window: the detection never throws in an error handler, whatever a proxy sends.
