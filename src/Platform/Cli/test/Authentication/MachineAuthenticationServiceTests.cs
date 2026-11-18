@@ -885,7 +885,7 @@ public class MachineAuthenticationServiceTests
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
-        exception.Message.ShouldBe("IDENTITY_ENDPOINT must be an absolute URL without user info: https, or http to localhost or to a loopback, link-local or private address.");
+        exception.Message.ShouldBe("IDENTITY_ENDPOINT must be an absolute URL without user info or a fragment: https, or http to localhost or to a loopback, link-local or private address.");
         _http.Requests.ShouldBeEmpty();
     }
 

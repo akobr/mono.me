@@ -36,6 +36,11 @@ internal sealed class TokenEndpointClient : IDisposable
     private readonly Lazy<HttpClient> _directHttpClient;
     private readonly TimeProvider _time;
 
+    // How long the body of an answer may take after its headers: the attempt timeout again, none when that is off. The
+    // attempt timeout of the pipeline ends with the headers, so an answer that stalls after them would never end for a
+    // caller without a token of its own.
+    private readonly TimeSpan? _answerTimeout;
+
     // The message of the last transient failure, named when the circuit is open: the answers that opened it are gone.
     private string? _lastFailure;
 
@@ -50,6 +55,7 @@ internal sealed class TokenEndpointClient : IDisposable
         // A copy: the caller's options may change later, and token requests always retry a POST.
         var options = resilience?.Clone() ?? new StorytellerResilienceOptions();
         options.RetryUnsafeMethods = true;
+        _answerTimeout = options.AttemptTimeout > TimeSpan.Zero && options.AttemptTimeout != Timeout.InfiniteTimeSpan ? options.AttemptTimeout : null;
 
         // One pipeline for both clients, so one circuit breaker: every request of the credential counts in it.
         var pipeline = new Lazy<ResiliencePipeline<HttpResponseMessage>>(() => StorytellerResilience.CreatePipeline(options));
@@ -296,11 +302,23 @@ internal sealed class TokenEndpointClient : IDisposable
         };
     }
 
+    // The answer with its body read: the callers read it from memory.
     private async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpRequestMessage request, string what, CancellationToken cancellationToken)
     {
         try
         {
-            return await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                await ReadBodyAsync(client, response, what, cancellationToken).ConfigureAwait(false);
+                return response;
+            }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
         }
         catch (BrokenCircuitException exception)
         {
@@ -314,6 +332,29 @@ internal sealed class TokenEndpointClient : IDisposable
             || (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             throw Unavailable($"{what} failed: {exception.Message}", exception);
+        }
+    }
+
+    // The body into memory, within the answer timeout: the caller's cancellation stays a cancellation, the timeout is
+    // Unavailable. It is not retried: the pipeline is behind it.
+    private async Task ReadBodyAsync(HttpClient client, HttpResponseMessage response, string what, CancellationToken cancellationToken)
+    {
+        if (_answerTimeout is not { } timeout)
+        {
+            await response.Content.LoadIntoBufferAsync(client.MaxResponseContentBufferSize, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+
+        try
+        {
+            await response.Content.LoadIntoBufferAsync(client.MaxResponseContentBufferSize, deadline.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw Unavailable($"{what} failed: the body of its answer did not end within {timeout}.", exception);
         }
     }
 

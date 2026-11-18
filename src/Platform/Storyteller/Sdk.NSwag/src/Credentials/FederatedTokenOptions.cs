@@ -13,6 +13,9 @@ public sealed record FederatedTokenOptions
     public const string IdTokenType = "urn:ietf:params:oauth:token-type:id_token";
     public const string AccessTokenType = "urn:ietf:params:oauth:token-type:access_token";
 
+    // null until an initializer sets it: the default then follows the source.
+    private readonly string? _subjectTokenType;
+
     // The endpoint, organization and project of the binding when unset.
     public Uri? Endpoint { get; init; }
 
@@ -32,8 +35,13 @@ public sealed record FederatedTokenOptions
     // The managed identity of the Azure host, asked again before every exchange.
     public AzureManagedIdentityTokenOptions? AzureManagedIdentity { get; init; }
 
-    // A URN, or its short form jwt, id_token or access_token.
-    public string SubjectTokenType { get; init; } = JwtTokenType;
+    // A URN, or its short form jwt, id_token or access_token. Unset or blank, it is the access token for a managed
+    // identity, whose token is always one, and jwt for the other sources.
+    public string SubjectTokenType
+    {
+        get => string.IsNullOrWhiteSpace(_subjectTokenType) ? (AzureManagedIdentity is null ? JwtTokenType : AccessTokenType) : _subjectTokenType;
+        init => _subjectTokenType = value;
+    }
 
     public string? Scope { get; init; }
 

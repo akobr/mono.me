@@ -174,3 +174,11 @@ All in `src/Platform/Storyteller/Sdk.NSwag/src/Credentials/`.
   - what `sform` prints for a managed identity: the names in `sform account`, the second deadline message and the hints of `machine create`;
   - the SDK's package readme, which names the new sources.
 - The spec's test list names "the loopback token endpoint of the existing tests". The exchange end to end runs over the stub handler against `http://localhost:7071/api`, as those tests do. Only the test of the proxy opens sockets.
+
+### After the review of the pull request
+
+- **A body that stalls.** The attempt timeout of the pipeline ends when the headers of an answer arrive, and the client buffered the body after that without a limit, so an answer that stalled after its headers never ended for a caller without a token of its own. `TokenEndpointClient.SendAsync` now reads the headers first and gives the body the attempt timeout again (`ReadBodyAsync`): the timeout is `Unavailable`, and the caller's cancellation stays a cancellation. It holds for every request of the client, and there is no body timeout when the attempt timeout is turned off. Two tests over a socket that sends part of a JSON answer and keeps the connection open pin both.
+- **The token type of a managed identity.** Options that set `AzureManagedIdentity` themselves kept `jwt`, the default of `SubjectTokenType`, although the token of a managed identity is always an access token. The default now follows the source: `access_token` with a managed identity, `jwt` otherwise, and a type that the options set wins. This replaces the record of spec-4 and quality-2 above.
+- **Not changed.** The managed identity request keeps the pipeline and the circuit breaker of the token endpoint. A pipeline of its own, with a short first attempt and retries of `404` and `410` of IMDS, is a decision for the owner. The SDK readme now says what a process that is not on Azure gets.
+- **`IDENTITY_ENDPOINT` with a fragment** is refused: the request appends its query to the value as written, which a fragment would take. A blank `SubjectTokenType` takes the default of the source, as an unset one does.
+- The SDK tests went from 497 to 502.
