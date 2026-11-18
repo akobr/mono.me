@@ -61,12 +61,21 @@ public static class AccessAuditValues
         return Json(rules ?? []);
     }
 
-    // The enabled kinds are a set: the order they were sent in is no change, and none (null) and an empty list are the same.
+    // The policy as it applies (MachineAuthenticationPolicies): no enabled kinds (null or empty) enable just the default
+    // kind, and without a default the first kind sent is the default. The enabled kinds are then a set, so their order
+    // is no change while the default stays, and a policy of only a default equals the same kind enabled explicitly.
     public static string MachineAuthentication(MachineAuthenticationPolicy? policy)
     {
         policy ??= new MachineAuthenticationPolicy();
-        var kinds = policy.EnabledCredentialKinds is { Count: > 0 } enabled ? enabled.Distinct().Order().ToList() : null;
-        return Json(policy with { EnabledCredentialKinds = kinds });
+        var requested = policy.EnabledCredentialKinds is { Count: > 0 } enabled
+            ? enabled.Distinct().ToList()
+            : policy.CredentialKind is { } single ? [single] : [];
+
+        return Json(policy with
+        {
+            EnabledCredentialKinds = requested.Count > 0 ? requested.Order().ToList() : null,
+            CredentialKind = policy.CredentialKind ?? (requested.Count > 0 ? requested[0] : null),
+        });
     }
 
     // What of a key/value policy decides who gets secrets and how; key versions, health and rewrap progress are left out,
@@ -108,7 +117,8 @@ public static class AccessAuditValues
 
             // by claim name, and the values of a claim as a set (any of them matches), so the same pins in another order
             // or repeated are no change
-            RequiredClaims = issuer.RequiredClaims?
+            // none (null) and an empty dictionary are the same
+            RequiredClaims = issuer.RequiredClaims is not { Count: > 0 } ? null : issuer.RequiredClaims
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .ToDictionary(
                     pair => pair.Key,
@@ -147,9 +157,9 @@ public static class AccessAuditValues
         return Convert.ToHexString(hash, 0, 8).ToLower(CultureInfo.InvariantCulture);
     }
 
-    // A thumbprint of the key set in a canonical form (compact, the members of every object by name, arrays in their
-    // order), so a key replaced by another (the same number of keys) is a change of the issuer, and a key set only
-    // formatted or ordered differently is none.
+    // A thumbprint of the key set in a canonical form (compact, the members of every object by name, the keys of the
+    // root's keys array as a set, other arrays in their order), so a key replaced by another (the same number of keys)
+    // is a change of the issuer, and a key set only formatted or ordered differently is none.
     private static string? JwksThumbprint(string? jwks)
     {
         if (string.IsNullOrWhiteSpace(jwks))
@@ -160,7 +170,7 @@ public static class AccessAuditValues
         try
         {
             using var document = JsonDocument.Parse(jwks);
-            return Thumbprint(Canonical(document.RootElement));
+            return Thumbprint(Canonical(document.RootElement, isRoot: true));
         }
         catch (JsonException)
         {
@@ -168,7 +178,7 @@ public static class AccessAuditValues
         }
     }
 
-    private static string Canonical(JsonElement element)
+    private static string Canonical(JsonElement element, bool isRoot = false)
     {
         return element.ValueKind switch
         {
@@ -176,10 +186,23 @@ public static class AccessAuditValues
                 ",",
                 element.EnumerateObject()
                     .OrderBy(member => member.Name, StringComparer.Ordinal)
-                    .Select(member => $"{JsonSerializer.Serialize(member.Name)}:{Canonical(member.Value)}")) + "}",
-            JsonValueKind.Array => "[" + string.Join(",", element.EnumerateArray().Select(Canonical)) + "]",
+                    .Select(member => $"{JsonSerializer.Serialize(member.Name)}:{CanonicalMember(member, isRoot)}")) + "}",
+            JsonValueKind.Array => "[" + string.Join(",", element.EnumerateArray().Select(item => Canonical(item))) + "]",
             _ => element.GetRawText(),
         };
+    }
+
+    // The keys of a JWKS are a set: their canonical forms are sorted, so the order of the keys is no change.
+    private static string CanonicalMember(JsonProperty member, bool isRoot)
+    {
+        if (!isRoot || member.Name != "keys" || member.Value.ValueKind != JsonValueKind.Array)
+        {
+            return Canonical(member.Value);
+        }
+
+        return "[" + string.Join(
+            ",",
+            member.Value.EnumerateArray().Select(item => Canonical(item)).Order(StringComparer.Ordinal)) + "]";
     }
 
     private static int? CountJwksKeys(string? jwks)
