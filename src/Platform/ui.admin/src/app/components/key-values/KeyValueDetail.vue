@@ -108,10 +108,11 @@ watch(
 )
 
 // The target is the scope the Reveal asked in, taken before the request: the page may move to another view meanwhile.
+// Only this Reveal's own error counts; a Reveal dropped on the way has none.
 async function reveal() {
   const target = revealTarget()
-  await revealed.reveal()
-  if (isStepUpRequired(revealed.error.value) && target) {
+  const failure = await revealed.reveal()
+  if (isStepUpRequired(failure) && target) {
     stepUp.rememberReveal(target)
   }
 }
