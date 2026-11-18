@@ -160,6 +160,39 @@ public class ProjectDisplayTests
         display.LabelOf("cnt").ShouldBeNull();
     }
 
+    // Names reach a terminal: escape sequences, line breaks, separators and bidirectional controls are left out, also
+    // from settings that an older API or a cache file held.
+    [Theory]
+    [InlineData("Com\u001b[31mpany", "Com[31mpany")]
+    [InlineData("Com\npany", "Company")]
+    [InlineData("Com\r\npany", "Company")]
+    [InlineData("Com\u2028pany\u2029", "Company")]
+    [InlineData("\u202ECompany\u202C", "Company")]
+    [InlineData("\u2066Comp\u0085any\u2069", "Company")]
+    public void Names_LeaveOutTerminalControls(string label, string shown)
+    {
+        var display = ProjectDisplay.Create(
+            new Dictionary<string, Appearance> { ["sbt"] = new() { Label = label, Plural = label + "s" } },
+            null,
+            TypeColorMode.None,
+            showsIcons: false);
+
+        display.LabelOf("sbt").ShouldBe(shown);
+        display.PluralOf("sbt").ShouldBe(shown + "s");
+    }
+
+    [Fact]
+    public void Name_OfControlsOnly_IsNoName()
+    {
+        var display = ProjectDisplay.Create(
+            new Dictionary<string, Appearance> { ["sbt"] = new() { Label = "\u001b\n\u2028" } },
+            null,
+            TypeColorMode.None,
+            showsIcons: false);
+
+        display.LabelOf("sbt").ShouldBeNull();
+    }
+
     // Every type gets a color and an icon once the project changes one: its own, else the built-in one.
     [Fact]
     public void ColorsAndIcons_AreTheProjects_ElseTheBuiltInOnes()

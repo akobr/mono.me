@@ -83,10 +83,37 @@ public class ProjectSettingsCommand : BaseContextCommand
 
         if (!string.IsNullOrWhiteSpace(ExportFilePath))
         {
-            Console.WriteJsonToFile(ProjectSettingsDocuments.ToFileDocument(ProjectSettingsDocuments.ToModel(settings)), ExportFilePath, _fileSystem);
+            var document = ProjectSettingsDocuments.ToFileDocument(ProjectSettingsDocuments.ToModel(settings));
+            if (!isJson)
+            {
+                Console.WriteJsonToFile(document, ExportFilePath, _fileSystem);
+            }
+            else if (!ExportForPrograms(document, ExportFilePath))
+            {
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
         }
 
         return ExitCodes.SUCCESS;
+    }
+
+    // The export of the JSON mode: the standard output carries the JSON only, so the file is written without a prompt and
+    // its notices are plain lines on the error output. A folder at the path is refused.
+    private bool ExportForPrograms(object document, string filePath)
+    {
+        if (_fileSystem.Directory.Exists(filePath))
+        {
+            Console.WriteErrorLine($"The settings were not exported: '{filePath}' is a folder.");
+            return false;
+        }
+
+        if (_fileSystem.File.Exists(filePath))
+        {
+            Console.WriteErrorLine($"The file '{_fileSystem.Path.GetFileName(filePath)}' already exists and is rewritten.");
+        }
+
+        _fileSystem.File.WriteAllText(filePath, JsonConvert.SerializeObject(document));
+        return true;
     }
 
     // Plain text on the standard output, for programs: in UTF-8, so every label comes out as it is.

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.Projects;
 using _42.Platform.Cli.Output;
@@ -201,9 +202,35 @@ public sealed class ProjectDisplay
         return ProjectSettingsCatalog.Default.BuiltIn.TryGetValue(code, out var builtIn) ? builtIn : null;
     }
 
+    // A value as a terminal may show it: control characters (ESC, line breaks and the other C0 and C1 controls), the
+    // line and paragraph separators and the bidirectional controls are left out, whatever the API or the cache held.
     private static string? Text(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var text = new StringBuilder(value.Length);
+        foreach (var character in value)
+        {
+            if (!IsUnsafeForTerminals(character))
+            {
+                text.Append(character);
+            }
+        }
+
+        var result = text.ToString().Trim();
+        return result.Length == 0 ? null : result;
+    }
+
+    private static bool IsUnsafeForTerminals(char character)
+    {
+        return char.IsControl(character)
+            || character is '\u2028' or '\u2029'
+            || character is >= '\u202A' and <= '\u202E'
+            || character is >= '\u2066' and <= '\u2069'
+            || character is '\u200E' or '\u200F' or '\u061C';
     }
 
     private Appearance? Find(string code)

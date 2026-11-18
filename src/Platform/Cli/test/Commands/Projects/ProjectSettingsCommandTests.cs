@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -118,6 +119,37 @@ public class ProjectSettingsCommandTests
 
         // what set -i reads back
         ProjectSettingsJson.Read(System.Text.Json.Nodes.JsonNode.Parse(file.ToString())).IsValid.ShouldBeTrue();
+    }
+
+    // JSON with -e: the standard output holds the JSON alone; the notice about a rewritten file goes to the error output.
+    [Fact]
+    public async Task JsonExport_OverAnExistingFile_KeepsTheStandardOutputJsonOnly()
+    {
+        _fixture.Console.UseInnerConsole(redirectedInput: false);
+        _fixture.FileSystem.AddFile(ExportPath, new MockFileData("{}"));
+        _fixture.SetupRead(ProjectSettingsFixture.Changed());
+
+        var exitCode = await Command(format: "json", export: ExportPath).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        JObject.Parse(_fixture.Console.OutputText)["Version"]!.Value<long>().ShouldBe(3);
+        _fixture.Console.ErrorText.ShouldContain("already exists and is rewritten");
+        JObject.Parse(_fixture.FileSystem.File.ReadAllText(ExportPath))["Format"]!.Value<string>()
+            .ShouldBe(_42.Platform.Storyteller.ProjectSettings.FileFormat);
+    }
+
+    [Fact]
+    public async Task JsonExport_ToAFolder_IsRefused_OnTheErrorOutput()
+    {
+        _fixture.Console.UseInnerConsole(redirectedInput: false);
+        _fixture.FileSystem.AddDirectory(ExportPath);
+        _fixture.SetupRead(ProjectSettingsFixture.Changed());
+
+        var exitCode = await Command(format: "json", export: ExportPath).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        JObject.Parse(_fixture.Console.OutputText)["Version"]!.Value<long>().ShouldBe(3);
+        _fixture.Console.ErrorText.ShouldContain("is a folder");
     }
 
     [Fact]
