@@ -24,9 +24,16 @@ public static class StepUp
     // Far beyond any window the API sends (at most a day), far below what TimeSpan overflows at.
     private const long MaxWindowSeconds = 366L * 24 * 60 * 60;
 
-    private static readonly Regex MaxAgeParameter = new(
-        "max_age\\s*=\\s*\"?(?<seconds>\\d+)\"?",
-        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
+    // An auth-param of a challenge (RFC 9110, 11.2): a name, then a token or a quoted string. Matched from left to right, a
+    // quoted value is consumed whole, so a parameter named inside another one's value (error_description) is never read.
+    private static readonly Regex AuthParameter = new(
+        """(?<name>[A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*=\s*(?:"(?<quoted>(?:[^"\\]|\\.)*)"|(?<token>[^\s,"]+))""",
+        RegexOptions.CultureInvariant,
+        TimeSpan.FromSeconds(1));
+
+    private static readonly Regex QuotedPair = new(
+        """\\(.)""",
+        RegexOptions.CultureInvariant | RegexOptions.Singleline,
         TimeSpan.FromSeconds(1));
 
     // "10 minutes", "1 hour", "90 seconds": the largest unit that divides the window, as the API writes it.
@@ -64,7 +71,7 @@ public static class StepUp
         var body = ReadBody(exception);
         var challenge = GetChallenge(exception.Headers);
         var byCode = string.Equals(GetErrorCode(exception, body), ErrorCode, StringComparison.Ordinal);
-        var byChallenge = challenge is not null && challenge.Contains(ChallengeError, StringComparison.OrdinalIgnoreCase);
+        var byChallenge = string.Equals(GetChallengeParameter(challenge, "error"), ChallengeError, StringComparison.OrdinalIgnoreCase);
 
         if (!byCode && !byChallenge)
         {
@@ -129,15 +136,38 @@ public static class StepUp
 
     private static TimeSpan? GetChallengeMaxAge(string? challenge)
     {
+        return long.TryParse(GetChallengeParameter(challenge, "max_age"), NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
+            ? ToWindow(seconds)
+            : null;
+    }
+
+    // The value of the first parameter of that name, unquoted; null when the challenge has none. A header that takes longer
+    // than the timeout to read names no parameter: the detection never throws in an error handler.
+    private static string? GetChallengeParameter(string? challenge, string name)
+    {
         if (challenge is null)
         {
             return null;
         }
 
-        var match = MaxAgeParameter.Match(challenge);
-        return match.Success && long.TryParse(match.Groups["seconds"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
-            ? ToWindow(seconds)
-            : null;
+        try
+        {
+            foreach (Match match in AuthParameter.Matches(challenge))
+            {
+                if (string.Equals(match.Groups["name"].Value, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return match.Groups["quoted"].Success
+                        ? QuotedPair.Replace(match.Groups["quoted"].Value, "$1")
+                        : match.Groups["token"].Value;
+                }
+            }
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return null;
+        }
+
+        return null;
     }
 
     // A window no TimeSpan holds is no window: the detection never throws in an error handler, whatever a proxy sends.
