@@ -128,9 +128,6 @@ declare global {
   export type { DocumentFormat, EditorMode, Density, GridPreferences, Preferences } from './stores/preferences'
   import('./stores/preferences')
   // @ts-ignore
-  export type { ProjectSettings } from './stores/project-settings'
-  import('./stores/project-settings')
-  // @ts-ignore
   export type { AccountStatus } from './stores/session'
   import('./stores/session')
   // @ts-ignore
