@@ -17,14 +17,23 @@ export const useProjectSettingsStore = defineStore('project-settings', () => {
   // The answer each entry was made from, so a refetch with the same settings changes nothing downstream.
   const sources = new Map<string, string>()
 
-  /** Takes an answer of the API for a project: sanitized, with the defaults for what it leaves out. */
+  /**
+   * Takes an answer of the API for a project: sanitized, with the defaults for what it leaves out. An answer older than
+   * the settings the app has (a lower Version, such as a slow read that arrives after the answer of a write) is ignored,
+   * as the version only rises.
+   */
   function receive(projectKey: string, settings: ProjectSettings): void {
     const source = JSON.stringify(settings)
     if (sources.get(projectKey) === source && projectKey in state.value) {
       return
     }
+    const received = fromApi(settings)
+    const stored = state.value[projectKey]
+    if (stored && received.version < stored.version) {
+      return
+    }
     sources.set(projectKey, source)
-    state.value = { ...state.value, [projectKey]: fromApi(settings) }
+    state.value = { ...state.value, [projectKey]: received }
   }
 
   function settingsOf(projectKey: string | undefined): ProjectSettingsState {

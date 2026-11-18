@@ -87,6 +87,30 @@ describe('project settings store', () => {
     expect(settings.settingsOf('acme.billing')).toMatchObject({ dateFormat: 'yyyy-mm-dd', version: 2 })
   })
 
+  it('ignores an answer older than the settings it has, such as a slow read after the answer of a write', () => {
+    const settings = useProjectSettingsStore()
+    settings.receive('acme.billing', { Types: {}, DateFormat: 'dd/mm/yyyy', Version: 5 })
+    const latest = settings.settingsOf('acme.billing')
+
+    settings.receive('acme.billing', { Types: {}, DateFormat: 'mm/dd/yyyy', Version: 4 })
+    expect(settings.settingsOf('acme.billing')).toBe(latest)
+
+    // an older answer does not count as the source either: the answer of version 5 again changes nothing
+    settings.receive('acme.billing', { Types: {}, DateFormat: 'dd/mm/yyyy', Version: 5 })
+    expect(settings.settingsOf('acme.billing')).toBe(latest)
+
+    // another answer of the same version is taken, the first answer of another project too
+    settings.receive('acme.billing', { Types: {}, DateFormat: 'd mmm yyyy', Version: 5 })
+    expect(settings.settingsOf('acme.billing')).toMatchObject({ dateFormat: 'd mmm yyyy', version: 5 })
+    settings.receive('acme.shipping', { Types: {}, Version: 0 })
+    expect(settings.loaded('acme.shipping')).toBe(true)
+
+    // after clear() the first answer is taken whatever its version
+    settings.clear()
+    settings.receive('acme.billing', { Types: {}, Version: 1 })
+    expect(settings.settingsOf('acme.billing')).toMatchObject({ dateFormat: 'yyyy-mm-dd', version: 1 })
+  })
+
   it('shows only what the UI can: unknown zones, formats, codes, colors and icons fall back', () => {
     const settings = useProjectSettingsStore()
 
