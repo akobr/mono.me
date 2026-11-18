@@ -188,6 +188,9 @@ public static class AccessAuditValues
                     .OrderBy(member => member.Name, StringComparer.Ordinal)
                     .Select(member => $"{JsonSerializer.Serialize(member.Name)}:{CanonicalMember(member, isRoot)}")) + "}",
             JsonValueKind.Array => "[" + string.Join(",", element.EnumerateArray().Select(item => Canonical(item))) + "]",
+
+            // decoded and written again, so the same text escaped differently (o for o) is the same string
+            JsonValueKind.String => JsonSerializer.Serialize(element.GetString()),
             _ => element.GetRawText(),
         };
     }
