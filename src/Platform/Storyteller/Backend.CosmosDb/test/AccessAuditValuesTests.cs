@@ -212,8 +212,17 @@ public class AccessAuditValuesTests
         var jwks = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"\\ud800\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"}]}";
         var issuer = new FederatedIssuer { Name = "k8s", Issuer = "https://k8s.example.com", KeySource = FederatedIssuerKeySource.Jwks, Jwks = jwks };
 
-        AccessAuditValues.Issuer(issuer).Should().MatchRegex("\"JwksKeys\":1,\"JwksThumbprint\":\"[0-9a-f]{16}\"");
-        AccessAuditValues.Issuer(issuer with { Jwks = jwks.Replace("\\ud800", "\\ud801") }).Should().NotBe(AccessAuditValues.Issuer(issuer));
+        var thumbprint = OneKeyThumbprint(AccessAuditValues.Issuer(issuer));
+        var replaced = OneKeyThumbprint(AccessAuditValues.Issuer(issuer with { Jwks = jwks.Replace("\\ud800", "\\ud801", StringComparison.Ordinal) }));
+
+        replaced.Should().NotBe(thumbprint);
+
+        static string OneKeyThumbprint(string value)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(value, "\"JwksKeys\":1,\"JwksThumbprint\":\"(?<thumbprint>[0-9a-f]{16})\"");
+            match.Success.Should().BeTrue(value);
+            return match.Groups["thumbprint"].Value;
+        }
     }
 
     [Fact]
