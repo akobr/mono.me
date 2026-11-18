@@ -129,6 +129,40 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         (await store.GetAsync(Organization, project, "a"))!.Description.ShouldBeNull();
     }
 
+    // A replace never creates: an issuer deleted after the caller found it stays deleted, and is not in the list either.
+    [Fact]
+    public async Task IssuerStore_ReplacesOnly_AnIssuerThatExists()
+    {
+        const string project = "issuerreplace";
+        await EnsureProjectAsync(project);
+        var store = CreateIssuerStore();
+        await store.CreateAsync(Organization, project, Issuer("a"), AccessCaller.System);
+        await store.ReplaceAsync(Organization, project, Issuer("a") with { Description = "Replaced" }, AccessCaller.System);
+        (await store.GetAsync(Organization, project, "a"))!.Description.ShouldBe("Replaced");
+        (await store.DeleteAsync(Organization, project, "a", AccessCaller.System)).ShouldBeTrue();
+
+        await Should.ThrowAsync<ConflictException>(() => store.ReplaceAsync(Organization, project, Issuer("a") with { Description = "Again" }, AccessCaller.System));
+
+        (await store.GetAsync(Organization, project, "a")).ShouldBeNull();
+        (await store.ListAsync(Organization, project)).ShouldBeEmpty();
+    }
+
+    // A create that finds the issuer another instance created drops its cached list, so the reload it asks for shows it.
+    [Fact]
+    public async Task IssuerStore_CreateConflict_DropsTheCachedList()
+    {
+        const string project = "issuercreatelist";
+        await EnsureProjectAsync(project);
+        var first = CreateIssuerStore();
+        var second = CreateIssuerStore();
+        (await first.ListAsync(Organization, project)).ShouldBeEmpty();
+        await second.CreateAsync(Organization, project, Issuer("a"), AccessCaller.System);
+
+        await Should.ThrowAsync<ConflictException>(() => first.CreateAsync(Organization, project, Issuer("a"), AccessCaller.System));
+
+        (await first.ListAsync(Organization, project)).Select(item => item.Name).ShouldBe(["a"]);
+    }
+
     [Fact]
     public async Task IssuerStore_RefusesTheIssuerNumber21()
     {

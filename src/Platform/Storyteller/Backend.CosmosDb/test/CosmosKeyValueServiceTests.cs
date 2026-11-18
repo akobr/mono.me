@@ -225,6 +225,42 @@ public class CosmosKeyValueServiceTests(Startup startup)
         (await KeyValues.GetAsync(Org, project, View, "p.three", new KeyValueReadOptions(), Admin)).Should().NotBeNull("an active key is not purged");
     }
 
+    // A permanent delete and a purge remove every version: a retained secret version needs the secret rights, also when
+    // the current version is public. A soft delete of the public key stays open.
+    [Fact]
+    public async Task PermanentDeleteAndPurge_OfAKeyWithASecretVersion_NeedTheSecretRights()
+    {
+        var project = NewProject("purge-mixed");
+        var withoutSecrets = KeyValueCaller.WithoutSecrets(AuditActor.Account("admin"));
+        await KeyValues.SetAsync(Org, project, View, "mixed", Secret("s1"), Admin);
+        await KeyValues.SetAsync(Org, project, View, "mixed", Public("p2"), Admin);
+
+        var permanent = () => KeyValues.DeleteAsync(Org, project, View, "mixed", new KeyValueDeleteOptions { Permanent = true }, withoutSecrets);
+        (await permanent.Should().ThrowAsync<AccessDeniedException>()).Which.ErrorCode.Should().Be(ErrorCodes.AccessDenied);
+        (await KeyValues.GetVersionsAsync(Org, project, View, "mixed")).Should().HaveCount(2);
+
+        (await KeyValues.DeleteAsync(Org, project, View, "mixed", new KeyValueDeleteOptions(), withoutSecrets)).Should().BeTrue();
+        var refused = await KeyValues.PurgeAsync(Org, project, View, new KeyValueBulkRequest { Keys = ["mixed"] }, withoutSecrets);
+        refused.Items.Should().ContainSingle().Which.Should().Be(new KeyValueBulkItemResult { Key = "mixed", Outcome = KeyValueBulkOutcome.Forbidden, ErrorCode = ErrorCodes.AccessDenied });
+        (await KeyValues.GetVersionsAsync(Org, project, View, "mixed")).Should().NotBeEmpty();
+
+        var purged = await KeyValues.PurgeAsync(Org, project, View, new KeyValueBulkRequest { Keys = ["mixed"] }, Admin);
+        purged.Items.Should().ContainSingle().Which.Outcome.Should().Be(KeyValueBulkOutcome.Done);
+        (await KeyValues.GetVersionsAsync(Org, project, View, "mixed")).Should().BeEmpty();
+    }
+
+    // Without a secret version, the caller without secret rights still deletes a public key for good.
+    [Fact]
+    public async Task PermanentDelete_OfAPublicOnlyKey_NeedsNoSecretRights()
+    {
+        var project = NewProject("purge-public");
+        await KeyValues.SetAsync(Org, project, View, "plain", Public("1"), Admin);
+        await KeyValues.SetAsync(Org, project, View, "plain", Public("2"), Admin);
+
+        (await KeyValues.DeleteAsync(Org, project, View, "plain", new KeyValueDeleteOptions { Permanent = true }, KeyValueCaller.WithoutSecrets(AuditActor.Account("admin")))).Should().BeTrue();
+        (await KeyValues.GetVersionsAsync(Org, project, View, "plain")).Should().BeEmpty();
+    }
+
     [Fact]
     public async Task PermanentDelete_ManyVersions_RemovesAllBatches()
     {

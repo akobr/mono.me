@@ -186,6 +186,16 @@ public class CertificatesHttp
             return new BadRequestObjectResult(new ErrorResponse { Message = "Invalid certificate label. Only letters, digits, hyphens, underscores, and dots are allowed." });
         }
 
+        try
+        {
+            // A project that does not allow shared certificates is refused before the step-up: a new sign-in cannot fix it.
+            await _sharedCertService.EnsureIssuableAsync(organization, project);
+        }
+        catch (MachineAccessNotSupportedException exception)
+        {
+            return ErrorResponseMapping.ToActionResult(exception);
+        }
+
         // The answer is a credential, its private key and password (Auth:StepUp); before the try, which drops the header.
         request.EnsureRecentSignIn();
 

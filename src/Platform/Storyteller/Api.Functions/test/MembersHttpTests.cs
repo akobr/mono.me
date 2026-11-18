@@ -19,6 +19,8 @@ public class MembersHttpTests
 {
     private const string EntraAccountId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d:3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d";
 
+    private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;
+
     [Fact]
     public async Task SetMemberRole_UsesTheCallerAndANormalizedKey()
     {
@@ -140,6 +142,27 @@ public class MembersHttpTests
 
         (await http.RemoveMember(UserRequest().WithSignIn(TestRequests.StaleSignIn), "acme.billing", "user-1")).ShouldBeOfType<NoContentResult>();
         access.Calls.ShouldBe(["remove:acme.billing:user-1:user-1"]);
+    }
+
+    // Debug builds (DEV_AUTH) serve a request without an identity as System: the removal reaches the service, which
+    // decides with that caller, as before the step-up. Release builds refuse it (no User.Impersonation).
+    [Fact]
+    public async Task RemoveMember_WithoutAnIdentity_ReachesTheServiceInDebugBuilds()
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var (_, request) = FunctionTestDoubles.CreateRequest(services, method: "DELETE");
+
+        if (!DevAuth)
+        {
+            await Should.ThrowAsync<Microsoft.IdentityModel.Tokens.SecurityTokenException>(() => http.RemoveMember(request, "acme.billing", "user-2"));
+            access.Calls.ShouldBeEmpty();
+            return;
+        }
+
+        (await http.RemoveMember(request, "acme.billing", "user-2")).ShouldBeOfType<NoContentResult>();
+        access.Calls.ShouldBe(["remove:acme.billing:user-2:system"]);
     }
 
     [Fact]

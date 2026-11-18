@@ -491,6 +491,19 @@ public class FederationHttpTests
         (await _issuers.GetAsync(Org, Project, "github")).ShouldBe(GitHub());
     }
 
+    // A new sign-in cannot make the change of the Issuer valid: 400 before the step-up.
+    [Fact]
+    public async Task PutIssuer_ChangingTheIssuer_WithAStaleSignIn_IsBadRequestBeforeTheStepUp()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
+        var changed = GitHub() with { Issuer = $"{GitHubIssuer}/acme" };
+
+        var result = await Http.PutFederatedIssuer(IssuerRequest(changed).WithSignIn(TestRequests.StaleSignIn), Org, Project, "github");
+
+        result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldBe(FederationValidation.IssuerImmutableMessage);
+        (await _issuers.GetAsync(Org, Project, "github")).ShouldBe(GitHub());
+    }
+
     [Fact]
     public async Task PutIssuer_ExistingOne_ChangesEverythingButTheIssuer()
     {
@@ -633,6 +646,30 @@ public class FederationHttpTests
             () => http.PutFederatedIssuer(IssuerRequest(Rekeyed()).WithSignIn(TestRequests.StaleSignIn), Org, Project, "github"));
 
         ShouldBeIssuer(await _issuers.GetAsync(Org, Project, "github"), GitHub());
+    }
+
+    // An issuer deleted between the handler's read and its write is not created again by the replace: that would skip the
+    // check of the rules a deleted issuer leaves behind.
+    [Fact]
+    public async Task PutIssuer_DeletedAfterTheRead_IsAConflictAndNotCreatedAgain()
+    {
+        _access.Add(Org, Project, FederatedMachine(Rule()));
+        var http = new FederationHttp(_access, new FoundOnRead(_issuers, GitHub()), _exchange, Options.Create(_options), FunctionTestDoubles.ApiJsonOptions, NullLogger<FederationHttp>.Instance);
+
+        await Should.ThrowAsync<ConflictException>(() => http.PutFederatedIssuer(IssuerRequest(Rekeyed()), Org, Project, "github"));
+
+        (await _issuers.GetAsync(Org, Project, "github")).ShouldBeNull();
+    }
+
+    // A replace goes to the replace-only write of the store, a create to the create-only one.
+    [Fact]
+    public async Task PutIssuer_ReplacesAnExistingOneThroughTheReplaceOnlyWrite()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
+
+        (await Http.PutFederatedIssuer(IssuerRequest(GitHub() with { Description = "CI" }), Org, Project, "github")).ShouldBeOfType<OkObjectResult>();
+
+        _issuerWrites.Writes.Select(write => write.Call).ShouldBe([$"replace:{Org}/{Project}/github"]);
     }
 
     [Fact]
@@ -834,6 +871,24 @@ public class FederationHttpTests
         var badRequest = result.ShouldBeOfType<ObjectResult>();
         badRequest.StatusCode.ShouldBe((int)HttpStatusCode.BadRequest);
         badRequest.Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.MachineNotFederated);
+    }
+
+    // A missing machine or one of another kind is refused before the step-up, which a new sign-in cannot change.
+    [Fact]
+    public async Task PutRules_UnknownMachineOrAnotherKind_WithAStaleSignIn_IsRefusedBeforeTheStepUp()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
+
+        var missing = await Http.PutMachineFederationRules(RulesRequest([Rule()]).WithSignIn(TestRequests.StaleSignIn), Org, Project, MachineId);
+        missing.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe((int)HttpStatusCode.NotFound);
+
+        _access.Add(Org, Project, FederatedMachine() with { CredentialKind = MachineCredentialKind.ApiKey, FederationRules = null });
+        var apiKey = await Http.PutMachineFederationRules(RulesRequest([Rule()]).WithSignIn(TestRequests.StaleSignIn), Org, Project, MachineId);
+        var badRequest = apiKey.ShouldBeOfType<ObjectResult>();
+        badRequest.StatusCode.ShouldBe((int)HttpStatusCode.BadRequest);
+        badRequest.Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.MachineNotFederated);
+
+        _access.Calls.ShouldNotContain(call => call.StartsWith("rules:", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1169,11 +1224,39 @@ public class FederationHttpTests
             return inner.CreateAsync(organization, project, issuer, caller, cancellationToken);
         }
 
+        public Task<FederatedIssuer> ReplaceAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+        {
+            Writes.Add(($"replace:{organization}/{project}/{issuer.Name}", caller));
+            return inner.ReplaceAsync(organization, project, issuer, caller, cancellationToken);
+        }
+
         public Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default)
         {
             Writes.Add(($"delete:{organization}/{project}/{name}", caller));
             return inner.DeleteAsync(organization, project, name, caller, cancellationToken);
         }
+    }
+
+    // A store whose read finds an issuer the inner store does not have, as a read before a concurrent delete does.
+    private sealed class FoundOnRead(IFederatedIssuerStore inner, FederatedIssuer found) : IFederatedIssuerStore
+    {
+        public Task<IReadOnlyList<FederatedIssuer>> ListAsync(string organization, string project, CancellationToken cancellationToken = default)
+            => inner.ListAsync(organization, project, cancellationToken);
+
+        public Task<FederatedIssuer?> GetAsync(string organization, string project, string name, CancellationToken cancellationToken = default)
+            => Task.FromResult<FederatedIssuer?>(found with { Name = name });
+
+        public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+            => inner.SetAsync(organization, project, issuer, caller, cancellationToken);
+
+        public Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+            => inner.CreateAsync(organization, project, issuer, caller, cancellationToken);
+
+        public Task<FederatedIssuer> ReplaceAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+            => inner.ReplaceAsync(organization, project, issuer, caller, cancellationToken);
+
+        public Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default)
+            => inner.DeleteAsync(organization, project, name, caller, cancellationToken);
     }
 
     // A store whose read misses every issuer, as a read before a concurrent create does.
@@ -1190,6 +1273,9 @@ public class FederationHttpTests
 
         public Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
             => inner.CreateAsync(organization, project, issuer, caller, cancellationToken);
+
+        public Task<FederatedIssuer> ReplaceAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+            => inner.ReplaceAsync(organization, project, issuer, caller, cancellationToken);
 
         public Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default)
             => inner.DeleteAsync(organization, project, name, caller, cancellationToken);

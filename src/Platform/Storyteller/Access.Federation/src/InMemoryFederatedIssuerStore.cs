@@ -39,15 +39,21 @@ public class InMemoryFederatedIssuerStore : IFederatedIssuerStore
 
     public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
     {
-        return WriteAsync(organization, project, issuer, createOnly: false);
+        return WriteAsync(organization, project, issuer, mustExist: null);
     }
 
     public Task<FederatedIssuer> CreateAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
     {
-        return WriteAsync(organization, project, issuer, createOnly: true);
+        return WriteAsync(organization, project, issuer, mustExist: false);
     }
 
-    private Task<FederatedIssuer> WriteAsync(string organization, string project, FederatedIssuer issuer, bool createOnly)
+    public Task<FederatedIssuer> ReplaceAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+    {
+        return WriteAsync(organization, project, issuer, mustExist: true);
+    }
+
+    // mustExist: null creates or replaces, false only creates, true only replaces.
+    private Task<FederatedIssuer> WriteAsync(string organization, string project, FederatedIssuer issuer, bool? mustExist)
     {
         ArgumentNullException.ThrowIfNull(issuer);
 
@@ -60,9 +66,14 @@ public class InMemoryFederatedIssuerStore : IFederatedIssuerStore
 
         lock (issuers)
         {
-            if (createOnly && issuers.ContainsKey(issuer.Name))
+            if (mustExist == false && issuers.ContainsKey(issuer.Name))
             {
                 throw new ConflictException($"The trusted issuer '{issuer.Name}' was created concurrently; reload and retry.");
+            }
+
+            if (mustExist == true && !issuers.ContainsKey(issuer.Name))
+            {
+                throw new ConflictException($"The trusted issuer '{issuer.Name}' was deleted concurrently; reload and retry.");
             }
 
             if (FederationValidation.ValidateIssuerChange(issuer, issuers.Values) is { } error)

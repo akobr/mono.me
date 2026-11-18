@@ -521,7 +521,15 @@ public class AccessHttp
 
         // A new secret gives out the machine's scopes, so the reset needs the role they need.
         var machine = await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
-        EnsureActorMayGiveOutSecretReads(request, machine?.Scopes ?? []);
+
+        // A missing machine is refused before the step-up, which a new sign-in cannot fix; the service answers the same
+        // for a machine deleted after this read.
+        if (machine is null)
+        {
+            throw new NotFoundException($"The machine access {id} has not been found.");
+        }
+
+        EnsureActorMayGiveOutSecretReads(request, machine.Scopes);
 
         // A new secret is a credential given out (Auth:StepUp); before the try, whose mapping would drop the header.
         request.EnsureRecentSignIn();

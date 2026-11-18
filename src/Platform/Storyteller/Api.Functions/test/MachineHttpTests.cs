@@ -530,16 +530,21 @@ public class MachineHttpTests
         access.Calls.ShouldNotContain($"reset:org1/proj1/{KeycloakId}");
     }
 
-    // A machine that is not stored has no scopes to check; the reset answers as it always did.
-    [Fact]
-    public async Task PutMachine_OfAnUnknownMachine_IsLeftToTheService()
+    // A machine that is not stored is 404 before the step-up, which a new sign-in cannot change, and the reset is not
+    // called; the service answers the same for a machine deleted after this read.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PutMachine_OfAnUnknownMachine_IsNotFoundBeforeTheStepUp(bool stale)
     {
         var access = new RecordingAccess(null);
         var http = CreateHttp(access);
+        var request = stale ? ContributorRequest().WithSignIn(TestRequests.StaleSignIn) : ContributorRequest();
 
-        await Should.ThrowAsync<NotFoundException>(() => http.PutMachine(ContributorRequest(), "org1", "proj1", KeycloakId));
+        var exception = await Should.ThrowAsync<NotFoundException>(() => http.PutMachine(request, "org1", "proj1", KeycloakId));
 
-        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"reset:org1/proj1/{KeycloakId}"]);
+        exception.Message.ShouldBe($"The machine access {KeycloakId} has not been found.");
+        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}"]);
     }
 
     // A Certificate machine has no key to reset: the router refuses it, and the answer is a coded 400 that no retry

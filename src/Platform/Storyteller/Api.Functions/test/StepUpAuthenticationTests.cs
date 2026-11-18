@@ -91,11 +91,11 @@ public class StepUpAuthenticationTests
             var claims = UserClaims(AuthTime(_time.Now.AddSeconds(-30)));
             claims.Add(new Claim("act", """{"sub":"admin@example.com"}"""));
             var user = new RecordingBearerTokenValidator { Result = new BearerValidationResult(claims, false, null) };
-            var (context, request) = CreateRequest(user, ProviderToken(), new StepUpOptions { Enabled = true });
+            var (context, _) = CreateRequest(user, ProviderToken(), new StepUpOptions { Enabled = true });
 
             (await InvokeAsync(context)).ShouldBeTrue();
 
-            request.HasRecentSignIn().ShouldBeFalse();
+            StoredJudgement(context).IsRecent.ShouldBeFalse();
         });
     }
 
@@ -124,7 +124,7 @@ public class StepUpAuthenticationTests
 
             request.TryGetDelegatedActor(out var actorId).ShouldBeTrue();
             actorId.ShouldBe(ActorId);
-            request.GetSignInRecency().IsRecent.ShouldBe(recent);
+            StoredJudgement(context).IsRecent.ShouldBe(recent);
         });
     }
 
@@ -157,26 +157,26 @@ public class StepUpAuthenticationTests
         await WithValidationAsync(async () =>
         {
             var user = new RecordingBearerTokenValidator { Result = new BearerValidationResult(UserClaims(null), false, null) };
-            var (context, request) = CreateRequest(user, ProviderToken(), new StepUpOptions { Enabled = enabled }, provider: provider);
+            var (context, _) = CreateRequest(user, ProviderToken(), new StepUpOptions { Enabled = enabled }, provider: provider);
 
             (await InvokeAsync(context)).ShouldBeTrue();
 
-            request.GetSignInRecency().ShouldBe(SignInRecency.NotRequired(MaxAge));
+            StoredJudgement(context).ShouldBe(SignInRecency.NotRequired(MaxAge));
         });
     }
 
-    // Under AuthKit and Keycloak the default is on in Release builds; Debug builds (DEV_AUTH) skip it unless it is set.
+    // Under AuthKit the default is on in Release builds; Debug builds (DEV_AUTH) skip it unless it is set.
     [Fact]
     public async Task AuthKitByDefault_JudgesInReleaseBuildsOnly()
     {
         await WithValidationAsync(async () =>
         {
             var user = new RecordingBearerTokenValidator { Result = new BearerValidationResult(UserClaims(null), false, null) };
-            var (context, request) = CreateRequest(user, ProviderToken(), new StepUpOptions(), provider: IdentityProviderKind.AuthKit);
+            var (context, _) = CreateRequest(user, ProviderToken(), new StepUpOptions(), provider: IdentityProviderKind.AuthKit);
 
             (await InvokeAsync(context)).ShouldBeTrue();
 
-            request.HasRecentSignIn().ShouldBe(DevAuth);
+            StoredJudgement(context).IsRecent.ShouldBe(DevAuth);
         });
     }
 
@@ -188,11 +188,11 @@ public class StepUpAuthenticationTests
         await WithModeAsync(decodeWithoutValidation: true, async () =>
         {
             var token = UnsignedJwt($$"""{"iss":"{{ProviderIssuer}}","sub":"{{AccountId}}","scp":"User.Impersonation","auth_time":{{_time.Now.AddHours(-1).ToUnixTimeSeconds()}}}""");
-            var (context, request) = CreateRequest(new RecordingBearerTokenValidator(), token, new StepUpOptions { Enabled = true });
+            var (context, _) = CreateRequest(new RecordingBearerTokenValidator(), token, new StepUpOptions { Enabled = true });
 
             (await InvokeAsync(context)).ShouldBeTrue();
 
-            request.GetSignInRecency().IsRecent.ShouldBeFalse();
+            StoredJudgement(context).IsRecent.ShouldBeFalse();
         });
     }
 
@@ -223,13 +223,14 @@ public class StepUpAuthenticationTests
     }
 
     // The same request on a host whose settings turn the step-up off for its provider needs none in any build; where they
-    // turn it on, Release builds still find no recent sign-in.
+    // turn it on, it finds no recent sign-in: by default in Release builds, and with Enabled true in every build.
     [Theory]
-    [InlineData(IdentityProviderKind.EntraId, null, false)]
-    [InlineData(IdentityProviderKind.AuthKit, false, false)]
-    [InlineData(IdentityProviderKind.AuthKit, null, true)]
-    [InlineData(IdentityProviderKind.EntraId, true, true)]
-    public void UserWithoutAJudgement_FollowsTheSettingsOfTheHost(IdentityProviderKind provider, bool? enabled, bool required)
+    [InlineData(IdentityProviderKind.EntraId, null, false, false)]
+    [InlineData(IdentityProviderKind.AuthKit, false, false, false)]
+    [InlineData(IdentityProviderKind.AuthKit, null, true, false)]
+    [InlineData(IdentityProviderKind.EntraId, true, true, true)]
+    [InlineData(IdentityProviderKind.AuthKit, true, true, true)]
+    public void UserWithoutAJudgement_FollowsTheSettingsOfTheHost(IdentityProviderKind provider, bool? enabled, bool requiredInRelease, bool requiredInDebug)
     {
         var services = new ServiceCollection()
             .Configure<StepUpOptions>(options =>
@@ -243,7 +244,7 @@ public class StepUpAuthenticationTests
 
         var recency = request.GetSignInRecency();
 
-        recency.IsRecent.ShouldBe(!required || DevAuth);
+        recency.IsRecent.ShouldBe(!(DevAuth ? requiredInDebug : requiredInRelease));
         recency.MaxAge.ShouldBe(TimeSpan.FromMinutes(3));
     }
 
@@ -257,6 +258,12 @@ public class StepUpAuthenticationTests
         exception.ErrorCode.ShouldBe(ErrorCodes.StepUpRequired);
         exception.MaxAge.ShouldBe(TimeSpan.FromMinutes(5));
         Should.NotThrow(() => TestRequests.User().EnsureRecentSignIn());
+    }
+
+    // The judgement the middleware stored, not the fallback of a request without one.
+    private static SignInRecency StoredJudgement(FunctionContext context)
+    {
+        return context.Items[FunctionContextItemKeys.SignInRecency].ShouldBeOfType<SignInRecency>();
     }
 
     private static Claim AuthTime(DateTimeOffset time)

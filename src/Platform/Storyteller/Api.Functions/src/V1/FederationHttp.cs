@@ -143,7 +143,7 @@ public class FederationHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(FederatedIssuer), Description = "The trusted issuer: the exact `iss`, where its keys come from, the longest accepted token lifetime and the claims every token must carry.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(FederatedIssuer), Description = "The stored trusted issuer.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The issuer is not valid, its Issuer would change, or the project already has 20 trusted issuers (ErrorCode InvalidFederation).")]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "Federation rules of machines still reference the name of a deleted issuer (ErrorCode FederatedIssuerInUse); the message names up to 10 machines.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "Federation rules of machines still reference the name of a deleted issuer (ErrorCode FederatedIssuerInUse; the message names up to 10 machines): change those rules or delete the machines first. Or the issuer was created or deleted by another request since this one read it (ErrorCode Conflict): reload it and retry, which runs the checks of a create or of a replace again.")]
     [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenFederatedIssuerReplace)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -182,12 +182,6 @@ public class FederationHttp
             throw KeyValueErrors.ActorRestricted();
         }
 
-        // For the same reason the replace needs a recent sign-in (Auth:StepUp), in every build too.
-        if (existing is not null)
-        {
-            request.EnsureRecentSignIn();
-        }
-
         if (existing is null)
         {
             // Rules left behind by a deleted issuer would silently trust whatever issuer gets the name next.
@@ -201,18 +195,26 @@ public class FederationHttp
                     ErrorCodes.FederatedIssuerInUse));
             }
         }
-        else if (!string.Equals(existing.Issuer, requested.Issuer, StringComparison.Ordinal))
+        else
         {
-            return InvalidFederation(FederationValidation.IssuerImmutableMessage);
+            // A refusal that a new sign-in cannot fix comes before the step-up.
+            if (!string.Equals(existing.Issuer, requested.Issuer, StringComparison.Ordinal))
+            {
+                return InvalidFederation(FederationValidation.IssuerImmutableMessage);
+            }
+
+            // For the same reason as the actor restriction the replace needs a recent sign-in (Auth:StepUp), in every build too.
+            request.EnsureRecentSignIn();
         }
 
         try
         {
-            // Create only when none was found: an issuer that appeared since is not replaced without the checks above.
+            // Create only when none was found and replace only when one was: an issuer that appeared since is not replaced
+            // without the checks of a replace, and one deleted since is not created again without the rules check above.
             var caller = request.GetAccessCaller();
             var stored = existing is null
                 ? await _issuerStore.CreateAsync(organization, project, requested, caller, cancellationToken)
-                : await _issuerStore.SetAsync(organization, project, requested, caller, cancellationToken);
+                : await _issuerStore.ReplaceAsync(organization, project, requested, caller, cancellationToken);
             return new OkObjectResult(stored);
         }
         catch (InvalidInputException exception)
@@ -298,6 +300,18 @@ public class FederationHttp
         if (FederationValidation.ValidateRules(requested, issuers) is { } invalid)
         {
             return InvalidFederation(invalid);
+        }
+
+        // A missing machine or one of another kind is refused before the step-up: a new sign-in cannot fix it. The service
+        // checks both again, for a machine deleted or replaced after this read.
+        if (stored is null)
+        {
+            return ErrorResponseMapping.ToActionResult(new NotFoundException($"The machine access {id} has not been found."));
+        }
+
+        if (stored.CredentialKind != MachineCredentialKind.Federated)
+        {
+            return ErrorResponseMapping.ToActionResult(new InvalidInputException(FederationValidation.RulesOnOtherKindMessage, ErrorCodes.MachineNotFederated));
         }
 
         // New rules give the machine's tokens to another workload, a reset of a federated machine (Auth:StepUp); after the

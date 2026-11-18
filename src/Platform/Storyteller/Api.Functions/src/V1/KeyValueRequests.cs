@@ -71,6 +71,27 @@ internal static class KeyValueAuthorization
         };
     }
 
+    // An import refuses a secret item per item when the key became a secret after its plan (the single write of a
+    // conflicting batch, a delete of Replace): AccessDenied, which says StepUpRequired as above when the step-up withheld
+    // the right. The items written before stay written.
+    public static KeyValueImportResult WithStepUpOutcomes(SecretRights rights, KeyValueImportResult result)
+    {
+        if (!rights.IsWriteWithheldByStepUp)
+        {
+            return result;
+        }
+
+        var refusal = new StepUpRequiredException(rights.StepUpMaxAge);
+        return result with
+        {
+            Items = result.Items
+                .Select(item => item.ErrorCode == ErrorCodes.AccessDenied
+                    ? item with { ErrorCode = refusal.ErrorCode, Message = refusal.Message }
+                    : item)
+                .ToList(),
+        };
+    }
+
     // The service refuses a secret with AccessDenied; when the only reason is the actor, the step-up or the missing mTLS,
     // the client learns that. Only the right of the direction counts: a machine without it would not get it over mTLS
     // either.

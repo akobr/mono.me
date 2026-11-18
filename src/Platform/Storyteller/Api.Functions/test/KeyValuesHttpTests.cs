@@ -836,15 +836,61 @@ public class KeyValuesHttpTests
             await http.PurgeKeyValues(Stale(KeyValueRequests.User("POST", body: body)), Org, Project, View),
         })
         {
+            // The client retries by key: the whole ordered result, so a refusal of the wrong key or an extra item fails.
             var items = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValueBulkResult>().Items;
-            items[0].ErrorCode.ShouldBe(ErrorCodes.StepUpRequired);
-            items[0].Message.ShouldBe(new StepUpRequiredException(StepUpOptions.DefaultMaxAge).Message);
-            items[0].Outcome.ShouldBe(KeyValueBulkOutcome.Forbidden);
-            items[1].ShouldBe(service.BulkItems[1]);
+            items.ShouldBe(
+            [
+                new KeyValueBulkItemResult
+                {
+                    Key = "db.password",
+                    Outcome = KeyValueBulkOutcome.Forbidden,
+                    ErrorCode = ErrorCodes.StepUpRequired,
+                    Message = new StepUpRequiredException(StepUpOptions.DefaultMaxAge).Message,
+                },
+                new KeyValueBulkItemResult { Key = "db.host", Outcome = KeyValueBulkOutcome.Done, Version = 3 },
+            ]);
         }
 
         var recent = await http.RestoreKeyValues(KeyValueRequests.User("POST", body: body), Org, Project, View);
         recent.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValueBulkResult>().Items[0].ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+    }
+
+    // An import item the service refused alone (a key that became a secret after the plan) names the step-up as well;
+    // the items written before it and the other failures stay as they are.
+    [Fact]
+    public async Task Import_WithAStaleSignIn_NamesTheStepUpInTheRefusedItems()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        var written = new KeyValueImportItemResult { Key = "db.host", Protection = KeyValueProtection.Public, Action = KeyValueImportAction.Update, Version = 3 };
+        var busy = new KeyValueImportItemResult { Key = "db.port", Protection = KeyValueProtection.Public, Action = KeyValueImportAction.Update, ErrorCode = ErrorCodes.KeyValueBusy, Message = "busy" };
+        service.ImportItems =
+        [
+            written,
+            new KeyValueImportItemResult { Key = "db.user", Protection = KeyValueProtection.Public, Action = KeyValueImportAction.Delete, ErrorCode = ErrorCodes.AccessDenied, Message = "no rights" },
+            busy,
+        ];
+        var document = new KeyValueDocument { Items = [new KeyValueDocumentItem { Key = "db.host", Protection = KeyValueProtection.Public, Value = "db-1" }] };
+
+        var stale = await http.ImportKeyValues(Stale(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(document))), Org, Project, View);
+
+        var result = stale.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValueImportResult>();
+        result.IsComplete.ShouldBeFalse();
+        result.Items.ShouldBe(
+        [
+            written,
+            new KeyValueImportItemResult
+            {
+                Key = "db.user",
+                Protection = KeyValueProtection.Public,
+                Action = KeyValueImportAction.Delete,
+                ErrorCode = ErrorCodes.StepUpRequired,
+                Message = new StepUpRequiredException(StepUpOptions.DefaultMaxAge).Message,
+            },
+            busy,
+        ]);
+
+        var recent = await http.ImportKeyValues(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(document)), Org, Project, View);
+        recent.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValueImportResult>().Items[1].ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
     }
 
     // Machines never need a step-up: a machine with a stray stale judgement reveals over mTLS as before.

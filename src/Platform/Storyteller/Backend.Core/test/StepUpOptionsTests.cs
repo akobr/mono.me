@@ -88,8 +88,8 @@ public class StepUpOptionsTests
     [Fact]
     public async Task AddUserAuthenticationOptions_AnInvalidWindow_FailsWhenTheHostStarts()
     {
-        var builder = Host.CreateApplicationBuilder();
-        builder.Environment.EnvironmentName = Environments.Production;
+        // No defaults: an Auth__StepUp__* variable of the machine must not decide what this test sees.
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { DisableDefaults = true, EnvironmentName = Environments.Production });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Auth:Provider"] = "EntraId",
@@ -103,6 +103,7 @@ public class StepUpOptionsTests
         var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync(TestContext.Current.CancellationToken));
 
         exception.Message.ShouldContain("Auth:StepUp:MaxAge");
+        exception.Message.ShouldContain("[d.]hh:mm:ss (00:10:00 for 10 minutes, 1.00:00:00 for 24 hours");
     }
 
     [Theory]
