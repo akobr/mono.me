@@ -36,7 +36,8 @@ A token whose `azp` (v1: `appid`) is not `Auth:ClientId` is a machine with that 
 | `Auth:AuthKit:Issuer` | yes | `https://api.workos.com/` | Must match the token's `iss`. Use your custom auth domain if one is configured. |
 | `Auth:AuthKit:JwksUri` | no | `{ApiBaseUrl}/sso/jwks/{ClientId}` | Must be HTTPS. |
 | `Auth:AuthKit:ApiBaseUrl` | no | `https://api.workos.com` | Used to build the default JWKS URL. Must be HTTPS. |
-| `Auth:AuthKit:Audience` | no, but set it in production | | When set, tokens must carry this `aud`. When empty, the audience is not checked. |
+| `Auth:AuthKit:Audiences:*` | no, but set it once the environment has several applications | none | The audiences of the deployment's WorkOS applications: a user token must carry one of them (see [Several WorkOS applications](#several-workos-applications)). When it lists any, `Audience` is ignored. Entries are trimmed; a blank entry stops the start. |
+| `Auth:AuthKit:Audience` | no, but set it (or `Audiences`) in production | | The single audience, from before `Audiences`. When set and `Audiences` is empty, tokens must carry this `aud`. When both are empty, the audience is not checked. |
 | `Auth:AuthKit:DefaultUserScopes:*` | no | none | Scopes given to every signed-in user. Only `User.Impersonation` counts, see [Scopes for users](#scopes-for-users). |
 | `Auth:AuthKit:PermissionMap:<slug>` | no | none | Maps a WorkOS permission slug to exactly one Storyteller scope: `User.Impersonation` for users, or a [machine scope](#scopes-of-machines). |
 | `Auth:AuthKit:ApiKey` | no | | WorkOS management key (`sk_…`). Used to look up a user's email and name at account registration when the token lacks them, and to send invitation emails. Keep it in Key Vault, never in plain settings. |
@@ -52,6 +53,8 @@ Example `local.settings.json` values:
 "Auth:AuthKit:Audience": "https://storyteller.42for.net",
 "Auth:AuthKit:DefaultUserScopes:0": "User.Impersonation"
 ```
+
+With several WorkOS applications, list their audiences in place of the single value: `"Auth:AuthKit:Audiences:0": "<audience of the first application>"`, `"Auth:AuthKit:Audiences:1": "…"`. As app settings: `Auth__AuthKit__Audiences__0`, `Auth__AuthKit__Audiences__1`.
 
 ### Keycloak settings
 
@@ -84,7 +87,7 @@ Every failure is reported at startup at once. Example `local.settings.json` valu
 
 * The signature must be **RS256**, using a key from the AuthKit JWKS. The key set is cached and refreshed. A token signed with an unknown key ID returns 401 and triggers a refresh of the key set, so a rotated key is picked up.
 * `iss` must equal `Auth:AuthKit:Issuer`. The comparison is case-sensitive, and only a trailing `/` may differ.
-* `aud` is checked only when `Auth:AuthKit:Audience` is set.
+* `aud` must hold one of `Auth:AuthKit:Audiences`, or, while that list is empty, `Auth:AuthKit:Audience`. One matching value is enough when the token carries an array. The comparison is case-sensitive, and only a trailing `/` may differ. A token without `aud` is refused. When neither setting is set, `aud` is not checked.
 * `exp` and `nbf` are enforced with a 30-second clock skew.
 * `sub` must be a WorkOS user ID (`user_…`). Other subjects are rejected.
 * A user token must not carry a top-level `act`, whatever its value (an object, a string, `null`, even `[]`). WorkOS puts `act` into the tokens of an [impersonated session](https://workos.com/docs/authkit/impersonation): a dashboard member signed in as the person, and `act.sub` is the member's email. 2S does not support impersonation, because accepting the token would serve and record the person, not the impersonator. The validator reads the validated payload, not only its claims, because IdentityModel turns `"act": []` into no claim at all. Such a token gets **401** on every route, and the validator logs one Warning: `An AuthKit user token of {Subject} is refused: it names an actor (act.sub {Actor}), a WorkOS impersonation`, with the validated `sub` and `act.sub`. `act.sub` is cut to 256 characters, and control characters become `?`. A `null`, an array or an `act` without a string `sub` is logged as `(no act.sub)`. The log never holds the token or the `act` JSON. A token that fails the checks above (a wrong signature, expired) is not logged as an impersonation. The [user token exchange](#subject-tokens) refuses such a subject token too.
@@ -227,7 +230,7 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
    }
    ```
 
-   Set `Auth:AuthKit:Audience` to the same `aud`. `email_verified` is needed to accept invitations (see [Members and invitations](access.md)). Without it, invitations can only be accepted when `Auth:AuthKit:RequireVerifiedEmail` is `false`. When a user has no first or last name, the template renders a blank or partial `name`, and Storyteller falls back as described above.
+   Set `Auth:AuthKit:Audience` to the same `aud`. The template is one per environment and renders into the tokens of every application of the environment, so this `aud` stops telling the deployment's tokens apart once the environment has a second application (see [Several WorkOS applications](#several-workos-applications)). `email_verified` is needed to accept invitations (see [Members and invitations](access.md)). Without it, invitations can only be accepted when `Auth:AuthKit:RequireVerifiedEmail` is `false`. When a user has no first or last name, the template renders a blank or partial `name`, and Storyteller falls back as described above.
 4. If you use the role-driven mode, create the permission that maps to `User.Impersonation` and assign it to organization roles. No other permission matters for users; the permissions of machines are described in [AuthKit M2M applications](#authkit-m2m-applications).
 5. Enable **CLI Auth** for the environment so `sform` can use the device sign-in. Without it, `POST /user_management/authorize/device` is rejected and `sform account` reports the WorkOS message.
 6. For invitation emails, set `Auth:AuthKit:ApiKey` (the management key) and point the environment's invitation link at the admin UI's accept page, for example `https://admin.42for.net/invitations/accept`. Without the key, invitations are still created, but no email is sent.
@@ -235,6 +238,20 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
 8. Keep **user impersonation** off in every environment: Authentication → Features, the "User impersonation" card. It is off by default, it is set per environment, and only a dashboard Admin can turn it on. The API refuses impersonation tokens anyway ([How AuthKit tokens are checked](#how-authkit-tokens-are-checked)), but other applications of the environment may not.
 9. Keep the dashboard team small. Name one or two members, give each the least role, and require MFA for each, or SSO whose identity provider enforces MFA. A member can change a user's email or delete their MFA factors and then sign in as that user. The [user name check](#changed-user-names) logs such a change, and [Who can sign in as a user](../Deployment/decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary) describes the trust boundary.
 10. Set **multi-factor authentication** to **Required** in the production environment, as the [MFA policy](#mfa-policy) asks. Leave it off in an environment whose automation pools sign in with passwords, such as staging.
+
+## Several WorkOS applications
+
+One WorkOS environment may serve several products, each as its own WorkOS **application** ([Applications](https://workos.com/docs/authkit/applications), "Multiple Applications"), so that people have one login and one account for all of them. Every application of the environment issues its session tokens with the **same issuer** (WorkOS: the `iss` "is the same for all applications in the environment", and it names the default application's client id), and one key pair signs every token of the environment. The JWT template, too, is one per environment. So neither the issuer, nor the signature, nor the template's `aud` tells the deployment's tokens from another product's: once the environment has a second application, a token that product gets for a person would also be a token of that person here.
+
+The audience does tell them apart, as WorkOS recommends ("one audience per API", [Verify WorkOS access tokens in your own API](https://workos.com/blog/verify-workos-access-tokens-in-your-own-api)): with Multiple Applications, "tokens carry an `aud` identifying the application". List the audiences of **this deployment's** applications in `Auth:AuthKit:Audiences` (today the admin UI and `sform` share one application, the client id the [discovery endpoint](#discovery-endpoint) returns). The list replaces `Auth:AuthKit:Audience`, so the template's shared `aud` stops counting.
+
+* **Read the values from real tokens.** WorkOS does not document the value of an application's `aud` (the client id, a URL) or what happens when the template sets `aud` as well. Decode a token of each application, after a fresh sign-in and after a refresh, before setting the list.
+* **Never list the template's shared `aud`** once another application exists: any token that carries it would pass, and IdentityModel accepts a token when one of its `aud` values is listed.
+* **Set the list before the second application exists.** Enabling Multiple Applications changes the `aud` of every token. While WorkOS switches, list the new audience next to the template's, so the deployment's tokens pass before and after; remove the template's before another application is created. If the template's `aud` wins over the application's, drop `aud` from the template, or, should WorkOS then put no per-application value there, the API needs a check of the token's `client_id` claim, which WorkOS documents as "the `client_id` for the current application context" (not built).
+* **Machine tokens are not affected.** AuthKit M2M tokens keep their own rule (issuer `AuthKitDomain`, `aud` the environment client id, `sub` = `client_id`, the machine organization; see [AuthKit M2M applications](#authkit-m2m-applications)).
+* **The token exchange** refuses an actor whose `SubjectAudiences` names any of these audiences, or the single `Audience` (see [Configuration of the exchange](#configuration-of-the-exchange)).
+
+The production steps are in the [runbook](../Deployment/runbook-azure-production.md#enabling-multiple-applications-in-workos).
 
 ## Discovery endpoint
 
@@ -968,7 +985,7 @@ An actor, `Auth:TokenExchange:Actors:{n}`:
 | `Authentication:WorkloadIdentity:Issuer`, `:Subject`, `:Audience`, `:JwksUri` | one proof | | A [workload identity](#actors-and-their-proof). `Issuer`, `Subject` and `Audience` are required; `Issuer` and `JwksUri` (optional) are HTTPS URLs. |
 | `Authentication:ClientAssertion:JwksUri` | one proof | | A [client assertion](#actors-and-their-proof). An HTTPS URL; needs `MachineAuth:Federation:PublicBaseUrl`. |
 | `Authentication:ClientSecretHash` | one proof | | A [client secret](#actors-and-their-proof): the hex SHA-256 hash of the secret, 64 digits. `Development` only. |
-| `SubjectAudiences:*` | yes | | The audiences of the tokens issued to the actor: the subject token's `aud` must be one of them. At least one and none blank. None may be the API's own audience (`api://{Auth:ClientId}`, `{Auth:ClientId}`, `Auth:AuthKit:Audience` or `Auth:Keycloak:Audience`, compared ignoring case and a trailing `/`): a token issued for the API would become exchangeable, and the API would refuse its own users' tokens. |
+| `SubjectAudiences:*` | yes | | The audiences of the tokens issued to the actor: the subject token's `aud` must be one of them. At least one and none blank. None may be the API's own audience (`api://{Auth:ClientId}`, `{Auth:ClientId}`, any of `Auth:AuthKit:Audiences`, `Auth:AuthKit:Audience` even while `Audiences` overrides it, or `Auth:Keycloak:Audience`, compared ignoring case and a trailing `/`): a token issued for the API would become exchangeable, and the API would refuse its own users' tokens. |
 | `AllowedClientIds:*` | no | none | The clients the subject token may be issued to (`azp`, `appid` or `client_id`). Empty: any client, and while the exchange is on the API logs a warning at start that names the actor and its `SubjectAudiences`. No blank entries. |
 | `Scopes:*` | no | `User.Impersonation` | The most an issued token carries. Storyteller scopes only, and it must contain `User.Impersonation`. |
 | `Restrictions:*` | no | none | [Restrictions](#restrictions-of-actors) on top of the default. Known values only. |
