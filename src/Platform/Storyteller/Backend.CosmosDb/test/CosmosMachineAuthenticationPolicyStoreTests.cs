@@ -120,7 +120,7 @@ public class CosmosMachineAuthenticationPolicyStoreTests(Startup startup)
                 Name = "Owner",
                 Organization = Organization,
                 Project = "base",
-            });
+            }, AccessCaller.System);
         }
 
         var project = NewProjectName();
@@ -130,7 +130,7 @@ public class CosmosMachineAuthenticationPolicyStoreTests(Startup startup)
             Project = project,
             ProjectDescription = description,
             OwnerId = OwnerId,
-        });
+        }, AccessCaller.System);
         return project;
     }
 
