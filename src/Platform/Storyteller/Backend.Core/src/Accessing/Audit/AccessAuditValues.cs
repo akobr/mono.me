@@ -172,8 +172,9 @@ public static class AccessAuditValues
             using var document = JsonDocument.Parse(jwks);
             return Thumbprint(Canonical(document.RootElement, isRoot: true));
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
+            // not JSON, or a string that does not decode (a lone surrogate such as \ud800): the text as it is
             return Thumbprint(jwks);
         }
     }

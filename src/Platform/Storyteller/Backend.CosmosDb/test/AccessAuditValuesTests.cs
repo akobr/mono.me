@@ -206,6 +206,17 @@ public class AccessAuditValuesTests
     }
 
     [Fact]
+    public void Issuer_AStringThatDoesNotDecode_IsThumbprintedAsItsText()
+    {
+        // a lone surrogate parses as JSON but does not decode to a string
+        var jwks = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"\\ud800\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"}]}";
+        var issuer = new FederatedIssuer { Name = "k8s", Issuer = "https://k8s.example.com", KeySource = FederatedIssuerKeySource.Jwks, Jwks = jwks };
+
+        AccessAuditValues.Issuer(issuer).Should().MatchRegex("\"JwksKeys\":1,\"JwksThumbprint\":\"[0-9a-f]{16}\"");
+        AccessAuditValues.Issuer(issuer with { Jwks = jwks.Replace("\\ud800", "\\ud801") }).Should().NotBe(AccessAuditValues.Issuer(issuer));
+    }
+
+    [Fact]
     public void Issuer_NoRequiredClaimsAndAnEmptyDictionary_AreTheSame()
     {
         var issuer = new FederatedIssuer { Name = "github", Issuer = "https://token.actions.githubusercontent.com" };
