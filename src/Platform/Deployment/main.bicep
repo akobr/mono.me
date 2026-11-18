@@ -78,8 +78,10 @@ param exhibitionOwner string = ''
 ])
 param stepUpEnabled string = ''
 
-@description('Auth__StepUp__MaxAge: the oldest sign-in that still counts, as a TimeSpan in whole seconds from 00:01:00 to 1.00:00:00 (24 hours; 24:00:00 would be 24 days and stop the API, and so would a fraction of a second). Empty leaves the setting out (00:10:00).')
-param stepUpMaxAge string = ''
+@description('Auth__StepUp__MaxAge in seconds: the oldest sign-in that still counts, from 60 (1 minute) to 86400 (24 hours), the range the API accepts at start; the template writes it as a TimeSpan. Null leaves the setting out (10 minutes).')
+@minValue(60)
+@maxValue(86400)
+param stepUpMaxAgeSeconds int?
 
 @description('The object id of the owner: Key Vault Administrator, Storage Blob Data Contributor.')
 @minLength(36)
@@ -282,7 +284,7 @@ module functions 'modules/functions.bicep' = {
     exhibitionProject: exhibitionProject
     exhibitionOwner: exhibitionOwner
     stepUpEnabled: stepUpEnabled
-    stepUpMaxAge: stepUpMaxAge
+    stepUpMaxAgeSeconds: stepUpMaxAgeSeconds
     disabledCredentialKinds: disabledCredentialKinds
     runtimeEnvironment: runtimeEnvironment
     maximumInstanceCount: functionMaximumInstanceCount

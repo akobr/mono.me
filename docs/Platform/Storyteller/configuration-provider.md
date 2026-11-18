@@ -187,7 +187,7 @@ Every failure is a `StorytellerConfigurationException` with `Key`, `StatusCode`,
 
   | `X-2S-Secrets-Withheld` | The caller | The fix |
   | --- | --- | --- |
-  | `mtls-required` | A machine with `Secrets.Read` that presented no certificate, under a project policy that delivers secrets only over mTLS | Present the machine certificate (`STORYTELLER_CLIENT_CERTIFICATE`), or remove `Secrets.Read` from the machine |
+  | `mtls-required` | A machine with `Secrets.Read` that presented no certificate, under a project policy that delivers secrets only over mTLS | Present the machine certificate (`STORYTELLER_CLIENT_CERTIFICATE`); or, only when the application does not need those secrets, remove `Secrets.Read` from the machine (it then gets the expressions unresolved, see below) |
   | `actor-restricted` | A person's token that acts through an actor under `NoSecretReveal` (a token file) | Read with a machine credential, or with a token of the person's own |
   | `step-up-required` | A person's token (a token file) whose sign-in is older than the API's window ([step-up](authentication.md#recent-sign-in-step-up)) | Sign in again, or use a machine credential, which the step-up never affects |
 
