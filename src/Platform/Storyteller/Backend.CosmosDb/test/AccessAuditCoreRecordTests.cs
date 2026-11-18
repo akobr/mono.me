@@ -404,6 +404,24 @@ public class AccessAuditCoreRecordTests(Startup startup)
     }
 
     [Fact]
+    public async Task MachineAuthenticationPolicy_NoEnabledKindsAndAnEmptyList_AreNoChange()
+    {
+        var pointKey = await CreateProjectAsync();
+        var store = MachinePolicies(Repositories);
+        var policy = new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey };
+
+        var added = await AddedAsync(pointKey, async () =>
+        {
+            await store.SetAsync(Organization, ProjectOf(pointKey), policy with { EnabledCredentialKinds = null }, ViaMcp);
+            await store.SetAsync(Organization, ProjectOf(pointKey), policy with { EnabledCredentialKinds = [] }, ViaMcp);
+            await store.SetAsync(Organization, ProjectOf(pointKey), policy with { EnabledCredentialKinds = null }, ViaMcp);
+        });
+
+        // only the first save is a change: from no policy to ApiKey
+        added.Should().ContainSingle().Which.NewValue.Should().Be("{\"CredentialKind\":\"ApiKey\"}");
+    }
+
+    [Fact]
     public async Task MachineAuthenticationPolicy_AMembershipChangedMeanwhile_IsKept()
     {
         // The policy used to be upserted over the access point it read, so a grant in between was lost.

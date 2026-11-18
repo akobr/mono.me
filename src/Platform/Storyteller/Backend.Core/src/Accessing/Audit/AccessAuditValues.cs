@@ -61,11 +61,12 @@ public static class AccessAuditValues
         return Json(rules ?? []);
     }
 
-    // The enabled kinds are a set: the order they were sent in is no change.
+    // The enabled kinds are a set: the order they were sent in is no change, and none (null) and an empty list are the same.
     public static string MachineAuthentication(MachineAuthenticationPolicy? policy)
     {
         policy ??= new MachineAuthenticationPolicy();
-        return Json(policy with { EnabledCredentialKinds = policy.EnabledCredentialKinds?.Distinct().Order().ToList() });
+        var kinds = policy.EnabledCredentialKinds is { Count: > 0 } enabled ? enabled.Distinct().Order().ToList() : null;
+        return Json(policy with { EnabledCredentialKinds = kinds });
     }
 
     // What of a key/value policy decides who gets secrets and how; key versions, health and rewrap progress are left out,
@@ -105,10 +106,14 @@ public static class AccessAuditValues
             JwksThumbprint = JwksThumbprint(issuer.Jwks),
             issuer.MaxTokenLifetimeSeconds,
 
-            // by claim name, so the same pins in another order are no change; the values keep their order
+            // by claim name, and the values of a claim as a set (any of them matches), so the same pins in another order
+            // or repeated are no change
             RequiredClaims = issuer.RequiredClaims?
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+                .ToDictionary(
+                    pair => pair.Key,
+                    pair => pair.Value.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
+                    StringComparer.Ordinal),
             issuer.Description,
         });
     }
