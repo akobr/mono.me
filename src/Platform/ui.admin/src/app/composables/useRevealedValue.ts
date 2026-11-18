@@ -22,7 +22,8 @@ export function useRevealedValue(fetch: () => Promise<string | undefined>, hideA
     }
   }
 
-  async function reveal(): Promise<void> {
+  /** The error of this reveal, when it failed and is still the current one; undefined otherwise. */
+  async function reveal(): Promise<unknown> {
     const asked = ++generation
     loading.value = true
     error.value = undefined
@@ -39,6 +40,7 @@ export function useRevealedValue(fetch: () => Promise<string | undefined>, hideA
     } catch (caught) {
       if (asked === generation) {
         error.value = caught
+        return caught
       }
     } finally {
       if (asked === generation) {

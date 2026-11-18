@@ -133,4 +133,19 @@ describe('useRevealedValue', () => {
     expect(revealed.value.value).toBeUndefined()
     expect(revealed.loading.value).toBe(false)
   })
+
+  it('gives each reveal its own error, and none to a reveal dropped on the way', async () => {
+    const answers: ((error: Error) => void)[] = []
+    const revealed = useRevealedValue(() => new Promise<string>((_, reject) => answers.push(reject)))
+
+    const first = revealed.reveal()
+    revealed.hide()
+    const second = revealed.reveal()
+    answers[1]!(new Error('the second'))
+    answers[0]!(new Error('the first'))
+
+    expect(((await second) as Error).message).toBe('the second')
+    expect(await first).toBeUndefined()
+    expect((revealed.error.value as Error).message).toBe('the second')
+  })
 })
