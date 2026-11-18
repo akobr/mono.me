@@ -556,6 +556,38 @@ public class TokenExchangeOptionsTests
             .Succeeded.ShouldBeFalse();
     }
 
+    // Every audience of Auth:AuthKit:Audiences is the API's own, and so is the single Audience while the list overrides it
+    // (the deployment keeps it, and it is the JWT template's audience of every application). Compared as above.
+    [Theory]
+    [InlineData("client_2s")]
+    [InlineData("CLIENT_2S")]
+    [InlineData("https://2s.42for.net/app")]
+    [InlineData("https://2S.42for.net/app/")]
+    [InlineData("https://2s.42for.net")]
+    [InlineData("https://2s.42for.net/")]
+    public void Validate_SubjectAudiences_DoNotNameAnAuthKitAudience(string audience)
+    {
+        var authKit = AuthKitUser();
+        authKit.AuthKit.Audience = "https://2s.42for.net";
+        authKit.AuthKit.Audiences = ["client_2s", " https://2s.42for.net/app "];
+
+        var result = Validate(new TokenExchangeOptions { Actors = [Actor(actor => actor.SubjectAudiences = [audience])] }, user: authKit);
+
+        result.Failures.ShouldBe([$"{Section}:Actors:0:SubjectAudiences must not name the API's own audience '{audience}'."]);
+    }
+
+    [Fact]
+    public void Validate_SubjectAudiences_OtherThanTheAuthKitAudiences_Pass()
+    {
+        var authKit = AuthKitUser();
+        authKit.AuthKit.Audience = "https://2s.42for.net";
+        authKit.AuthKit.Audiences = ["client_2s"];
+
+        Validate(new TokenExchangeOptions { Actors = [Actor()] }, user: authKit).Succeeded.ShouldBeTrue();
+        Validate(new TokenExchangeOptions { Actors = [Actor(actor => actor.SubjectAudiences = ["https://2s.42for.net/mcp"])] }, user: authKit)
+            .Succeeded.ShouldBeTrue();
+    }
+
     [Fact]
     public void Validate_AllowedClientIds_AreOptionalButNotBlank()
     {

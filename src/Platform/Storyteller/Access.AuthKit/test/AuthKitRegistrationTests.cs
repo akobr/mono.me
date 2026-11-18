@@ -75,6 +75,65 @@ public class AuthKitRegistrationTests
     }
 
     [Fact]
+    public void GetAudiences_TheListWinsOverTheSingleValue()
+    {
+        new AuthKitOptions { Audience = "https://2s.42for.net", Audiences = [" client_2s ", "https://2s.42for.net/app", "client_2s"] }
+            .GetAudiences().ShouldBe(["client_2s", "https://2s.42for.net/app"]);
+    }
+
+    [Theory]
+    [InlineData("https://2s.42for.net", "https://2s.42for.net")]
+    [InlineData(" https://2s.42for.net ", " https://2s.42for.net ")]
+    [InlineData(" ", null)]
+    [InlineData(null, null)]
+    public void GetAudiences_WithoutAList_IsTheSingleValueAsConfigured(string? audience, string? expected)
+    {
+        var options = new AuthKitOptions { Audience = audience };
+
+        options.GetAudiences().ShouldBe(expected is null ? [] : [expected]);
+    }
+
+    // Blank entries are refused at the start; should one reach GetAudiences, it does not count.
+    [Fact]
+    public void GetAudiences_SkipsBlankEntries()
+    {
+        new AuthKitOptions { Audience = "https://2s.42for.net", Audiences = [" ", "client_2s"] }.GetAudiences().ShouldBe(["client_2s"]);
+        new AuthKitOptions { Audience = "https://2s.42for.net", Audiences = [" "] }.GetAudiences().ShouldBe(["https://2s.42for.net"]);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Validate_AuthKitBlankAudiencesEntry_Fails(string blank)
+    {
+        var result = _validator.Validate(null, AuthKitOptions(authKit => authKit.Audiences = ["client_2s", blank]));
+
+        result.Failed.ShouldBeTrue();
+        result.FailureMessage.ShouldContain("Auth:AuthKit:Audiences entries must not be blank.");
+    }
+
+    [Fact]
+    public void Validate_AuthKitFailures_AreReportedTogether()
+    {
+        var result = _validator.Validate(null, AuthKitOptions(authKit =>
+        {
+            authKit.ClientId = " ";
+            authKit.Issuer = string.Empty;
+            authKit.JwksUri = "http://api.workos.com/sso/jwks/client_123";
+            authKit.Audiences = [" "];
+        }));
+
+        result.Failures.ShouldNotBeNull();
+        result.Failures.ShouldBe(
+        [
+            "Auth:AuthKit:ClientId is required when Auth:Provider is AuthKit.",
+            "Auth:AuthKit:Issuer is required when Auth:Provider is AuthKit.",
+            "Auth:AuthKit:JwksUri (or Auth:AuthKit:ApiBaseUrl when JwksUri is empty) must be an absolute HTTPS URL.",
+            "Auth:AuthKit:Audiences entries must not be blank.",
+        ]);
+    }
+
+    [Fact]
     public void Validate_AuthKitWithDefaults_Succeeds()
     {
         var result = _validator.Validate(null, AuthKitOptions(_ => { }));
@@ -129,6 +188,45 @@ public class AuthKitRegistrationTests
         host.Services.GetRequiredService<WorkOsManagementClient>().IsConfigured.ShouldBeFalse();
 
         await host.StopAsync();
+    }
+
+    // The app settings Auth__AuthKit__Audiences__0 and __1, next to the single value the deployment keeps for a rollback.
+    [Fact]
+    public async Task AddAuthKitUserAuthentication_IndexedAudiences_BindAndOverrideTheSingleValue()
+    {
+        using var host = BuildHost(new Dictionary<string, string?>
+        {
+            ["Auth:Provider"] = "AuthKit",
+            ["Auth:AuthKit:ClientId"] = "client_123",
+            ["Auth:AuthKit:Audience"] = "https://2s.42for.net",
+            ["Auth:AuthKit:Audiences:0"] = "client_123",
+            ["Auth:AuthKit:Audiences:1"] = "client_2s_cli",
+        });
+
+        await host.StartAsync();
+
+        var authKit = host.Services.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value.AuthKit;
+        authKit.Audiences.ShouldBe(["client_123", "client_2s_cli"]);
+        authKit.GetAudiences().ShouldBe(["client_123", "client_2s_cli"]);
+        host.Services.GetRequiredService<IBearerTokenValidator>().ShouldBeOfType<AuthKitBearerTokenValidator>()
+            .Source.Audiences.ShouldBe(["client_123", "client_2s_cli"]);
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task AddAuthKitUserAuthentication_BlankAudiencesEntry_FailsWhenTheHostStarts()
+    {
+        using var host = BuildHost(new Dictionary<string, string?>
+        {
+            ["Auth:Provider"] = "AuthKit",
+            ["Auth:AuthKit:ClientId"] = "client_123",
+            ["Auth:AuthKit:Audiences:0"] = "client_123",
+            ["Auth:AuthKit:Audiences:1"] = " ",
+        });
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
+        exception.Message.ShouldContain("Auth:AuthKit:Audiences entries must not be blank.");
     }
 
     [Fact]
@@ -219,6 +317,8 @@ public class AuthKitRegistrationTests
             ["Auth:AuthKit:MachineOrganizationId"] = "org_machines",
             ["Auth:AuthKit:DefaultUserScopes:0"] = "User.Impersonation",
             ["Auth:AuthKit:DefaultUserScopes:1"] = "Annotation.Read",
+            ["Auth:AuthKit:Audiences:0"] = "client_123",
+            ["Auth:AuthKit:Audiences:1"] = "client_2s_cli",
         }).Build();
         var services = new ServiceCollection();
 
@@ -226,8 +326,9 @@ public class AuthKitRegistrationTests
         services.AddAuthKitMachineAccess(configuration);
         using var provider = services.BuildServiceProvider();
 
-        provider.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value.AuthKit.DefaultUserScopes
-            .ShouldBe(["User.Impersonation", "Annotation.Read"]);
+        var authKit = provider.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value.AuthKit;
+        authKit.DefaultUserScopes.ShouldBe(["User.Impersonation", "Annotation.Read"]);
+        authKit.Audiences.ShouldBe(["client_123", "client_2s_cli"]);
     }
 
     [Fact]

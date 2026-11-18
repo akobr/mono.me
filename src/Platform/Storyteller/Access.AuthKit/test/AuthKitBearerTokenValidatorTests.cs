@@ -64,6 +64,78 @@ public class AuthKitBearerTokenValidatorTests
         (result is not null).ShouldBe(accepted);
     }
 
+    // The audiences of the 2S applications: a token of another application of the environment (same issuer, same keys)
+    // is refused.
+    [Theory]
+    [InlineData("https://2s.42for.net", true)]
+    [InlineData("client_2s", true)]
+    [InlineData("client_other", false)]
+    [InlineData("https://other.42for.net", false)]
+    [InlineData(null, false)]
+    public async Task Validate_ConfiguredAudiences_RequireOneOfThem(string? tokenAudience, bool accepted)
+    {
+        using var fixture = new TokenFixture(configure: authKit => authKit.Audiences = ["https://2s.42for.net", "client_2s"]);
+        var rawToken = fixture.CreateToken(UserClaims(), audience: tokenAudience);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        (result is not null).ShouldBe(accepted);
+    }
+
+    // The list wins: the single value of earlier releases (the JWT template's audience, shared by every application of
+    // the environment) is no longer accepted once the list is set.
+    [Theory]
+    [InlineData("https://2s.42for.net", false)]
+    [InlineData("client_2s", true)]
+    public async Task Validate_ConfiguredAudiences_OverrideTheSingleAudience(string tokenAudience, bool accepted)
+    {
+        using var fixture = new TokenFixture(configure: authKit =>
+        {
+            authKit.Audience = "https://2s.42for.net";
+            authKit.Audiences = ["client_2s"];
+        });
+        var rawToken = fixture.CreateToken(UserClaims(), audience: tokenAudience);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        (result is not null).ShouldBe(accepted);
+    }
+
+    // IdentityModel's rule: one listed member of an aud array suffices; none, or an empty array, fails.
+    [Theory]
+    [InlineData("""["client_2s"]""", true)]
+    [InlineData("""["client_other","client_2s"]""", true)]
+    [InlineData("""["client_other","https://2s.42for.net"]""", false)]
+    [InlineData("""[]""", false)]
+    public async Task Validate_AudienceArray_NeedsOneListedMember(string audiences, bool accepted)
+    {
+        using var fixture = new TokenFixture(configure: authKit => authKit.Audiences = ["client_2s"]);
+        var rawToken = fixture.CreateRawToken(RawUserPayload($"\"aud\":{audiences}"));
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        (result is not null).ShouldBe(accepted);
+    }
+
+    // Listed values are trimmed; the token's aud is compared ordinally, and only a trailing '/' may differ (IdentityModel's
+    // default, as for the single value).
+    [Theory]
+    [InlineData("https://2s.42for.net/app", true)]
+    [InlineData("https://2s.42for.net/app/", true)]
+    [InlineData("client_2s", true)]
+    [InlineData("https://2S.42for.net/app", false)]
+    [InlineData("CLIENT_2S", false)]
+    [InlineData("https://2s.42for.net/app//", false)]
+    public async Task Validate_ConfiguredAudiences_AreComparedOrdinallyIgnoringATrailingSlash(string tokenAudience, bool accepted)
+    {
+        using var fixture = new TokenFixture(configure: authKit => authKit.Audiences = [" https://2s.42for.net/app ", "client_2s"]);
+        var rawToken = fixture.CreateToken(UserClaims(), audience: tokenAudience);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        (result is not null).ShouldBe(accepted);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("https://anything.example")]
@@ -75,6 +147,23 @@ public class AuthKitBearerTokenValidatorTests
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
         result.ShouldNotBeNull();
+    }
+
+    // A blank single value and an empty list: nothing to check, as before the list existed.
+    [Fact]
+    public async Task Validate_BlankAudienceAndNoAudiences_DoesNotCheckTheAudience()
+    {
+        using var fixture = new TokenFixture(configure: authKit =>
+        {
+            authKit.Audience = " ";
+            authKit.Audiences = [];
+        });
+        var rawToken = fixture.CreateToken(UserClaims(), audience: "https://anything.example");
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        fixture.Validator.Source.Audiences.ShouldBeNull();
     }
 
     [Theory]

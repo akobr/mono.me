@@ -10,8 +10,13 @@ public class AuthKitOptions
     // Null uses {ApiBaseUrl}/sso/jwks/{ClientId}, which is https://api.workos.com/sso/jwks/{ClientId} by default.
     public string? JwksUri { get; set; }
 
-    // Set when a JWT template adds "aud". Null means the audience is not validated.
+    // The single audience of earlier releases, set when a JWT template adds "aud". Ignored when Audiences lists any;
+    // GetAudiences() is the rule. Kept so that settings (and builds) that know only this key keep checking an audience.
     public string? Audience { get; set; }
+
+    // The audiences of the 2S applications (WorkOS Multiple Applications): a user token must carry one of them. When it
+    // lists any, Audience is ignored, so a shared audience of the environment can leave the check. No blank entries.
+    public string[] Audiences { get; set; } = [];
 
     // https://<subdomain>.authkit.app or a custom domain. Used for Connect / M2M.
     public string AuthKitDomain { get; set; } = string.Empty;
@@ -38,6 +43,24 @@ public class AuthKitOptions
 
     // Phase E only.
     public string ApiKeyScheme { get; set; } = "WorkOS";
+
+    // The audiences a user token must carry one of: the non-blank Audiences, trimmed and distinct, when there are any;
+    // otherwise a non-blank Audience as configured; otherwise none, and the audience is not checked.
+    public IReadOnlyList<string> GetAudiences()
+    {
+        var audiences = Audiences
+            .Where(audience => !string.IsNullOrWhiteSpace(audience))
+            .Select(audience => audience.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (audiences.Length > 0)
+        {
+            return audiences;
+        }
+
+        return string.IsNullOrWhiteSpace(Audience) ? [] : [Audience];
+    }
 
     public string GetJwksUri()
     {
