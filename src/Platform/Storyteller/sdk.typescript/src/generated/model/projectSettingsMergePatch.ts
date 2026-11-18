@@ -3,13 +3,13 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.42.39559
+ * OpenAPI spec version: 0.10.43.46332
  */
 import type { ProjectSettingsMergePatchTypes } from "./projectSettingsMergePatchTypes";
 
 export interface ProjectSettingsMergePatch {
   /**
-   * The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance. A null type goes back to its built-in appearance, a null member of a type to its built-in value.
+   * The changes of the appearance of annotation types, keyed by type code (rst, unt, sbt, usg, cnt, exe, uxe; any case). A type left out keeps its appearance; a null type goes back to its built-in appearance, a null member of a type to its built-in value.
    * @nullable
    */
   Types?: ProjectSettingsMergePatchTypes;

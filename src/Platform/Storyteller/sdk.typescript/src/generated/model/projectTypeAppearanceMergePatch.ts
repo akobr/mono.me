@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.42.39559
+ * OpenAPI spec version: 0.10.43.46332
  */
 
 /**
@@ -12,12 +12,12 @@
  */
 export type ProjectTypeAppearanceMergePatch = {
   /**
-   * The singular name of the type, such as Company: trimmed, at most 40 characters; absent for the built-in name.
+   * The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.
    * @nullable
    */
   Label?: string | null;
   /**
-   * The plural, only with a Label: trimmed, at most 40 characters; clients derive it from the label when it is absent.
+   * The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.
    * @nullable
    */
   Plural?: string | null;

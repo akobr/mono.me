@@ -27209,7 +27209,7 @@ namespace _42.Platform.Storyteller.Sdk
     {
 
         /// <summary>
-        /// The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance. A null type goes back to its built-in appearance, a null member of a type to its built-in value.
+        /// The changes of the appearance of annotation types, keyed by type code (rst, unt, sbt, usg, cnt, exe, uxe; any case). A type left out keeps its appearance; a null type goes back to its built-in appearance, a null member of a type to its built-in value.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("Types", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.IDictionary<string, ProjectTypeAppearanceMergePatch> Types { get; set; }
@@ -27270,13 +27270,13 @@ namespace _42.Platform.Storyteller.Sdk
     {
 
         /// <summary>
-        /// The singular name of the type, such as Company: trimmed, at most 40 characters; absent for the built-in name.
+        /// The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("Label", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Label { get; set; }
 
         /// <summary>
-        /// The plural, only with a Label: trimmed, at most 40 characters; clients derive it from the label when it is absent.
+        /// The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("Plural", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Plural { get; set; }
@@ -28163,13 +28163,13 @@ namespace _42.Platform.Storyteller.Sdk
     {
 
         /// <summary>
-        /// The singular name of the type, such as Company: trimmed, at most 40 characters; absent for the built-in name.
+        /// The singular name of the type, such as Company: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; absent for the built-in name.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("Label", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Label { get; set; }
 
         /// <summary>
-        /// The plural, only with a Label: trimmed, at most 40 characters; clients derive it from the label when it is absent.
+        /// The plural, only with a Label: trimmed, then at most 40 characters (UTF-16 code units) without control characters, line or paragraph separators or bidirectional controls; clients derive it from the label when it is absent.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("Plural", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Plural { get; set; }
