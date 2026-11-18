@@ -37,7 +37,7 @@ public class AuthKitMachineTokenValidator : IMachineTokenValidator
                 "Auth:AuthKit:AuthKitDomain, MachineOrganizationId and ClientId are required for AuthKit machine tokens.");
         }
 
-        _source = new AuthKitTokenSource(authKit.AuthKitDomain, authKit.ClientId, keyManager);
+        _source = new AuthKitTokenSource(authKit.AuthKitDomain, [authKit.ClientId], keyManager);
         _machineOrganizationId = authKit.MachineOrganizationId!;
         _normalizer = normalizer;
     }

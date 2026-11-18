@@ -28,24 +28,34 @@ public sealed class UserAuthenticationOptionsValidator : IValidateOptions<UserAu
 
     private static ValidateOptionsResult ValidateAuthKit(AuthKitOptions options)
     {
+        var failures = new List<string>();
+
         if (string.IsNullOrWhiteSpace(options.ClientId))
         {
-            return ValidateOptionsResult.Fail("Auth:AuthKit:ClientId is required when Auth:Provider is AuthKit.");
+            failures.Add("Auth:AuthKit:ClientId is required when Auth:Provider is AuthKit.");
         }
 
         if (string.IsNullOrWhiteSpace(options.Issuer))
         {
-            return ValidateOptionsResult.Fail("Auth:AuthKit:Issuer is required when Auth:Provider is AuthKit.");
+            failures.Add("Auth:AuthKit:Issuer is required when Auth:Provider is AuthKit.");
         }
 
         // The key retriever only fetches over HTTPS. Failing here beats a 503 on every request.
         if (!Uri.TryCreate(options.GetJwksUri(), UriKind.Absolute, out var jwksUri)
             || jwksUri.Scheme != Uri.UriSchemeHttps)
         {
-            return ValidateOptionsResult.Fail("Auth:AuthKit:JwksUri (or Auth:AuthKit:ApiBaseUrl when JwksUri is empty) must be an absolute HTTPS URL.");
+            failures.Add("Auth:AuthKit:JwksUri (or Auth:AuthKit:ApiBaseUrl when JwksUri is empty) must be an absolute HTTPS URL.");
         }
 
-        return ValidateOptionsResult.Success;
+        // A blank entry is a setting left empty (Auth__AuthKit__Audiences__1=); dropping it silently could hide a missing audience.
+        if (options.Audiences.Any(string.IsNullOrWhiteSpace))
+        {
+            failures.Add("Auth:AuthKit:Audiences entries must not be blank.");
+        }
+
+        return failures.Count > 0
+            ? ValidateOptionsResult.Fail(failures)
+            : ValidateOptionsResult.Success;
     }
 
     private static ValidateOptionsResult ValidateKeycloak(UserAuthenticationOptions options)

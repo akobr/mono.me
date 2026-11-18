@@ -10,7 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace _42.Platform.Storyteller;
 
 // One AuthKit token issuer with its key set: RS256, 30 s clock skew, an exact issuer
-// (only a trailing slash may differ) and the audience when one is required.
+// (only a trailing slash may differ) and one of the audiences when any are required.
 internal sealed class AuthKitTokenSource
 {
     public const string NoActorSubject = "(no act.sub)";
@@ -20,16 +20,18 @@ internal sealed class AuthKitTokenSource
 
     private readonly JsonWebTokenHandler _handler = new();
 
-    public AuthKitTokenSource(string issuer, string? audience, IConfigurationManager<JsonWebKeySet> keys)
+    // Null or empty audiences: aud is not checked.
+    public AuthKitTokenSource(string issuer, IReadOnlyCollection<string>? audiences, IConfigurationManager<JsonWebKeySet> keys)
     {
         Issuer = issuer;
-        Audience = audience;
+        Audiences = audiences is { Count: > 0 } ? audiences : null;
         Keys = keys;
     }
 
     public string Issuer { get; }
 
-    public string? Audience { get; }
+    // The source's own audiences; null when aud is not checked.
+    public IReadOnlyCollection<string>? Audiences { get; }
 
     public IConfigurationManager<JsonWebKeySet> Keys { get; }
 
@@ -115,10 +117,10 @@ internal sealed class AuthKitTokenSource
         return result.IsValid ? result.ClaimsIdentity.Claims.ToList() : null;
     }
 
-    // ValidateTokenAsync with the source's own audience (none: aud is not checked).
+    // ValidateTokenAsync with the source's own audiences (none: aud is not checked).
     public Task<TokenValidationResult> ValidateTokenAsync(string rawToken, CancellationToken cancellationToken)
     {
-        return ValidateTokenAsync(rawToken, Audience is null ? null : [Audience], cancellationToken);
+        return ValidateTokenAsync(rawToken, Audiences, cancellationToken);
     }
 
     // The source's keys, issuer and lifetime rules with the given audiences (null: aud is not checked); the result keeps

@@ -9,8 +9,10 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller;
 
-// Validates AuthKit user access tokens: issuer Auth:AuthKit:Issuer, JWKS Auth:AuthKit:JwksUri,
-// audience Auth:AuthKit:Audience when set. M2M tokens are AuthKitMachineTokenValidator's.
+// Validates AuthKit user access tokens: issuer Auth:AuthKit:Issuer, JWKS Auth:AuthKit:JwksUri, and one of the audiences
+// Auth:AuthKit:Audiences (or the single Auth:AuthKit:Audience, AuthKitOptions.GetAudiences) when any are set. Every WorkOS
+// application of the environment has the same issuer, so the audiences keep other products' tokens out. M2M tokens are
+// AuthKitMachineTokenValidator's.
 public class AuthKitBearerTokenValidator : IBearerTokenValidator
 {
     private const string UserIdPrefix = "user_";
@@ -48,10 +50,7 @@ public class AuthKitBearerTokenValidator : IBearerTokenValidator
             throw new InvalidOperationException("Auth:AuthKit:Issuer is required for AuthKit token validation.");
         }
 
-        _source = new AuthKitTokenSource(
-            authKit.Issuer,
-            string.IsNullOrWhiteSpace(authKit.Audience) ? null : authKit.Audience,
-            keyManager);
+        _source = new AuthKitTokenSource(authKit.Issuer, authKit.GetAudiences(), keyManager);
         _normalizer = normalizer;
         _logger = logger;
 

@@ -330,8 +330,16 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
                 audiences.Add($"api://{options.ClientId.Trim()}");
                 audiences.Add(options.ClientId.Trim());
                 break;
-            case IdentityProviderKind.AuthKit when !string.IsNullOrWhiteSpace(options.AuthKit.Audience):
-                audiences.Add(options.AuthKit.Audience.Trim());
+            case IdentityProviderKind.AuthKit:
+                // Every audience the bearer check accepts, and the single Audience even while Audiences overrides it: the
+                // deployment keeps it for a rollback, and it is the audience the JWT template gives every application.
+                audiences.AddRange(options.AuthKit.GetAudiences().Select(audience => audience.Trim()));
+
+                if (!string.IsNullOrWhiteSpace(options.AuthKit.Audience))
+                {
+                    audiences.Add(options.AuthKit.Audience.Trim());
+                }
+
                 break;
             case IdentityProviderKind.Keycloak when !string.IsNullOrWhiteSpace(options.Keycloak.Audience):
                 audiences.Add(options.Keycloak.Audience.Trim());

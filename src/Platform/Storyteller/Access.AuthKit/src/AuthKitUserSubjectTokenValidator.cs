@@ -41,7 +41,7 @@ public class AuthKitUserSubjectTokenValidator : IUserSubjectTokenValidator
             validator.Source,
             .. options.Value.AdditionalIssuers.Select(issuer => new AuthKitTokenSource(
                 issuer.Issuer.Trim(),
-                audience: null,
+                audiences: null,
                 createKeyManager(issuer.JwksUri.Trim()))),
         ];
         _normalizer = normalizer;
