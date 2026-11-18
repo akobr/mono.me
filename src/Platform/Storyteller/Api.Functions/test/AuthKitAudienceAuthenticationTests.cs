@@ -130,8 +130,9 @@ public sealed class AuthKitAudienceAuthenticationTests : IDisposable
         return context;
     }
 
-    // A user token of the shared issuer and keys; org_id is the machine organization, so the machine validator of the
-    // shared issuer gets as far as its user-or-machine check.
+    // A user token of the shared issuer and keys. Another application's aud is never the client id, so the machine
+    // validator of the shared issuer refuses it at its audience check; its refusal of user_ tokens with the client id as
+    // aud is AuthKitImpersonationAuthenticationTests'.
     private string Sign(string audience, string clientId)
     {
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
@@ -143,7 +144,6 @@ public sealed class AuthKitAudienceAuthenticationTests : IDisposable
                 ["sub"] = "user_01",
                 ["sid"] = "session_01",
                 ["client_id"] = clientId,
-                ["org_id"] = MachineOrganization,
                 ["email"] = "ada@example.com",
             },
             IssuedAt = DateTime.UtcNow.AddMinutes(-1),
