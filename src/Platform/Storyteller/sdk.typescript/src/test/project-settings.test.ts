@@ -10,6 +10,8 @@ import {
   projectSettingsTypeCodes,
   typeIconNames,
   validateProjectSettings,
+  StorytellerError,
+  type ErrorResponse,
   type NormalizedProjectSettings,
   type ProjectSettings,
 } from '../index'
@@ -107,6 +109,19 @@ describe('project settings helpers', () => {
     // Trimmed at either end before the check; a zero width joiner is not a control.
     expect(validateProjectSettings({ Types: { sbt: { Label: '\u0009Company\u2029' } } }).settings?.Types.sbt?.Label).toBe('Company')
     expect(validateProjectSettings({ Types: { sbt: { Label: 'Zero\u200Dwidth' } } }).valid).toBe(true)
+  })
+
+  it('keeps the problems of a 400 InvalidSettings, whose Details are an array', () => {
+    const body: ErrorResponse = {
+      Message: 'The project settings have 1 problem; the first is $.DateFormat: no.',
+      ErrorCode: 'InvalidSettings',
+      Details: [{ Path: '$.DateFormat', Rule: 'date-format', Message: 'no.' }],
+    }
+
+    const error = StorytellerError.fromResponse(400, 'Bad Request', body)
+
+    expect(error.errorCode).toBe('InvalidSettings')
+    expect((error.body as ErrorResponse).Details).toEqual([{ Path: '$.DateFormat', Rule: 'date-format', Message: 'no.' }])
   })
 
   it('reads an object without a prototype, and refuses one that is not JSON data', () => {
