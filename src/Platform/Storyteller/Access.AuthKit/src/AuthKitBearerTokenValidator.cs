@@ -54,6 +54,15 @@ public class AuthKitBearerTokenValidator : IBearerTokenValidator
         _normalizer = normalizer;
         _logger = logger;
 
+        // The single Audience is the JWT template's, which every WorkOS application of the environment gets. Listed next to
+        // the 2S audiences it is the transition of the rollout; left there, it lets other products' tokens in.
+        if (authKit.ListsTheSingleAudience())
+        {
+            _logger.LogWarning(
+                "Auth:AuthKit:Audiences lists the single Auth:AuthKit:Audience {Audience}: a token of any WorkOS application that carries it is accepted. Remove it from the list once Multiple Applications is on.",
+                AuthKitTokenSource.Sanitize(authKit.Audience!.Trim()));
+        }
+
         if (environment.IsDevelopment())
         {
             // Process-wide. Production leaves the default (false) so token details stay out of logs.

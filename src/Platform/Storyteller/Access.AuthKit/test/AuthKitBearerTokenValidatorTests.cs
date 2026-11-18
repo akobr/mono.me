@@ -101,6 +101,36 @@ public class AuthKitBearerTokenValidatorTests
         (result is not null).ShouldBe(accepted);
     }
 
+    // The single value still in the list is the rollout's transition; left there, other products' tokens pass. One warning
+    // at the start, compared as aud is (ordinally, ignoring a trailing '/'); none otherwise.
+    [Theory]
+    [InlineData("https://2s.42for.net", new[] { "client_2s", "https://2s.42for.net" }, true)]
+    [InlineData(" https://2s.42for.net/ ", new[] { "client_2s", "https://2s.42for.net" }, true)]
+    [InlineData("https://2s.42for.net", new[] { "client_2s", "https://2s.42for.net/" }, true)]
+    [InlineData("https://2s.42for.net", new[] { "client_2s", "https://2S.42for.net" }, false)]
+    [InlineData("https://2s.42for.net", new[] { "client_2s" }, false)]
+    [InlineData("https://2s.42for.net", new string[0], false)]
+    [InlineData(null, new[] { "https://2s.42for.net" }, false)]
+    public void Constructor_ListThatHoldsTheSingleAudience_LogsAWarning(string? audience, string[] audiences, bool warned)
+    {
+        using var fixture = new TokenFixture(configure: authKit =>
+        {
+            authKit.Audience = audience;
+            authKit.Audiences = audiences;
+        });
+
+        if (!warned)
+        {
+            fixture.Logger.Entries.ShouldBeEmpty();
+            return;
+        }
+
+        var entry = fixture.Logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        LoggedValue(entry, "Audience").ShouldBe(audience!.Trim());
+        entry.Message.ShouldContain("Auth:AuthKit:Audiences lists the single Auth:AuthKit:Audience");
+    }
+
     // IdentityModel's rule: one listed member of an aud array suffices; none, or an empty array, fails.
     [Theory]
     [InlineData("""["client_2s"]""", true)]

@@ -45,21 +45,35 @@ public class AuthKitOptions
     public string ApiKeyScheme { get; set; } = "WorkOS";
 
     // The audiences a user token must carry one of: the non-blank Audiences, trimmed and distinct, when there are any;
-    // otherwise a non-blank Audience as configured; otherwise none, and the audience is not checked.
+    // otherwise a non-blank Audience, trimmed; otherwise none, and the audience is not checked.
     public IReadOnlyList<string> GetAudiences()
     {
-        var audiences = Audiences
-            .Where(audience => !string.IsNullOrWhiteSpace(audience))
-            .Select(audience => audience.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var audiences = GetListedAudiences();
 
         if (audiences.Length > 0)
         {
             return audiences;
         }
 
-        return string.IsNullOrWhiteSpace(Audience) ? [] : [Audience];
+        return string.IsNullOrWhiteSpace(Audience) ? [] : [Audience.Trim()];
+    }
+
+    // True when Audiences overrides a non-blank Audience and still lists it, compared as the token handler compares aud:
+    // ordinally, ignoring a trailing '/'.
+    public bool ListsTheSingleAudience()
+    {
+        if (string.IsNullOrWhiteSpace(Audience))
+        {
+            return false;
+        }
+
+        var single = TrimSlash(Audience.Trim());
+        return GetListedAudiences().Any(audience => string.Equals(TrimSlash(audience), single, StringComparison.Ordinal));
+
+        static string TrimSlash(string value)
+        {
+            return value.EndsWith('/') ? value[..^1] : value;
+        }
     }
 
     public string GetJwksUri()
@@ -79,5 +93,14 @@ public class AuthKitOptions
     public string GetMachineJwksUri()
     {
         return $"{AuthKitDomain.TrimEnd('/')}/oauth2/jwks";
+    }
+
+    private string[] GetListedAudiences()
+    {
+        return Audiences
+            .Where(audience => !string.IsNullOrWhiteSpace(audience))
+            .Select(audience => audience.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 }
