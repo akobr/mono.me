@@ -148,8 +148,21 @@ public class ProjectSettingsCommandTests
         var exitCode = await Command(format: "json", export: ExportPath).OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        JObject.Parse(_fixture.Console.OutputText)["Version"]!.Value<long>().ShouldBe(3);
+        _fixture.Console.OutputText.ShouldBeEmpty();
         _fixture.Console.ErrorText.ShouldContain("is a folder");
+    }
+
+    [Fact]
+    public async Task JsonExport_IntoAMissingFolder_IsRefused_BeforeTheJson()
+    {
+        _fixture.Console.UseInnerConsole(redirectedInput: false);
+        _fixture.SetupRead(ProjectSettingsFixture.Changed());
+
+        var exitCode = await Command(format: "json", export: "/missing/settings.json").OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _fixture.Console.OutputText.ShouldBeEmpty();
+        _fixture.Console.ErrorText.ShouldContain("does not exist");
     }
 
     [Fact]

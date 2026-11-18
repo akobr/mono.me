@@ -115,7 +115,7 @@ public class ProjectSettingsEditCommand : BaseContextCommand
             // The editor failed on a re-open of a refused draft: the draft is kept as well, and the crash is the outcome.
             if (refused is not null && result.ExitCode == ExitCodes.ERROR_CRASH)
             {
-                KeepEdit(projectKey, refused, "Fix it, then save it with");
+                KeepEdit(projectKey, refused, "It is the last draft the rules checked; what the failed editor held after it was not read. Fix it, then save it with");
                 return ExitCodes.ERROR_CRASH;
             }
 
