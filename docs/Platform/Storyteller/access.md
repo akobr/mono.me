@@ -133,7 +133,7 @@ The allowed values are the **catalog of project settings**, `src/Platform/Storyt
 - A malformed `If-Match` (not `*` or a list of tags, `*` together with tags, or an empty value) answers `400 InvalidPrecondition`, and so does an `If-None-Match` on a write ("The project settings always exist; a write takes If-Match.").
 - Without `If-Match`, the last write wins.
 
-**PUT** replaces the settings: a type left out goes back to its built-in appearance, a missing `DefaultTimeZone` or `DateFormat` to its default. A body that is empty, not JSON, or holds a member twice answers `400 InvalidSettings` with one problem at `$`.
+**PUT** replaces the settings: a type left out goes back to its built-in appearance, a missing `DefaultTimeZone` or `DateFormat` to its default. A body that is empty, not JSON, or holds a member twice answers `400 InvalidSettings` with one problem at `$`. A body sent as `application/merge-patch+json` or `application/json-patch+json` answers `415 InvalidContentType`, because a partial body would reset every type it leaves out (send a merge patch with PATCH).
 
 **PATCH** merges a JSON Merge Patch (RFC 7396) into the stored settings and checks the result as PUT does:
 
@@ -392,7 +392,7 @@ The account id comes from the caller's token under the deployment's provider: th
 
 ## Error codes
 
-All errors use `ErrorResponse` without exception details, and the errors below carry a stable `ErrorCode`. See also [401 and 403](authentication.md#401-and-403).
+All errors use `ErrorResponse` without exception details, and the errors below carry a stable `ErrorCode`. `Details`, when an error has them, is any JSON value: an object (such as `Details.Version` of `SettingsPreconditionFailed`) or an array (the problems of `InvalidSettings`). See also [401 and 403](authentication.md#401-and-403).
 
 A route that takes a JSON body does not require a `Content-Type`, and answers `400` for an empty body, `null` or JSON that does not fit the documented type, unless it documents a default for a missing body. On the routes of this page, these `400`s name the problem in `Message` and have no `ErrorCode`, except those of the [project settings](#project-settings), which carry `InvalidSettings` (`PatchInvalid` for a merge patch). Each such route reads a limited number of bytes of its body, and answers `413` with `ErrorCode` `BodyTooLarge` for a larger body or a larger declared `Content-Length`, before it parses any JSON.
 
@@ -418,4 +418,4 @@ The `404` of the two [exhibition](#exhibition) routes has no body, and so no `Er
 | `412` | `SettingsPreconditionFailed` | The `If-Match` of a settings write names another version; `Details.Version` is the current one. |
 | `503` | `AccessAuditUnavailable` | The identity provider replaced the client secret of a machine, but the [access audit](access-audit.md) record of the reset could not be stored; the new secret is withheld, reset the machine again. |
 | `413` | `BodyTooLarge` | The body is larger than its route reads: 64 KiB for a view, 16 KiB for the project settings, 8 KiB for an account, a new project, a project update, a member role or an invitation. |
-| `415` | `InvalidContentType` | A `PATCH` of the project settings that is neither `application/merge-patch+json` nor `application/json`; `Accept-Patch` names the patch format. |
+| `415` | `InvalidContentType` | A `PATCH` of the project settings that is neither `application/merge-patch+json` nor `application/json`; `Accept-Patch` names the patch format. A `PUT` of the project settings with `application/merge-patch+json` or `application/json-patch+json`. |

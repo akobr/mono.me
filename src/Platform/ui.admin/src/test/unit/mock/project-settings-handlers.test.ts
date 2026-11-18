@@ -209,6 +209,15 @@ describe('mock project settings: PUT', () => {
     expect(broken.body).toMatchObject({ ErrorCode: 'InvalidSettings', Details: [{ Path: '$', Rule: 'type' }] })
   })
 
+  it('answers 415 for a patch media type, which would reset every type the body leaves out', async () => {
+    for (const type of ['application/merge-patch+json', 'application/json-patch+json; charset=utf-8']) {
+      const answer = await put(company, { 'Content-Type': type })
+      expect(answer.status, type).toBe(415)
+      expect(answer.body).toMatchObject({ ErrorCode: 'InvalidContentType' })
+    }
+    expect(loadDb().accessPoints['acme.billing']?.Settings).toBeUndefined()
+  })
+
   it('needs the Administrator role', async () => {
     expect((await put(company, {}, 'acme/shipping')).status).toBe(403)
     expect((await put(company, {}, 'northwind/portal')).status).toBe(403)
