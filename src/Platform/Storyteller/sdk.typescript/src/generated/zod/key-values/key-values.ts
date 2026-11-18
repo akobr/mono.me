@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.50.58415
+ * OpenAPI spec version: 0.10.55.3770
  */
 import * as zod from "zod";
 
@@ -1518,7 +1518,7 @@ export const ImportKeyValuesResponse = zod.object({
 });
 
 /**
- * The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy or the keys, and the aggregated binding reads. Never a value. Administrator only.
+ * The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy, the keys or the project settings, and the aggregated binding reads. Never a value. Administrator only.
  */
 export const GetKeyValueAuditParams = zod.object({
   organization: zod.string().describe("Target organization name."),
@@ -1532,7 +1532,7 @@ export const GetKeyValueAuditQueryParams = zod.object({
     .string()
     .optional()
     .describe(
-      "Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved).",
+      "Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved, ProjectSettingsChange).",
     ),
   from: zod.iso
     .datetime({ offset: true })
@@ -1592,6 +1592,7 @@ export const GetKeyValueAuditResponse = zod.object({
             "RecipientAdded",
             "RecipientChanged",
             "RecipientRemoved",
+            "ProjectSettingsChange",
           ])
           .default(getKeyValueAuditResponseItemsItemOperationDefault),
         Actor: zod
