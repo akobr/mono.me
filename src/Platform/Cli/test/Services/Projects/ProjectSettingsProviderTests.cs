@@ -114,6 +114,66 @@ public class ProjectSettingsProviderTests
         ReadCache().Find(BaseUrl, ProjectKey)!.FetchedAt.ShouldBe(_time.Now);
     }
 
+    // Offline after a read: the cached settings stay on screen, and the failure is remembered for a minute.
+    [Fact]
+    public async Task AFailedRevalidation_KeepsTheCachedSettings_AndWaitsAMinuteBeforeAskingAgain()
+    {
+        SetupRead(null, Ok(Settings(3)));
+        await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken);
+        _time.Now += TimeSpan.FromMinutes(11);
+        _api.Setup(api => api.GetProjectSettingsConditionalAsync(Organization, Project, "\"3\"", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("No such host is known."));
+
+        var display = await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken);
+
+        display.LabelOf("sbt").ShouldBe("Company");
+        var entry = ReadCache().Find(BaseUrl, ProjectKey).ShouldNotBeNull();
+        entry.FailedAt.ShouldBe(_time.Now);
+        entry.ETag.ShouldBe("\"3\"");
+
+        _api.Invocations.Clear();
+        _time.Now += TimeSpan.FromSeconds(50);
+        (await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken)).LabelOf("sbt").ShouldBe("Company");
+        _api.Invocations.ShouldBeEmpty();
+
+        _time.Now += TimeSpan.FromSeconds(20);
+        var reads = SetupRead("\"3\"", NotModified(3));
+        (await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken)).LabelOf("sbt").ShouldBe("Company");
+        reads.ShouldBe(["\"3\""]);
+        ReadCache().Find(BaseUrl, ProjectKey)!.FailedAt.ShouldBeNull();
+    }
+
+    // A refusal (here a lost access) shows the built-in names, not what was cached before.
+    [Fact]
+    public async Task ARefusedRevalidation_ShowsTheBuiltInDisplay()
+    {
+        SetupRead(null, Ok(Settings(3)));
+        await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken);
+        _time.Now += TimeSpan.FromMinutes(11);
+        _api.Setup(api => api.GetProjectSettingsConditionalAsync(Organization, Project, "\"3\"", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(AnnotationCommandFixture.Error(403));
+
+        var display = await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken);
+
+        display.ShouldBeSameAs(ProjectDisplay.BuiltIn);
+        ReadCache().Find(BaseUrl, ProjectKey)!.HasSettings.ShouldBeFalse();
+    }
+
+    // Without a cache, a failure is remembered too: the next command within a minute makes no request.
+    [Fact]
+    public async Task AFailedFirstRead_IsNotRepeatedWithinAMinute()
+    {
+        _api.Setup(api => api.GetProjectSettingsConditionalAsync(Organization, Project, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout."));
+        (await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken)).ShouldBeSameAs(ProjectDisplay.BuiltIn);
+        _api.Invocations.Clear();
+        _time.Now += TimeSpan.FromSeconds(30);
+
+        (await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken)).ShouldBeSameAs(ProjectDisplay.BuiltIn);
+
+        _api.Invocations.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task AnOldCache_IsReplaced_ByNewSettings()
     {
@@ -215,7 +275,8 @@ public class ProjectSettingsProviderTests
         _logger.Entries.ShouldContain(entry => entry.Level == LogLevel.Debug);
     }
 
-    // Offline, signed out, a machine without a read scope, an older API: the built-in names and one debug line.
+    // Offline, signed out, a machine without a read scope, an older API: the built-in names and one debug line; the
+    // failure is remembered without settings.
     [Theory]
     [MemberData(nameof(Failures))]
     public async Task AnyFailure_IsTheBuiltInDisplay_WithOneDebugLine(Exception failure)
@@ -226,7 +287,9 @@ public class ProjectSettingsProviderTests
 
         display.ShouldBeSameAs(ProjectDisplay.BuiltIn);
         _logger.Entries.ShouldHaveSingleItem().Level.ShouldBe(LogLevel.Debug);
-        _fileSystem.File.Exists(CachePath).ShouldBeFalse();
+        var entry = ReadCache().Find(BaseUrl, ProjectKey).ShouldNotBeNull();
+        entry.HasSettings.ShouldBeFalse();
+        entry.FailedAt.ShouldBe(_time.Now);
     }
 
     [Fact]

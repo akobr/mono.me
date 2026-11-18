@@ -20,8 +20,16 @@ internal sealed record ProjectSettingsCacheEntry
     [JsonPropertyName("fetchedAt")]
     public DateTimeOffset FetchedAt { get; init; }
 
+    // When a read failed last (offline, a timeout, a refusal); for RetryAfterFailure no request is made again.
+    [JsonPropertyName("failedAt")]
+    public DateTimeOffset? FailedAt { get; init; }
+
     [JsonPropertyName("settings")]
     public ProjectSettingsCacheValues Settings { get; init; } = new();
+
+    // Whether the API answered settings once: an entry may record a failed read only.
+    [JsonIgnore]
+    public bool HasSettings => ETag is not null;
 
     public bool Matches(string baseUrl, string project)
     {

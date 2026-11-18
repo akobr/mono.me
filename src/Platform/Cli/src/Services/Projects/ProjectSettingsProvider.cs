@@ -19,7 +19,8 @@ namespace _42.Platform.Cli.Services.Projects;
 // Loads the settings of the context project for the console output (spec section 7.3) and keeps them in
 // project-settings.cache.json of the state directory, per API and project, with their ETag and when they were read.
 // Within FreshFor of a read the cache is used without a request; after that GET …/settings asks with If-None-Match, and
-// a 304 keeps it. sform project settings set, edit and reset write their answer into it (IProjectSettingsCache).
+// a 304 keeps it. sform project settings set, edit and reset write their answer into it (IProjectSettingsCache). A failed
+// read keeps showing what was read before (a refusal shows nothing of it) and is remembered for RetryAfterFailure.
 // Without a console, with the output redirected to a file or a pipe (also from a terminal), with --builtin,
 // SFORM_PROJECT_SETTINGS=builtin or output.projectSettings=builtin, no request is made. Any failure (offline, 401, a 403
 // of a machine without a read scope, a 404 of an older API, a broken cache file) gives the built-in display and one
@@ -29,8 +30,11 @@ public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProject
     // How long a read is used without asking the API again.
     public static readonly TimeSpan FreshFor = TimeSpan.FromMinutes(10);
 
-    // How long the console output waits for the settings before it shows the built-in names.
-    public static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(5);
+    // How long the console output waits for the settings before it shows the cached or the built-in names.
+    public static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(2);
+
+    // How long after a failed read no request is made again, so a bad network costs one wait, not one per command.
+    public static readonly TimeSpan RetryAfterFailure = TimeSpan.FromMinutes(1);
 
     private static readonly JsonSerializerOptions CacheJson = new() { WriteIndented = true };
 
@@ -124,19 +128,46 @@ public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProject
             var entry = cache.Find(_baseUrl, project);
             var now = _timeProvider.GetUtcNow();
 
-            if (entry is null || entry.FetchedAt > now || now - entry.FetchedAt >= FreshFor)
+            if (entry?.FailedAt is { } failedAt && failedAt <= now && now - failedAt < RetryAfterFailure)
             {
-                entry = await FetchAsync(project, entry, now, cancellationToken);
-                TryWriteCache(cache.With(entry));
+                return StaleOrBuiltIn(entry);
             }
 
-            return Display(entry.Settings);
+            if (entry is { HasSettings: true, FailedAt: null } && entry.FetchedAt <= now && now - entry.FetchedAt < FreshFor)
+            {
+                return Display(entry.Settings);
+            }
+
+            try
+            {
+                var fetched = await FetchAsync(project, entry is { HasSettings: true } ? entry : null, now, cancellationToken);
+                TryWriteCache(cache.With(fetched));
+                return Display(fetched.Settings);
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogDebug(exception, "The project settings of {Project} could not be read; the console output shows the cached or the built-in names and dates", project);
+
+                // A refusal (signed out, no read scope, no such project, an older API) shows nothing of what was cached.
+                var refused = exception is ApiException { StatusCode: 401 or 403 or 404 };
+                var failed = (refused || entry is null
+                    ? new ProjectSettingsCacheEntry { BaseUrl = _baseUrl, Project = project }
+                    : entry) with { FailedAt = now };
+                TryWriteCache(cache.With(failed));
+                return StaleOrBuiltIn(failed);
+            }
         }
         catch (Exception exception)
         {
             _logger.LogDebug(exception, "The project settings of {Project} could not be read; the console output shows the built-in names and dates", project);
             return ProjectDisplay.BuiltIn;
         }
+    }
+
+    // The settings read before a failure, else the built-in display.
+    private ProjectDisplay StaleOrBuiltIn(ProjectSettingsCacheEntry entry)
+    {
+        return entry.HasSettings ? Display(entry.Settings) : ProjectDisplay.BuiltIn;
     }
 
     // The settings of the API: the cached ones again on a 304 of their ETag.
@@ -149,7 +180,7 @@ public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProject
 
         if (response.IsNotModified && cached is not null)
         {
-            return cached with { FetchedAt = now };
+            return cached with { FetchedAt = now, FailedAt = null };
         }
 
         return Entry(project, response.Result ?? throw new InvalidOperationException("The API answered no project settings."), response.ETag);
