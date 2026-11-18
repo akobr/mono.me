@@ -112,7 +112,7 @@ npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 npm run prepare:local  # npm ci and npm run build, each only when its inputs changed (--force: always)
 ```
 
-To generate from a specific document: `SPEC=../open.api.v0.10.45.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.45.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.45.6327` → `0.10.45`).
+To generate from a specific document: `SPEC=../open.api.v0.10.49.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.49.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.49.48581` → `0.10.49`).
 
 Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer) corrects the document:
 

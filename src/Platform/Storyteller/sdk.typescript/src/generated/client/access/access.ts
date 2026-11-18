@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.45.34964
+ * OpenAPI spec version: 0.10.49.48581
  */
 import type {
   AccessAuditResponse,
@@ -561,7 +561,7 @@ export const getGetAuthConfigurationUrl = () => {
 };
 
 /**
- * Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
+ * Anonymous. Tells clients which identity provider signs users in and with which public settings, whether the user token exchange is enabled, and the step-up of users (whether secrets, role changes and machine credentials need a recent sign-in, and its max age in seconds).
  */
 export const getAuthConfiguration = async (
   options?: Parameters<typeof storytellerFetch>[1],
