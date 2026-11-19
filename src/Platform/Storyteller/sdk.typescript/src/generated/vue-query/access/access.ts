@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.55.3770
+ * OpenAPI spec version: 0.10.56.10738
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -4713,7 +4713,7 @@ export const getSetProjectSettingsUrl = (
 };
 
 /**
- * Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version, Modified and Format in the body are ignored, so a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.
+ * Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version and Modified in the body are ignored, and Format is optional: when it is given, it must be 2s.project-settings.v1. So a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.
  */
 export const setProjectSettings = async (
   organization: string,
