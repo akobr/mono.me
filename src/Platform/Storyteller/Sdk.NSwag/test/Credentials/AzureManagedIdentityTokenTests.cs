@@ -207,12 +207,19 @@ public class AzureManagedIdentityTokenTests
         using var host = new TcpListener(IPAddress.Loopback, 0);
         host.Start();
         using var hold = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var serving = ServeAStalledAnswerAsync(host, hold.Token);
+        var stalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serving = ServeAStalledAnswerAsync(host, hold.Token, stalled);
         UseAppService($"http://{host.LocalEndpoint}/msi/token");
         using var credential = BindOverSockets(TimeSpan.FromMinutes(1));
-        using var caller = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
-        await Should.ThrowAsync<OperationCanceledException>(async () => await credential.GetAuthorizationAsync(null, caller.Token));
+        // Cancelled only once the body stalls, so a slow host cannot cancel before the headers arrive.
+        var request = credential.GetAuthorizationAsync(null, caller.Token).AsTask();
+        await stalled.Task.WaitAsync(TestContext.Current.CancellationToken);
+        request.IsCompleted.ShouldBeFalse();
+        await caller.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => request);
 
         await hold.CancelAsync();
         await serving;
@@ -551,8 +558,8 @@ public class AzureManagedIdentityTokenTests
     }
 
     // The head of an answer and the start of its body, then nothing more: the connection stays open until the token
-    // ends.
-    private static async Task ServeAStalledAnswerAsync(TcpListener listener, CancellationToken cancellationToken)
+    // ends. stalled: completes once the start of the body is written.
+    private static async Task ServeAStalledAnswerAsync(TcpListener listener, CancellationToken cancellationToken, TaskCompletionSource? stalled = null)
     {
         try
         {
@@ -576,6 +583,7 @@ public class AzureManagedIdentityTokenTests
             await stream.WriteAsync(
                 Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 64\r\n\r\n{\"access_token\":"),
                 cancellationToken);
+            stalled?.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
         catch (OperationCanceledException)
