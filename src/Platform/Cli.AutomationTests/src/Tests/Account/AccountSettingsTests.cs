@@ -35,11 +35,12 @@ public sealed partial class AccountSettingsTests : CliTest
     // ACC-STG-01: account settings lists every setting with its default and source in an empty home without a sign-in;
     // --path prints the file and --json the values the commands use.
     // In an empty home: sform account settings prints the header "Settings", "File <SFORM_HOME>/sform.settings.json" and a
-    // row per setting, editor.type "(ask on first use)", editor.command "(not set)", access.project house.main and
-    // access.view default, each from "default", then "Change them with sform account settings editor, set and unset.";
-    // sform account settings --path prints only the path of sform.settings.json in SFORM_HOME; sform account settings
-    // --json prints { "editor.type": null, "editor.command": null, "access.project": "house.main", "access.view":
-    // "default" }. Each ends with 0 without a sign-in, and no sform.settings.json is written.
+    // row per setting, editor.type "(ask on first use)", editor.command "(not set)", access.project house.main,
+    // access.view default, output.icons auto and output.projectSettings project, each from "default", then "Change them
+    // with sform account settings editor, set and unset."; sform account settings --path prints only the path of
+    // sform.settings.json in SFORM_HOME; sform account settings --json prints { "editor.type": null, "editor.command":
+    // null, "access.project": "house.main", "access.view": "default", "output.icons": "auto", "output.projectSettings":
+    // "project" }. Each ends with 0 without a sign-in, and no sform.settings.json is written.
     [Test]
     [TestCase(474)]
     [UserRole(Role.Any)]
@@ -56,12 +57,16 @@ public sealed partial class AccountSettingsTests : CliTest
         await AssertRowAsync(list, EditorCommand, "(not set)", Default);
         await AssertRowAsync(list, AccessProject, "house.main", Default);
         await AssertRowAsync(list, AccessView, "default", Default);
+        await AssertRowAsync(list, "output.icons", "auto", Default);
+        await AssertRowAsync(list, "output.projectSettings", "project", Default);
 
         var path = (await Sform("account", "settings", "--path")).ShouldSucceed();
         await Assert.That(path.PlainStdOut.Trim()).IsEqualTo(Home.SettingsFile);
 
         var json = (await Sform("account", "settings", "--json")).ShouldSucceed().JsonNode();
         await AssertJsonAsync(json, editorType: null, editorCommand: null, project: "house.main", view: "default");
+        await Assert.That(json["output.icons"]?.GetValue<string>()).IsEqualTo("auto");
+        await Assert.That(json["output.projectSettings"]?.GetValue<string>()).IsEqualTo("project");
 
         await Assert.That(FileSystem.File.Exists(Home.SettingsFile)).IsFalse();
         await Assert.That(Home.HasSession).IsFalse();

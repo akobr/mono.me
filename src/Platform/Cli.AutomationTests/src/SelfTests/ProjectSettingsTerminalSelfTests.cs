@@ -32,8 +32,9 @@ public sealed class ProjectSettingsTerminalSelfTests
     private static readonly Regex RowWithSymbol = new(@"pink\s+\S+\s+i-lucide-building-2", RegexOptions.CultureInvariant);
     private static readonly Regex PlainRow = new(@"sbt\s+Subject\s+Company\s+Companies\s+pink\s+i-lucide-building-2", RegexOptions.CultureInvariant);
 
-    // The tree's tag of the subject: the project's name in the terminal (with COLORTERM=truecolor in its 24-bit color, an
-    // escape code), the built-in tag in the redirected file.
+    // The tree's tag of the subject: the project's name in the terminal, the built-in tag in the redirected file, which
+    // gets no escape codes even with COLORTERM=truecolor. The runs have NO_COLOR (SformProcessEnvironment), so the colors
+    // themselves are not checked here; ProjectSettingsProviderTests checks how the terminal decides them.
     [Test]
     public async Task StoryTree_InATerminal_ShowsTheProjectsName_ItsRedirectedOutputTheBuiltInTag()
     {
@@ -115,7 +116,7 @@ public sealed class ProjectSettingsTerminalSelfTests
     }
 
     // A run in the pseudo terminal as the machine of the stub, with its standard output in the file when one is given, and
-    // with COLORTERM=truecolor, under which a terminal gets 24-bit escape codes (a redirected output never).
+    // with COLORTERM=truecolor, under which a terminal without NO_COLOR gets 24-bit escape codes (a redirected output never).
     private static SformRunOptions Options(StubApi api, SelfTestSandbox sandbox, string? file = null, string? icons = null)
     {
         var options = new SformRunOptions

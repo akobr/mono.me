@@ -147,7 +147,12 @@ public sealed partial class ProjectSettingsTests : CliTest
             rows => rows.Count >= 4,
             AuditWait);
         await Assert.That(events.Select(row => row.Operation).Distinct().ToArray()).IsEquivalentTo(new[] { "ProjectSettingsChange" });
-        await Assert.That(events.Count).IsEqualTo(4);
+
+        // one event per saved version, whatever the order of the rows: the detail starts with "v<old>→v<new>:"
+        var transitions = events
+            .Select(row => VersionChange().Match(row.Line) is { Success: true } match ? $"{match.Groups[1].Value}-{match.Groups[2].Value}" : row.Line)
+            .ToArray();
+        await Assert.That(transitions).IsEquivalentTo(new[] { "0-1", "1-2", "2-3", "3-4" });
     }
 
     // ACC-PRS-03: project settings -e exports the settings in the file shape, and set -i merges a settings file into them
@@ -229,9 +234,10 @@ public sealed partial class ProjectSettingsTests : CliTest
     // Version); the editor sets exe (Job, emerald) and d mmm yyyy, Yes saves version 1. An edit that leaves the file prints
     // "No changes detected." (42). An edit to the color chartreuse prints the problem, No to the re-open question keeps the
     // edit ("Your edit is in <file>. Fix it, then save it with: sform project settings set -p <org>.<project> -i "<file>"
-    // --replace", 2). An edit to dd/mm/yyyy, answered after a second user, an Administrator of the project, saved mm/dd/yyyy
-    // (version 2), ends with "The project settings changed meanwhile; they are at version 2." and keeps the edit ("To save
-    // it anyway: …", 2); set -i <file> --replace saves it as version 3.
+    // --replace --expected-version 1", 2). An edit to dd/mm/yyyy, answered after a second user, an Administrator of the
+    // project, saved mm/dd/yyyy (version 2), ends with "The project settings changed meanwhile; they are at version 2." and
+    // keeps the edit with the advice to merge it into the current settings ("It started from an older version: …", 2);
+    // set -i <file> --replace --expected-version 2 saves it as version 3.
     [Test]
     [TestCase(502)]
     [UserRole(Role.Owner)]
@@ -281,7 +287,7 @@ public sealed partial class ProjectSettingsTests : CliTest
             await terminal.SendLineAsync("n");
             await terminal.ExpectAsync("Your edit is in");
             await terminal.ExpectAsync($"Fix it, then save it with: sform project settings set -p {project} -i");
-            await terminal.ExpectAsync("--replace");
+            await terminal.ExpectAsync("--replace --expected-version 1");
             (await terminal.WaitForExitAsync()).ShouldExitWith(CliExit.WrongInput);
         }
 
@@ -302,14 +308,15 @@ public sealed partial class ProjectSettingsTests : CliTest
             await terminal.SendLineAsync("y");
             await terminal.ExpectAsync(ProjectSettingsOutput.ChangedMeanwhile(2));
             await terminal.ExpectAsync("Your edit is in");
-            await terminal.ExpectAsync($"To save it anyway: sform project settings set -p {project} -i");
-            await terminal.ExpectAsync("--replace");
+            await terminal.ExpectAsync("It started from an older version: read the current settings with");
+            await terminal.ExpectAsync("--replace --expected-version <the version it shows>.");
             (await terminal.WaitForExitAsync()).ShouldExitWith(CliExit.WrongInput);
         }
 
+        // the kept edit differs from version 2 only in the date format, so the merge keeps it as it is
         var kept = KeptEdit(staleFolder, project);
         await Assert.That(ProjectSettingsOutput.Value(JsonNode.Parse(await FileSystem.File.ReadAllTextAsync(kept))!, "DateFormat")).IsEqualTo("dd/mm/yyyy");
-        (await Sform(ProjectSettings("set", "-i", kept, "--replace"))).ShouldSucceed().ShouldContain(ProjectSettingsOutput.Saved(3));
+        (await Sform(ProjectSettings("set", "-i", kept, "--replace", "--expected-version", "2"))).ShouldSucceed().ShouldContain(ProjectSettingsOutput.Saved(3));
         var final = await ReadSettingsAsync();
         await Assert.That(ProjectSettingsOutput.Value(final, "DateFormat")).IsEqualTo("dd/mm/yyyy");
         await Assert.That(ProjectSettingsOutput.TypeValue(final, "exe", "Label")).IsEqualTo("Job");
@@ -839,6 +846,10 @@ public sealed partial class ProjectSettingsTests : CliTest
     private static partial Regex Columns();
 
     // "Modified: <yyyy-MM-dd HH:mm> by <actor>" of the table (the built-in date: its output is redirected).
+    // "v<old>→v<new>:" of the detail of a ProjectSettingsChange; the arrow may come out as another character in a code page.
+    [GeneratedRegex(@"v(\d+)\S{1,3}v(\d+):")]
+    private static partial Regex VersionChange();
+
     [GeneratedRegex(@"(?m)^\s*Modified: \d{4}-\d{2}-\d{2} \d{2}:\d{2} by \S")]
     private static partial Regex ModifiedLine();
 

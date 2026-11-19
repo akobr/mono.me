@@ -284,6 +284,11 @@ public class ProjectSettingsSetCommand : BaseContextCommand
         {
             type[PluralMember] = ValueOf(Plural);
         }
+        else if (Label is not null && type[LabelMember] is null)
+        {
+            // A plural needs its name: removing the name removes a stored plural too.
+            type[PluralMember] = null;
+        }
 
         if (Color is not null)
         {

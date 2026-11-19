@@ -376,6 +376,50 @@ public class ProjectSettingsProviderTests
         _logger.Entries.ShouldHaveSingleItem().Level.ShouldBe(LogLevel.Debug);
     }
 
+    // A set of another run during the read: its newer entry stays in the cache and is shown, not the older answer.
+    [Fact]
+    public async Task ANewerEntryWrittenDuringTheRead_IsKept_AndShown()
+    {
+        var newer = Settings(5);
+        newer.Types["sbt"].Label = "Client";
+        _api.Setup(api => api.GetProjectSettingsConditionalAsync(Organization, Project, null, It.IsAny<CancellationToken>()))
+            .Callback(() => CreateProvider().RememberAsync(Organization, Project, newer, "\"5\"").GetAwaiter().GetResult())
+            .ReturnsAsync(Ok(Settings(4)));
+
+        var display = await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken);
+
+        display.LabelOf("sbt").ShouldBe("Client");
+        ReadCache().Find(BaseUrl, ProjectKey)!.ETag.ShouldBe("\"5\"");
+    }
+
+    // A failed read while another run wrote the entry: the display follows that entry, not what this run read before.
+    [Fact]
+    public async Task AFailedRead_ShowsAnEntryWrittenMeanwhile()
+    {
+        var newer = Settings(5);
+        newer.Types["sbt"].Label = "Client";
+        _api.Setup(api => api.GetProjectSettingsConditionalAsync(Organization, Project, null, It.IsAny<CancellationToken>()))
+            .Callback(() => CreateProvider().RememberAsync(Organization, Project, newer, "\"5\"").GetAwaiter().GetResult())
+            .ThrowsAsync(new HttpRequestException("No such host is known."));
+
+        var display = await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken);
+
+        display.LabelOf("sbt").ShouldBe("Client");
+        ReadCache().Find(BaseUrl, ProjectKey)!.FailedAt.ShouldBeNull();
+    }
+
+    // A null entry in a hand-edited file does not hide the entries after it.
+    [Fact]
+    public async Task ANullCacheEntry_IsSkipped()
+    {
+        _fileSystem.AddFile(CachePath, new MockFileData($"{{ \"entries\": [ null, {JsonSerializer.Serialize(Entry(BaseUrl, ProjectKey))} ] }}"));
+
+        var display = await CreateProvider().GetDisplayAsync(TestContext.Current.CancellationToken);
+
+        display.LabelOf("sbt").ShouldBe("Company");
+        _api.Invocations.ShouldBeEmpty();
+    }
+
     // Older entries go once the file holds the projects read last.
     [Fact]
     public async Task TheCache_KeepsTheProjectsReadLast()

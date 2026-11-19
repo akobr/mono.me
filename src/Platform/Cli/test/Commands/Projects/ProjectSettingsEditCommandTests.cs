@@ -72,7 +72,7 @@ public class ProjectSettingsEditCommandTests
         _fixture.Lines[0].ShouldStartWith("! $.Types.sbt.Color: 'pinkish' is not a color of the catalog");
         var kept = KeptFile();
         JObject.Parse(_fixture.FileSystem.File.ReadAllText(kept))["Types"]!["sbt"]!["Color"]!.Value<string>().ShouldBe("pinkish");
-        _fixture.Lines[^1].ShouldBe($"Your edit is in {kept}. Fix it, then save it with: sform project settings set -p org1.proj1 -i \"{kept}\" --replace");
+        _fixture.Lines[^1].ShouldBe($"Your edit is in {kept}. Fix it, then save it with: sform project settings set -p org1.proj1 -i \"{kept}\" --replace --expected-version 3");
     }
 
     // The rules refuse the edit, the user re-opens it, and the editor fails: the refused draft is still kept.
@@ -85,13 +85,26 @@ public class ProjectSettingsEditCommandTests
             var edited = (JObject)original.DeepClone();
             edited["Types"]!["sbt"]!["Color"] = "pinkish";
             check!(edited).Document.ShouldBeNull();
-            return new JsonEditResult(null, ExitCodes.ERROR_CRASH);
+            return new JsonEditResult(null, ExitCodes.ERROR_CRASH, edited.ToString());
         });
 
         var exitCode = await Command().OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
         JObject.Parse(_fixture.FileSystem.File.ReadAllText(KeptFile()))["Types"]!["sbt"]!["Color"]!.Value<string>().ShouldBe("pinkish");
+    }
+
+    // An edit that is not JSON, given up: its text is kept as it was written.
+    [Fact]
+    public async Task Edit_ThatIsNotJson_KeepsItsText()
+    {
+        _fixture.SetupRead(ProjectSettingsFixture.Changed());
+        SetupEditor((_, _) => new JsonEditResult(null, ExitCodes.WARNING_ABORTED, "{ \"DateFormat\": "));
+
+        var exitCode = await Command().OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _fixture.FileSystem.File.ReadAllText(KeptFile()).ShouldBe("{ \"DateFormat\": ");
     }
 
     [Fact]
@@ -107,7 +120,7 @@ public class ProjectSettingsEditCommandTests
         var kept = KeptFile();
         _fixture.Lines.ShouldBe([
             "! The project settings changed meanwhile; they are at version 5.",
-            $"Your edit is in {kept}. To save it anyway: sform project settings set -p org1.proj1 -i \"{kept}\" --replace",
+            $"Your edit is in {kept}. It started from an older version: read the current settings with sform project settings -p org1.proj1 -e <file>, merge your changes into that file, and save it with sform project settings set -p org1.proj1 -i <file> --replace --expected-version <the version it shows>.",
         ]);
         _fixture.VerifyNothingRemembered();
     }
@@ -123,7 +136,8 @@ public class ProjectSettingsEditCommandTests
 
         exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
         _fixture.Lines[0].ShouldBe("! Changing the project settings needs a user with the Administrator role.");
-        _fixture.Lines[^1].ShouldStartWith("Your edit is in ");
+        var kept = KeptFile();
+        _fixture.Lines[^1].ShouldBe($"Your edit is in {kept}. To save it anyway: sform project settings set -p org1.proj1 -i \"{kept}\" --replace --expected-version 3");
     }
 
     [Fact]
@@ -164,7 +178,7 @@ public class ProjectSettingsEditCommandTests
 
         exitCode.ShouldBe(ExitCodes.WARNING_INTERACTION_NEEDED);
         _fixture.Console.ErrorLines[0].ShouldBe("! sform cannot ask for the edit of the project settings: the input or the output is redirected.");
-        _fixture.Console.ErrorLines[1].ShouldContain("sform project settings set -p org1.proj1 -i <file> --replace");
+        _fixture.Console.ErrorLines[1].ShouldContain("sform project settings set -p org1.proj1 -i <file> --replace --expected-version <version>");
     }
 
     // The editor gives back the opened document after the change, through the command's check, as EditorService does.
@@ -179,7 +193,7 @@ public class ProjectSettingsEditCommandTests
             if (result.Document is null)
             {
                 // the user does not re-open the editor
-                return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+                return new JsonEditResult(null, ExitCodes.WARNING_ABORTED, edited.ToString());
             }
 
             onChecked?.Invoke(result.Document);

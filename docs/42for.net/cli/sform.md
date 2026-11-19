@@ -464,7 +464,7 @@ In a console, a swatch `■` in the color stands before each color name, unless 
 | `--expected-version <n>` | Saves only while the settings are at version `n` (sent as `If-Match`); otherwise nothing is written. Without it, the change applies to the settings as they are at that moment |
 | `--dry-run` | Applies the change to the current settings by the rules of the API and shows it, without saving it |
 
-- An empty value removes the setting. `--label ""` and `--plural ""` remove the name and the plural, `--color ""` and `--icon ""` restore the built-in color and icon, and `--time-zone ""` and `--date-format ""` restore `UTC` and `yyyy-mm-dd`.
+- An empty value removes the setting. `--label ""` and `--plural ""` remove the name and the plural (a plural needs its name, so `--label ""` removes the plural too), `--color ""` and `--icon ""` restore the built-in color and icon, and `--time-zone ""` and `--date-format ""` restore `UTC` and `yyyy-mm-dd`.
 - Values match in any case and are stored as the catalog spells them: `europe/prague` is stored as `Europe/Prague`, and `DD.MM.YYYY` as `dd.mm.yyyy`.
 - After a save, the command prints the changes and "Saved the project settings, version 8.". When nothing changed, it prints "The project settings did not change; they stay at version 7.".
 - `sform` checks the `-i` file and `--dry-run` by the rules itself, before any write; the API checks every other change. A refused value is named by its path, as in `! $.Types.sbt.Color: 'chartreuse' is not a color of the catalog; use one of red, orange, …`, and nothing is saved.
@@ -485,12 +485,12 @@ sform project settings reset --types -y
 
 **Edit.** `sform project settings edit` opens the settings in the file shape in your editor (see [Settings](#settings) for which editor). It checks what you saved by the same rules, shows the changes and asks before it saves them. It saves only while the settings are at the version it opened (`If-Match`). If someone changed them in the meantime, it prints "The project settings changed meanwhile; they are at version 9.".
 
-In two cases `sform` keeps your edit in a file and prints the command that saves it, `sform project settings set -p <organization>.<project> -i "<file>" --replace`:
+In these cases `sform` keeps your edit in a file:
 
-- the save fails, for example because the settings changed in the meantime or the API refused it;
-- your edit breaks a rule and you choose not to fix it in the editor.
+- your edit breaks a rule and you choose not to fix it in the editor, or the save fails, for example because the API refused it. `sform` prints the command that saves the file only while the settings are still at the version you opened: `sform project settings set -p <organization>.<project> -i "<file>" --replace --expected-version <n>`;
+- the settings changed in the meantime (`412`). Saving your edit as it is would undo the other change, so `sform` does not offer it. Read the current settings with `sform project settings -e <file>`, which prints their version, merge your changes into that file, and save it with `set -i <file> --replace --expected-version <that version>`.
 
-`edit` needs a terminal. With the input or the output redirected, it ends with `43` before the editor opens. Instead, export the settings with `-e`, change the file, and save it with `set -i <file> --replace`.
+`edit` needs a terminal. With the input or the output redirected, it ends with `43` before the editor opens. Instead, export the settings with `-e`, which prints their version, change the file, and save it with `set -i <file> --replace --expected-version <that version>`.
 
 **Reset.** `sform project settings reset` resets the settings to the defaults: the built-in names, colors and icons, `UTC`, and `yyyy-mm-dd`. `--types`, `--time-zone` and `--date-format` reset only those parts.
 
@@ -578,7 +578,7 @@ sform account settings set output.icons always
 A command that shows a type or a date reads the settings of the context's project once, after its own call of the API (`GET v1/{organization}/{project}/settings`). It keeps them in `project-settings.cache.json` next to `sform`, or in `SFORM_HOME` when that is set (see [Where sform keeps its files](#where-sform-keeps-its-files)). The cache has an entry per API address and project, with the settings' ETag.
 
 - For 10 minutes after a read, commands use the cache without a request. After that they ask again with `If-None-Match`, and an unchanged answer (`304`) keeps the cache.
-- `set`, `edit` and `reset` write their answer into the cache, so your own changes show at once, and a change by someone else shows within 10 minutes. Delete the file to read the settings on the next command.
+- `set`, `edit` and `reset` write their answer into the cache, so your own changes show at once. A change by someone else shows after the next read that succeeds: within 10 minutes, or later when a read fails (see below). Delete the file to read the settings on the next command.
 - If the read fails, the command shows the settings it read before, or the built-in names and dates when it has none; it prints no message and writes one debug line to the log. Failures include no answer within 2 seconds and an API that cannot be reached; a broken cache file counts as no cache, so the settings are read from the API. A refusal (`401`, or `403` for a machine without a read scope) or an older API without the route (`404`) always shows the built-in names. For a minute after a failure, commands make no request and show the same. A command never fails, and never changes its exit code, because of the settings.
 - Without a console, with the output redirected to a file or a pipe, or with the settings turned off, no request is made.
 
@@ -598,7 +598,7 @@ A command that shows a type or a date reads the settings of the context's projec
 | `sform story config patch` | a confirmation of the patch | pass `-y` (`--yes`) | `43` |
 | `sform story config edit`, `template edit`, `schema type edit`, `schema annotation edit`, `schema descendant edit` | a confirmation of the changes | pass `-y` (`--yes`) | `43` |
 | `sform project settings reset` | a confirmation | pass `-y` (`--yes`) | `43` |
-| `sform project settings edit` | the edit and the confirmation of the changes; it also stops when only the output is redirected | export the settings with `sform project settings -e <file>`, change the file, and save it with `sform project settings set -i <file> --replace` | `43` |
+| `sform project settings edit` | the edit and the confirmation of the changes; it also stops when only the output is redirected | export the settings with `sform project settings -e <file>`, which prints their version, change the file, and save it with `sform project settings set -i <file> --replace --expected-version <that version>` | `43` |
 | `sform account register`, `sform account points create`, `sform assist` and `assist key` | names and choices without options | run them in a terminal | `43` |
 
 A missing value ends with `2`, as when it is missing on the command line; a confirmation, or a command that needs a terminal, with `43`. A command still checks what comes before its question and ends with that code: `sform account register` of a registered user says so and ends with `0`, `story kv import` with nothing to change and `story config patch -i` with an empty patch end with `42`, and an unknown key or a missing file with `2`; `story kv import` shows its plan before it stops. The edit commands, and `story config patch` without `-i`, stop before the editor opens, so no edit is lost to a question nobody can answer. An edit command without a configured editor (and without `$VISUAL` or `$EDITOR`) stops with `43` too and names `sform account settings editor` to set one. `-e` of a `get` command rewrites an existing file without asking. Standard input is read only where an option asks for it (`--stdin`, `--password-stdin`).

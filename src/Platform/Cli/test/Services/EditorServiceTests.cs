@@ -159,6 +159,28 @@ public class EditorServiceTests
         _console.Lines.ShouldContain(line => line.Contains("Invalid JSON", StringComparison.Ordinal));
     }
 
+    // Given up after a refused edit: the text of the last one comes back, as the temporary file is deleted.
+    [Fact]
+    public async Task ARefusedEdit_GivenUp_GivesBackTheLastText()
+    {
+        var editor = Editor("""{ "a": 2, "bad": true }""", "{ \"a\": ");
+        _answers.Enqueue(true);
+        _answers.Enqueue(false);
+
+        var result = await editor.EditJsonAsync(
+            _console.Object,
+            ScriptedEditor.Vim,
+            new JObject { ["a"] = 1 },
+            "config-x",
+            false,
+            check: document => document.ContainsKey("bad") ? JsonEditCheck.Invalid("bad") : JsonEditCheck.Valid(document));
+
+        result.Edited.ShouldBeNull();
+        result.ExitCode.ShouldBe(ExitCodes.WARNING_ABORTED);
+        result.Rejected.ShouldBe("{ \"a\": ");
+        _fileSystem.FileExists(editor.Paths[0]).ShouldBeFalse();
+    }
+
     [Fact]
     public void Comments_InsideAndAfterTheObject_AreAccepted()
     {
