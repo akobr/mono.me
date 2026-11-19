@@ -124,7 +124,7 @@ The configuration itself is edited on its own page (see Configuration). The head
 
 The breadcrumb and **Lineage** show its ancestors in merge order.
 
-**New** creates an annotation from its type and names. Its time zone (the zone of **Valid from** and **Expires**) starts as the project's default time zone from **Settings**, the same for everyone in the project, and the dialog lets you pick another one. Missing ancestors created with it get the same zone. **New** and **Bulk create** are on **Graph** too.
+**New** creates an annotation from its type and names. Its time zone (the zone of **Valid from** and **Expires**) starts as the project's default time zone from **Settings**, the same for everyone in the project when their browser knows that zone (a browser that does not starts in `UTC`), and the dialog lets you pick another one. Missing ancestors created with it get the same zone. **New** and **Bulk create** are on **Graph** too.
 
 **Bulk create** creates many annotations from a list of keys, typed or pasted, one per line. A line that starts with a type code is that key (`rst.invoicing`). A line without a code is a [compact line](using-the-platform#writing-the-catalog), read by its number of parts: `northwind` is a subject, `northwind.invoicing` a usage, `northwind.invoicing.production` an execution, and four parts a unit of execution. Responsibilities, contexts and units need their code.
 
@@ -322,7 +322,7 @@ After **Create**, a federated machine shows its setup instead of credentials: th
 
 - The cards **Annotations**, **Dates** and **Annotation types** edit one draft. **Save project settings** below them stores it for everyone and confirms with "Project settings saved". Until then the rest of the UI keeps the saved settings, and only the previews of the type editor show your changes. Leaving the page with unsaved changes asks first.
 - **Use the default** sets the time zone back to `UTC` or the date format back to `yyyy-mm-dd`, and **Reset to built-in** gives every type its built-in name, color and icon again. They change the draft too, so **Save project settings** stores them.
-- If someone saved the project settings after you opened them, Save stores nothing and says so. Your changes stay: **Load the new settings** replaces them with the saved ones, or a second Save stores yours over them. When the API refuses the settings, the page lists what is wrong, and your changes stay too.
+- If someone saved the project settings after you opened them, Save stores nothing and says so. Your changes stay: **Load the new settings** replaces them with the saved ones, or a second Save stores yours over them. When the saved settings cannot be read, the page offers **Read them again** first. When the API refuses the settings, the page lists what is wrong, and your changes stay too.
 - Contributors and Readers see the settings read-only, with an **Administrator** lock on each of the three cards.
 
 Before the API stored them, these settings were kept in each browser. A browser that still has such settings for a project whose settings were never saved shows **Project settings of this browser** on Settings, with what they change. Administrators **Save for the project**, which stores them for everyone only while the project still has no saved settings, or **Discard** them; everyone else is asked to have an Administrator save them. Once the project has saved settings, a browser forgets its old ones for the project when it opens it. Your own Preferences on the account page stay in your browser, as before.

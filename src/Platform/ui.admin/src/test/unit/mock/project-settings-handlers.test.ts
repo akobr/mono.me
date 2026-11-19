@@ -100,6 +100,11 @@ describe('mock project settings: reads', () => {
     })
     expect((await call('GET', 'access/points/acme.billing')).body).toMatchObject({ Settings: { Version: 1 } })
     expect((await call('GET', 'access/points/acme')).body).not.toHaveProperty('Settings')
+
+    // the list of the access points an Administrator manages: a project with its settings, an organization without
+    const points = (await call('GET', 'access/points')).body as unknown as { Key: string; Settings?: unknown }[]
+    expect(points.find((point) => point.Key === 'acme.billing')?.Settings).toMatchObject({ Version: 1 })
+    expect(points.find((point) => point.Key === 'acme')).not.toHaveProperty('Settings')
   })
 })
 
