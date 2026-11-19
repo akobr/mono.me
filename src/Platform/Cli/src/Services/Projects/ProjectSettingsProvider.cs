@@ -120,6 +120,12 @@ public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProject
         return Task.CompletedTask;
     }
 
+    // Whether the cache entry is still the one this run read at its start.
+    private static bool IsSame(ProjectSettingsCacheEntry? current, ProjectSettingsCacheEntry? read)
+    {
+        return current?.ETag == read?.ETag && current?.FetchedAt == read?.FetchedAt && current?.FailedAt == read?.FailedAt;
+    }
+
     private async Task<ProjectDisplay> LoadAsync(string project, CancellationToken cancellationToken)
     {
         try
@@ -141,7 +147,17 @@ public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProject
             try
             {
                 var fetched = await FetchAsync(project, entry is { HasSettings: true } ? entry : null, now, cancellationToken);
-                TryWriteCache(cache.With(fetched));
+
+                // Another run may have written the cache meanwhile: its other entries stay, and a newer entry of this
+                // project (a set, an edit, a reset) is kept and shown.
+                var latest = ReadCache();
+                if (latest.Find(_baseUrl, project) is { HasSettings: true } stored && !IsSame(stored, entry)
+                    && stored.Settings.Version > fetched.Settings.Version)
+                {
+                    return Display(stored.Settings);
+                }
+
+                TryWriteCache(latest.With(fetched));
                 return Display(fetched.Settings);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
@@ -157,9 +173,13 @@ public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProject
                 // Another run (a set, an edit, a read that succeeded) may have written the entry meanwhile: keep its.
                 var latest = ReadCache();
                 var current = latest.Find(_baseUrl, project);
-                if (current?.ETag == entry?.ETag && current?.FetchedAt == entry?.FetchedAt && current?.FailedAt == entry?.FailedAt)
+                if (IsSame(current, entry))
                 {
                     TryWriteCache(latest.With(failed));
+                }
+                else if (!refused && current is { HasSettings: true })
+                {
+                    return Display(current.Settings);
                 }
 
                 return StaleOrBuiltIn(failed);

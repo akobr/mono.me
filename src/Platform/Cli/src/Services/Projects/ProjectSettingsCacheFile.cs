@@ -16,7 +16,7 @@ internal sealed record ProjectSettingsCacheFile
 
     public ProjectSettingsCacheEntry? Find(string baseUrl, string project)
     {
-        return Entries.FirstOrDefault(entry => entry.Matches(baseUrl, project));
+        return Entries.FirstOrDefault(entry => entry is not null && entry.Matches(baseUrl, project));
     }
 
     // The file with the entry in place of the one of its project, first, and at most MaxEntries.

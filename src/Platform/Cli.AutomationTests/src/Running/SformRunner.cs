@@ -101,7 +101,7 @@ public sealed class SformRunner
             environment,
             runOptions.TerminalColumns,
             runOptions.TerminalRows,
-            runOptions.StandardOutputFile is { } output ? fileSystem.Path.GetFullPath(fileSystem.Path.Combine(workingDirectory, output)) : null);
+            runOptions.StandardOutputFile is { } output ? fileSystem.Path.GetFullPath(output, fileSystem.Path.GetFullPath(workingDirectory)) : null);
 
         var number = Interlocked.Increment(ref runs);
         var timeout = runOptions.Timeout ?? options.Timeout;

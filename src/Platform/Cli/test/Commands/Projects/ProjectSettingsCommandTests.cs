@@ -165,6 +165,21 @@ public class ProjectSettingsCommandTests
         _fixture.Console.ErrorText.ShouldContain("does not exist");
     }
 
+    // A file that cannot be written fails the export before the JSON is printed.
+    [Fact]
+    public async Task JsonExport_ToAReadOnlyFile_IsRefused_BeforeTheJson()
+    {
+        _fixture.Console.UseInnerConsole(redirectedInput: false);
+        _fixture.FileSystem.AddFile(ExportPath, new MockFileData("{}") { Attributes = System.IO.FileAttributes.ReadOnly });
+        _fixture.SetupRead(ProjectSettingsFixture.Changed());
+
+        var exitCode = await Command(format: "json", export: ExportPath).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _fixture.Console.OutputText.ShouldBeEmpty();
+        _fixture.Console.ErrorText.ShouldContain("The settings were not exported:");
+    }
+
     [Fact]
     public async Task UnknownFormat_IsRefused_BeforeAnyRequest()
     {

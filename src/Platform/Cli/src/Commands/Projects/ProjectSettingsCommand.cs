@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.IO.Abstractions;
 using System.Net;
 using System.Threading.Tasks;
@@ -68,8 +69,10 @@ public class ProjectSettingsCommand : BaseContextCommand
             return isJson ? Console.WriteApiErrorLine(e) : Console.WriteApiError(e);
         }
 
-        // A JSON export that cannot be written is refused before the JSON reaches the standard output.
-        if (isJson && !string.IsNullOrWhiteSpace(ExportFilePath) && ExportProblem(ExportFilePath) is { } problem)
+        // A JSON export that cannot be written is refused before the JSON reaches the standard output: the file is
+        // written first.
+        if (isJson && !string.IsNullOrWhiteSpace(ExportFilePath)
+            && ExportForPrograms(ProjectSettingsDocuments.ToFileDocument(ProjectSettingsDocuments.ToModel(settings)), ExportFilePath) is { } problem)
         {
             Console.WriteErrorLine($"The settings were not exported: {problem}");
             return ExitCodes.ERROR_WRONG_INPUT;
@@ -78,27 +81,19 @@ public class ProjectSettingsCommand : BaseContextCommand
         if (isJson)
         {
             WriteOut(JsonConvert.SerializeObject(settings, Formatting.Indented));
+            return ExitCodes.SUCCESS;
         }
-        else
-        {
-            Console.WriteProjectSettings(
-                ProjectSettingsCommands.ProjectKeyOf(Context),
-                settings,
-                Console.ShowsTypeColors(_switches.GetVariable),
-                Console.ShowsTypeIcons(_switches));
-        }
+
+        Console.WriteProjectSettings(
+            ProjectSettingsCommands.ProjectKeyOf(Context),
+            settings,
+            Console.ShowsTypeColors(_switches.GetVariable),
+            Console.ShowsTypeIcons(_switches));
 
         if (!string.IsNullOrWhiteSpace(ExportFilePath))
         {
             var document = ProjectSettingsDocuments.ToFileDocument(ProjectSettingsDocuments.ToModel(settings));
-            if (!isJson)
-            {
-                Console.WriteJsonToFile(document, ExportFilePath, _fileSystem);
-            }
-            else
-            {
-                ExportForPrograms(document, ExportFilePath);
-            }
+            Console.WriteJsonToFile(document, ExportFilePath, _fileSystem);
         }
 
         return ExitCodes.SUCCESS;
@@ -118,16 +113,29 @@ public class ProjectSettingsCommand : BaseContextCommand
             : $"the folder '{folder}' does not exist.";
     }
 
-    // The export of the JSON mode, checked by ExportProblem first: the standard output carries the JSON only, so the file
-    // is written without a prompt and its notices are plain lines on the error output.
-    private void ExportForPrograms(object document, string filePath)
+    // The export of the JSON mode, before the JSON is printed: the standard output carries the JSON only, so the file is
+    // written without a prompt and its notices are plain lines on the error output. Gives why it could not be written.
+    private string? ExportForPrograms(object document, string filePath)
     {
-        if (_fileSystem.File.Exists(filePath))
+        if (ExportProblem(filePath) is { } problem)
         {
-            Console.WriteErrorLine($"The file '{_fileSystem.Path.GetFileName(filePath)}' already exists and is rewritten.");
+            return problem;
         }
 
-        _fileSystem.File.WriteAllText(filePath, JsonConvert.SerializeObject(document));
+        try
+        {
+            if (_fileSystem.File.Exists(filePath))
+            {
+                Console.WriteErrorLine($"The file '{_fileSystem.Path.GetFileName(filePath)}' already exists and is rewritten.");
+            }
+
+            _fileSystem.File.WriteAllText(filePath, JsonConvert.SerializeObject(document));
+            return null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return e.Message;
+        }
     }
 
     // Plain text on the standard output, for programs: in UTF-8, so every label comes out as it is.

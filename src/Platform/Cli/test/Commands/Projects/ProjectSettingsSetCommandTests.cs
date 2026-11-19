@@ -88,6 +88,22 @@ public class ProjectSettingsSetCommandTests
         ShouldBeJson(sent.ShouldHaveSingleItem().Patch, """{"Types":{"cnt":{"Icon":"i-lucide-building-2"}}}""");
     }
 
+    // A plural needs its name, so an empty --label removes the stored plural too; the color and the icon stay.
+    [Fact]
+    public async Task EmptyLabel_RemovesThePluralToo()
+    {
+        _fixture.SetupRead(ProjectSettingsFixture.Changed());
+        var sent = _fixture.SetupPatch(ProjectSettingsFixture.Changed(version: 4));
+
+        await Command(command =>
+        {
+            command.TypeName = "sbt";
+            command.Label = "";
+        }).OnExecuteAsync();
+
+        ShouldBeJson(sent.ShouldHaveSingleItem().Patch, """{"Types":{"sbt":{"Label":null,"Plural":null}}}""");
+    }
+
     [Fact]
     public async Task Clear_RemovesTheEntryOfTheType()
     {

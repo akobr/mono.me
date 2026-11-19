@@ -241,6 +241,9 @@ public class EditorService : IEditorService
             // 3. Open editor loop (allows re-editing on invalid JSON, or on a document the check rejects)
             JObject edited;
 
+            // The text of the last edit the loop refused.
+            string? rejected = null;
+
             while (true)
             {
                 int exitCode;
@@ -266,17 +269,17 @@ public class EditorService : IEditorService
                         }
 
                         console.WriteImportant("No editor command was entered, edit aborted.");
-                        return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+                        return new JsonEditResult(null, ExitCodes.WARNING_ABORTED, rejected);
                     }
 
                     console.WriteLine("Choose another one with sform account settings editor.".ThemedLowlight(console.Theme));
-                    return new JsonEditResult(null, ExitCodes.ERROR_CRASH);
+                    return new JsonEditResult(null, ExitCodes.ERROR_CRASH, rejected);
                 }
 
                 if (exitCode != 0)
                 {
                     console.WriteImportant($"Editor exited with code {exitCode}.");
-                    return new JsonEditResult(null, ExitCodes.ERROR_CRASH);
+                    return new JsonEditResult(null, ExitCodes.ERROR_CRASH, rejected);
                 }
 
                 var editedJson = _fileSystem.File.ReadAllText(tempFilePath, Encoding.UTF8);
@@ -289,12 +292,13 @@ public class EditorService : IEditorService
                 }
 
                 console.WriteImportant(problem!);
+                rejected = editedJson;
 
                 // Without a terminal there is nobody to fix it in the editor again.
                 if (!console.IsInteractive())
                 {
                     console.WriteLine("Nothing was saved.");
-                    return new JsonEditResult(null, ExitCodes.ERROR_WRONG_INPUT);
+                    return new JsonEditResult(null, ExitCodes.ERROR_WRONG_INPUT, rejected);
                 }
 
                 var shouldRetry = console.Confirm(new ConfirmOptions
@@ -306,7 +310,7 @@ public class EditorService : IEditorService
                 if (!shouldRetry)
                 {
                     console.WriteLine("Edit aborted.");
-                    return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+                    return new JsonEditResult(null, ExitCodes.WARNING_ABORTED, rejected);
                 }
             }
 

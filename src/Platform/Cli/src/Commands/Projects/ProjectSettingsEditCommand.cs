@@ -59,7 +59,8 @@ public class ProjectSettingsEditCommand : BaseContextCommand
     /// - <c>ExitCodes.ERROR_WRONG_INPUT</c> when the edited settings break a rule, or changed meanwhile (412);
     /// - <c>ExitCodes.WARNING_UNAUTHORIZED_ACCESS</c> when the API refused the change (403);
     /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
-    /// After the editor, a failure keeps the edited document in a file and names the command that saves it.
+    /// After the editor, a failure keeps the edited document in a file and names the command that saves it under the
+    /// version it was opened at; after a 412 it says to merge the edit into the current settings instead.
     /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
@@ -69,7 +70,7 @@ public class ProjectSettingsEditCommand : BaseContextCommand
         if (Console.Console is { IsInputRedirected: true } or { IsOutputRedirected: true })
         {
             Console.WriteErrorLine("! sform cannot ask for the edit of the project settings: the input or the output is redirected.");
-            Console.WriteErrorLine($"  Without a terminal: sform project settings -p {projectKey} -e <file>, edit the file, then sform project settings set -p {projectKey} -i <file> --replace.");
+            Console.WriteErrorLine($"  Without a terminal: sform project settings -p {projectKey} -e <file> (note its Version), edit the file, then sform project settings set -p {projectKey} -i <file> --replace --expected-version <version>.");
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
@@ -87,35 +88,28 @@ public class ProjectSettingsEditCommand : BaseContextCommand
 
         var original = ProjectSettingsDocuments.ToFileDocument(ProjectSettingsDocuments.ToModel(before));
 
-        // The last document the rules refused, kept when the user gives up fixing it.
-        JObject? refused = null;
-
         var result = await _editorService.EditJsonAsync(
             Console,
             _editorOptions,
             original,
             $"project-settings-{projectKey}",
             isNew: false,
-            check: document =>
-            {
-                var check = Check(document);
-                refused = check.Document is null ? document : null;
-                return check;
-            });
+            check: Check);
 
         if (result.Edited is null)
         {
-            // Given up after the rules refused the edit (no re-open, or no terminal to ask): the edit is not lost.
-            if (refused is not null && result.ExitCode is ExitCodes.WARNING_ABORTED or ExitCodes.ERROR_WRONG_INPUT)
+            // Given up after an edit that is not JSON or that the rules refused (no re-open, or no terminal to ask): the
+            // text of that edit is not lost.
+            if (result.Rejected is { } refused && result.ExitCode is ExitCodes.WARNING_ABORTED or ExitCodes.ERROR_WRONG_INPUT)
             {
-                KeepEdit(projectKey, refused, "Fix it, then save it with");
+                KeepEdit(projectKey, refused, before.Version, "Fix it, then save it with");
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
             // The editor failed on a re-open of a refused draft: the draft is kept as well, and the crash is the outcome.
-            if (refused is not null && result.ExitCode == ExitCodes.ERROR_CRASH)
+            if (result.Rejected is { } draft && result.ExitCode == ExitCodes.ERROR_CRASH)
             {
-                KeepEdit(projectKey, refused, "It is the last draft the rules checked; what the failed editor held after it was not read. Fix it, then save it with");
+                KeepEdit(projectKey, draft, before.Version, "It is the last draft that was checked; what the failed editor held after it was not read. Fix it, then save it with");
                 return ExitCodes.ERROR_CRASH;
             }
 
@@ -123,6 +117,11 @@ public class ProjectSettingsEditCommand : BaseContextCommand
         }
 
         return await SaveAsync(projectKey, before, etag, result.Edited);
+    }
+
+    private static string Text(JObject document)
+    {
+        return document.ToString(Formatting.Indented);
     }
 
     // The write of the edited settings under the version that was opened. Whatever fails keeps the edit in a file.
@@ -133,7 +132,7 @@ public class ProjectSettingsEditCommand : BaseContextCommand
         if (!check.IsValid)
         {
             Console.WriteSettingsProblems(check.Problems);
-            KeepEdit(projectKey, edited, "Fix it, then save it with");
+            KeepEdit(projectKey, Text(edited), before.Version, "Fix it, then save it with");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
@@ -150,13 +149,23 @@ public class ProjectSettingsEditCommand : BaseContextCommand
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             var exitCode = Console.WriteSettingsFailure(e);
-            KeepEdit(projectKey, edited, "To save it anyway");
+
+            if (e.StatusCode == (int)HttpStatusCode.PreconditionFailed)
+            {
+                // The edit started from settings that are gone: saving it as it is would undo the other change.
+                KeepStaleEdit(projectKey, Text(edited));
+            }
+            else
+            {
+                KeepEdit(projectKey, Text(edited), before.Version, "To save it anyway");
+            }
+
             return exitCode;
         }
         catch
         {
             // a 401 or a network error: the top level reports it, after the edit is kept
-            KeepEdit(projectKey, edited, "To save it anyway");
+            KeepEdit(projectKey, Text(edited), before.Version, "To save it anyway");
             throw;
         }
 
@@ -182,18 +191,37 @@ public class ProjectSettingsEditCommand : BaseContextCommand
         return JsonEditCheck.Invalid("The edited project settings are not valid.");
     }
 
-    // The edited document in a new file, and the command that saves it without the editor.
-    private void KeepEdit(string projectKey, JObject edited, string lead)
+    // The edited document in a new file, and the command that saves it without the editor, only while the settings are
+    // still at the version the edit started from.
+    private void KeepEdit(string projectKey, string edited, long version, string lead)
+    {
+        if (WriteEdit(projectKey, edited) is { } path)
+        {
+            Console.WriteLine($"Your edit is in {path}. {lead}: sform project settings set -p {projectKey} -i \"{path}\" --replace --expected-version {version}");
+        }
+    }
+
+    // The edit of settings that changed meanwhile: kept, with the advice to merge it into the current settings.
+    private void KeepStaleEdit(string projectKey, string edited)
+    {
+        if (WriteEdit(projectKey, edited) is { } path)
+        {
+            Console.WriteLine($"Your edit is in {path}. It started from an older version: read the current settings with sform project settings -p {projectKey} -e <file>, merge your changes into that file, and save it with sform project settings set -p {projectKey} -i <file> --replace --expected-version <the version it shows>.");
+        }
+    }
+
+    private string? WriteEdit(string projectKey, string edited)
     {
         try
         {
             var path = EditorService.CreateTempFilePath(_fileSystem, $"project-settings-{projectKey}");
-            _fileSystem.File.WriteAllText(path, edited.ToString(Formatting.Indented), new UTF8Encoding(false));
-            Console.WriteLine($"Your edit is in {path}. {lead}: sform project settings set -p {projectKey} -i \"{path}\" --replace");
+            _fileSystem.File.WriteAllText(path, edited, new UTF8Encoding(false));
+            return path;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Console.WriteImportant($"Your edit could not be kept in a file: {e.Message}");
+            return null;
         }
     }
 }
