@@ -28,7 +28,7 @@ The OpenAPI document comes from the API test `OpenApiExportTests`: it renders th
 
 ```powershell
 $env:STORYTELLER_OPENAPI_EXPORT = "$PWD/open.api.v<version>.json"
-dotnet test --project ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTests"
+dotnet test --project ../Api.Functions/test --filter-class "_42.Platform.Storyteller.Api.Functions.UnitTests.OpenApiExportTests"
 ```
 
 Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (`npm run generate`), then add the new `{controller}ApiClient` to `src/ApiSdk.partial.cs` and `src/ServicesCollectionExtensions.cs`.
@@ -159,35 +159,42 @@ var read = await access.GetProjectSettingsConditionalAsync("acme", "billing", et
 if (!read.IsNotModified)
 {
     settings = read.Result;          // Types, DefaultTimeZone, DateFormat, Version, Modified
+    etag = read.ETag;                // "7": the Version in quotes; a 304 keeps both as they are
 }
 
-etag = read.ETag;                    // "7": the Version in quotes
-
-settings.Types["sbt"] = new ProjectTypeAppearance { Label = "Company", Color = "pink", Icon = "i-lucide-building-2" };
+// The change goes into a copy: the cached settings stay what the API answered until a write succeeds.
+var draft = JsonConvert.DeserializeObject<ProjectSettings>(JsonConvert.SerializeObject(settings))!;
+draft.Types["sbt"] = new ProjectTypeAppearance { Label = "Company", Color = "pink", Icon = "i-lucide-building-2" };
 
 try
 {
-    var written = await access.SetProjectSettingsVersionedAsync("acme", "billing", settings, ifMatch: etag);
+    var written = await access.SetProjectSettingsVersionedAsync("acme", "billing", draft, ifMatch: etag);
+    settings = written.Result;       // the body and its tag stay together
     etag = written.ETag;             // "8", or "7" again for a write that changed nothing
 }
 catch (ApiException<ErrorResponse> e) when (e.StatusCode == 412)
 {
-    // SettingsPreconditionFailed: they changed since the read (Details.Version is the current version); read them again
+    // SettingsPreconditionFailed: they changed since the read (Details.Version is the current version). Nothing was
+    // written: read them again, apply the change to what they are now, and write under the new tag.
+    return;
 }
 
-// A merge patch with its nulls: the type goes back to its built-in appearance, the time zone to UTC.
-await access.PatchProjectSettingsVersionedAsync("acme", "billing", new JObject
+// A merge patch with its nulls, under the version just written: the type goes back to its built-in appearance, the
+// time zone to UTC.
+var patched = await access.PatchProjectSettingsVersionedAsync("acme", "billing", new JObject
 {
     ["Types"] = new JObject { ["sbt"] = JValue.CreateNull() },
     ["DefaultTimeZone"] = JValue.CreateNull(),
-});
+}, ifMatch: etag);
+settings = patched.Result;
+etag = patched.ETag;
 ```
 
 * `GetProjectSettingsConditionalAsync(organization, project, ifNoneMatch, cancellationToken)` is `GET v1/{organization}/{project}/settings` with an optional `If-None-Match`, and returns a `ConditionalResponse<ProjectSettings>`: a `304` returns with `IsNotModified` and no `Result`, as the [conditional reads](#conditional-reads) of configurations do. The settings of a project that set none are `Types` `{}`, no `DefaultTimeZone` (UTC), no `DateFormat` (`yyyy-mm-dd`) and `Version` `0`, never a `404`.
 * `SetProjectSettingsVersionedAsync(organization, project, body, ifMatch, cancellationToken)` is the `PUT`: the body replaces the settings, a type left out goes back to its built-in appearance, and `Version` and `Modified` of the body are ignored, so a read can go back as it is.
-* `PatchProjectSettingsVersionedAsync(organization, project, patch, ifMatch, cancellationToken)` is the `PATCH` of a `JObject`, sent as `application/merge-patch+json` as it is: its explicit `null`s stay, so it can remove a type, a member of a type, the time zone or the date format. Any other token throws `ArgumentException` before a request. The generated `PatchProjectSettingsAsync` sends a `ProjectSettingsMergePatch` (a type is a `ProjectTypeAppearanceMergePatch`) as the same media type, but it leaves its `null`s out, so it can set but never remove.
+* `PatchProjectSettingsVersionedAsync(organization, project, patch, ifMatch, cancellationToken)` is the `PATCH` of a `JObject`, sent as `application/merge-patch+json` as it is: its explicit `null`s stay, so it can remove a type, a member of a type, the time zone or the date format. Any other token throws `ArgumentException` before a request. The generated `PatchProjectSettingsAsync` sends a `ProjectSettingsMergePatch` (a type is a `ProjectTypeAppearanceMergePatch`) as the same media type. It leaves out its `null` properties (`DefaultTimeZone`, `DateFormat`, `Types` itself and the members of a type), so it cannot remove them; only a `null` entry of `Types` is sent, and removes the appearance of that type. Send the other removals with `PatchProjectSettingsVersionedAsync`.
 * Both writes return a `VersionedResponse<ProjectSettings>` with the stored settings and the `ETag` of their version, also for a write that changed nothing. `ifMatch` is `*` or the tags of earlier reads; `null` (the default) or an empty string sends none, and a tag is sent as it came. Without an `ETag` at hand, `"\"" + settings.Version + "\""` is the tag of a read.
-* The methods go through the client's `PrepareRequest` and `ProcessResponse` hooks and throw what the generated methods throw, with the same messages: `ApiException<ErrorResponse>` for a documented status with a body (a `400` `InvalidSettings` whose `Details` list every problem with its `Path`, `Rule` and `Message`, a `403` for a machine or a user without the Administrator role, `404`, `409`, `412`, `413`, a `415` of the patch, `500`), and a plain `ApiException` for a `401`, a body-less status and anything else, a `304` of a write included.
+* The methods go through the client's `PrepareRequest` and `ProcessResponse` hooks and throw what the generated methods throw, with the same messages: `ApiException<ErrorResponse>` for a documented status with a body (a `400` `InvalidSettings` whose `Details` list every problem with its `Path`, `Rule` and `Message`, a `403` for a machine or a user without the Administrator role, `404`, `409`, `412`, `413`, a `415` of either write (a patch media type sent to the `PUT`, or a `PATCH` that is neither a merge patch nor JSON), `500`), and a plain `ApiException` for a `401`, a body-less status and anything else, a `304` of a write included.
 * Colors, icons, date formats and time zones are strings of the catalog of project settings (`src/Platform/Storyteller/conformance/project-settings.json`); `ProjectSettingsRules` and `ProjectSettingsJson` of `42.Platform.Storyteller.Abstractions.Annotations` check a document as the API does.
 
 ## Credentials

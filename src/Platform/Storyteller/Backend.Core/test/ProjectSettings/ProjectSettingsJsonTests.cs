@@ -256,6 +256,36 @@ public class ProjectSettingsJsonTests
             ProjectSettingsJson.ToJson(Settings, ProjectSettingsJsonShape.Api),
             JsonNode.Parse("""{ "Types": null, "DefaultTimeZone": null, "DateFormat": null }""")!.AsObject());
 
-        ProjectSettingsRules.SameValues(ProjectSettingsJson.Read(merged).Settings, null).ShouldBeTrue();
+        var read = ProjectSettingsJson.Read(merged);
+        read.Problems.ShouldBeEmpty();
+        read.Settings.ShouldNotBeNull();
+        ProjectSettingsRules.SameValues(read.Settings, null).ShouldBeTrue();
+    }
+
+    // A string value built in code, not parsed, is read as its text, without the quotes of its JSON.
+    [Fact]
+    public void Read_AStringValueBuiltInCode_IsItsText()
+    {
+        var label = System.Guid.Empty;
+        var node = new JsonObject { ["Types"] = new JsonObject { ["sbt"] = new JsonObject { ["Label"] = JsonValue.Create(label) } } };
+
+        var read = ProjectSettingsJson.Read(node);
+
+        read.Problems.ShouldBeEmpty();
+        read.Settings!.Types["sbt"].Label.ShouldBe(label.ToString());
+    }
+
+    // A parse of bytes lets an escape through that is no UTF-16 text; the read names it as a problem instead of throwing.
+    [Fact]
+    public void Read_ALoneSurrogate_IsAProblemOfItsMember()
+    {
+        var node = JsonNode.Parse(System.Text.Encoding.UTF8.GetBytes("""{ "Types": { "sbt": { "Label": "\ud800" } } }"""))!;
+
+        var read = ProjectSettingsJson.Read(node);
+
+        read.Settings.ShouldBeNull();
+        var problem = read.Problems.ShouldHaveSingleItem();
+        problem.Path.ShouldBe("$.Types.sbt.Label");
+        problem.Rule.ShouldBe(ProjectSettingsRules.WrongType);
     }
 }

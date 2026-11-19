@@ -74,7 +74,9 @@ public sealed class DiscoveryToolsTests : IDisposable
         defaults["DefaultTimeZone"].ShouldBeNull();
         defaults["DateFormat"].ShouldBeNull();
         defaults["Modified"].ShouldBeNull();
-        defaults.Value<long>("Version").ShouldBe(0);
+        var version = defaults["Version"].ShouldNotBeNull();
+        version.Type.ShouldBe(JTokenType.Integer);
+        version.Value<long>().ShouldBe(0);
 
         result.Text().ShouldContain("\"Label\":\"Solution\"");
     }

@@ -393,7 +393,26 @@ public static class ProjectSettingsJson
 
         if (value is JsonValue scalar && scalar.GetValueKind() == JsonValueKind.String)
         {
-            return scalar.TryGetValue<string>(out var text) ? text : scalar.ToString();
+            try
+            {
+                // a value built in code (a Guid, a date) has no string to give: its JSON text, decoded
+                if (scalar.TryGetValue<string>(out var text))
+                {
+                    return text;
+                }
+
+                using var document = JsonDocument.Parse(scalar.ToJsonString());
+                return document.RootElement.GetString();
+            }
+            catch (InvalidOperationException)
+            {
+                // an escape that is no UTF-16 text, such as a lone surrogate, which a parse of bytes lets through
+                problems.Add(new ProjectSettingsProblem(
+                    ProjectSettingsText.Property(parent, name),
+                    ProjectSettingsRules.WrongType,
+                    $"{name} is not valid Unicode text."));
+                return null;
+            }
         }
 
         problems.Add(new ProjectSettingsProblem(

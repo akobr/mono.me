@@ -133,7 +133,7 @@ The allowed values are the **catalog of project settings**, `src/Platform/Storyt
 - A malformed `If-Match` (not `*` or a list of tags, `*` together with tags, or an empty value) answers `400 InvalidPrecondition`, and so does an `If-None-Match` on a write ("The project settings always exist; a write takes If-Match.").
 - Without `If-Match`, the last write wins.
 
-**PUT** replaces the settings: a type left out goes back to its built-in appearance, a missing `DefaultTimeZone` or `DateFormat` to its default. A body that is empty, not JSON, or holds a member twice answers `400 InvalidSettings` with one problem at `$`. A body sent as `application/merge-patch+json` or `application/json-patch+json` answers `415 InvalidContentType`, because a partial body would reset every type it leaves out (send a merge patch with PATCH).
+**PUT** replaces the settings: a type left out goes back to its built-in appearance, a missing `DefaultTimeZone` or `DateFormat` to its default. A body that is empty, not JSON, or holds a member twice answers `400 InvalidSettings` with one problem at `$`. A body sent as `application/merge-patch+json` or `application/json-patch+json` answers `415 InvalidContentType`, because a partial body would reset every type it leaves out (send a merge patch with PATCH); so does a `Content-Type` with several media types or one that is no media type.
 
 **PATCH** merges a JSON Merge Patch (RFC 7396) into the stored settings and checks the result as PUT does:
 
