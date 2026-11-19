@@ -72,7 +72,7 @@ public class ProjectSettingsHttp
     }
 
     [Function(nameof(SetProjectSettings))]
-    [OpenApiOperation(Definitions.RouteIds.Access.SetProjectSettings, Definitions.Tags.Access, Description = "Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version, Modified and Format in the body are ignored, so a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.")]
+    [OpenApiOperation(Definitions.RouteIds.Access.SetProjectSettings, Definitions.Tags.Access, Description = "Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version and Modified in the body are ignored, and Format is optional: when it is given, it must be 2s.project-settings.v1. So a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -87,7 +87,7 @@ public class ProjectSettingsHttp
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConflictProjectSettings)]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailedProjectSettings)]
     [OpenApiResponseWithBody(HttpStatusCode.RequestEntityTooLarge, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBodyTooLargeProjectSettings)]
-    [OpenApiResponseWithBody(HttpStatusCode.UnsupportedMediaType, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The body is application/merge-patch+json or application/json-patch+json (ErrorCode InvalidContentType): a PUT replaces the whole settings, so a partial body would reset every type it leaves out. Send a merge patch with PATCH.")]
+    [OpenApiResponseWithBody(HttpStatusCode.UnsupportedMediaType, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The body is application/merge-patch+json or application/json-patch+json (ErrorCode InvalidContentType): a PUT replaces the whole settings, so a partial body would reset every type it leaves out. Send a merge patch with PATCH. A Content-Type with several media types, or one that is no media type, is refused the same way.")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetProjectSettings(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.ProjectSettings)]
@@ -103,8 +103,19 @@ public class ProjectSettingsHttp
             return conditionError!;
         }
 
+        if (!TryReadMediaType(request, out var mediaType))
+        {
+            return new ObjectResult(new ErrorResponse($"The Content-Type is not one media type; a PUT of the project settings is {Definitions.ContentTypes.Json}.")
+            {
+                ErrorCode = ErrorCodes.InvalidContentType,
+            })
+            {
+                StatusCode = (int)HttpStatusCode.UnsupportedMediaType,
+            };
+        }
+
         // A patch sent to the PUT would replace the settings with its few members and reset every type it leaves out.
-        if (IsPatch(request))
+        if (IsPatch(mediaType))
         {
             return new ObjectResult(new ErrorResponse($"A PUT replaces the whole project settings with an {Definitions.ContentTypes.Json} body; send a merge patch ({Definitions.ContentTypes.MergePatch}) with PATCH.")
             {
@@ -126,10 +137,12 @@ public class ProjectSettingsHttp
 
         try
         {
-            document = body.Length == 0 ? null : JsonNode.Parse(body.Span, documentOptions: BodyDocumentOptions);
+            document = body.Length == 0 ? null : EnsureText(JsonNode.Parse(body.Span, documentOptions: BodyDocumentOptions));
         }
-        catch (JsonException exception)
+        catch (Exception exception) when (exception is JsonException or ArgumentException or InvalidOperationException)
         {
+            // ArgumentException or InvalidOperationException (EnsureText): an escape that is no UTF-16 text, such as a lone
+            // surrogate
             return ErrorResponseMapping.ToActionResult(new ProjectSettingsInvalidException(
                 [new ProjectSettingsProblem("$", ProjectSettingsRules.WrongType, $"The body is not JSON: {exception.Message}")]));
         }
@@ -199,10 +212,10 @@ public class ProjectSettingsHttp
 
         try
         {
-            patch = JsonNode.Parse(body.Span, documentOptions: BodyDocumentOptions) as JsonObject
+            patch = EnsureText(JsonNode.Parse(body.Span, documentOptions: BodyDocumentOptions)) as JsonObject
                 ?? throw new InvalidOperationException("A merge patch (RFC 7396) of the project settings is a JSON object.");
         }
-        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or ArgumentException)
         {
             return new BadRequestObjectResult(new ErrorResponse($"The body is not a merge patch of the project settings: {exception.Message}")
             {
@@ -219,27 +232,75 @@ public class ProjectSettingsHttp
         return KeyValueCaller.WithoutSecrets(request.GetAuditActor()) with { CorrelationId = request.FunctionContext.InvocationId };
     }
 
+    // The node, after every name and string of it was decoded once: a parse of bytes lets an escape through that is no
+    // UTF-16 text (a lone surrogate), and its decoding throws InvalidOperationException.
+    private static JsonNode? EnsureText(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject members:
+                foreach (var (_, value) in members)
+                {
+                    EnsureText(value);
+                }
+
+                break;
+            case JsonArray items:
+                foreach (var item in items)
+                {
+                    EnsureText(item);
+                }
+
+                break;
+            case JsonValue value when value.GetValueKind() == JsonValueKind.String:
+                value.GetValue<string>();
+                break;
+        }
+
+        return node;
+    }
+
     // application/merge-patch+json, application/json, or no media type at all.
     private static bool IsMergePatch(HttpRequestData request)
     {
-        if (!request.Headers.TryGetValues(HeaderNames.ContentType, out var values)
-            || string.Join(",", values) is not { Length: > 0 } contentType)
+        return TryReadMediaType(request, out var mediaType)
+            && (mediaType is null
+                || mediaType.Equals(Definitions.ContentTypes.MergePatch, StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals(Definitions.ContentTypes.Json, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // application/merge-patch+json or application/json-patch+json: a body that changes settings rather than holds them.
+    private static bool IsPatch(string? mediaType)
+    {
+        return mediaType is not null
+            && (mediaType.Equals(Definitions.ContentTypes.MergePatch, StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals(Definitions.ContentTypes.JsonPatch, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // The media type of the body, null without a Content-Type; false for several values, or one that is no media type.
+    private static bool TryReadMediaType(HttpRequestData request, out string? mediaType)
+    {
+        mediaType = null;
+
+        if (!request.Headers.TryGetValues(HeaderNames.ContentType, out var values))
         {
             return true;
         }
 
-        return MediaTypeHeaderValue.TryParse(contentType, out var mediaType)
-            && (mediaType.MediaType.Equals(Definitions.ContentTypes.MergePatch, StringComparison.OrdinalIgnoreCase)
-                || mediaType.MediaType.Equals(Definitions.ContentTypes.Json, StringComparison.OrdinalIgnoreCase));
-    }
+        var given = values.Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
 
-    // application/merge-patch+json or application/json-patch+json: a body that changes settings rather than holds them.
-    private static bool IsPatch(HttpRequestData request)
-    {
-        return request.Headers.TryGetValues(HeaderNames.ContentType, out var values)
-            && MediaTypeHeaderValue.TryParse(string.Join(",", values), out var mediaType)
-            && (mediaType.MediaType.Equals(Definitions.ContentTypes.MergePatch, StringComparison.OrdinalIgnoreCase)
-                || mediaType.MediaType.Equals(Definitions.ContentTypes.JsonPatch, StringComparison.OrdinalIgnoreCase));
+        if (given.Count == 0)
+        {
+            return true;
+        }
+
+        if (given.Count > 1 || !MediaTypeHeaderValue.TryParse(given[0], out var parsed))
+        {
+            return false;
+        }
+
+        mediaType = parsed.MediaType.Value;
+        return true;
     }
 
     // The body without its byte order mark, or the 413 of a body above RequestBodyLimits.ProjectSettings. A body of

@@ -237,6 +237,7 @@ public class ProjectSettingsHttpTests
     [InlineData("\"settings\"")]
     [InlineData("{ \"Types\": ")]
     [InlineData("{ \"DateFormat\": \"yyyy-mm-dd\", \"DateFormat\": \"dd.mm.yyyy\" }")]
+    [InlineData("{ \"Types\": { \"sbt\": { \"Label\": \"\\ud800\" } } }")]
     public async Task Put_OfABodyThatIsNoJsonObject_IsABadRequest(string body)
     {
         var settings = new FakeProjectSettings();
@@ -411,6 +412,38 @@ public class ProjectSettingsHttpTests
         settings.Calls.ShouldBeEmpty();
     }
 
+    // Several media types, or a value that is none, could hide a patch: refused as well.
+    [Theory]
+    [InlineData("application/merge-patch+json, application/json")]
+    [InlineData("application/json, application/merge-patch+json")]
+    [InlineData("not a media type")]
+    public async Task Put_OfNotOneMediaType_IsUnsupported(string contentType)
+    {
+        var settings = new FakeProjectSettings();
+        var request = WithContext(BodyRequest("PUT", """{ "Types": { "sbt": { "Color": "pink" } } }""", contentType));
+
+        var result = await Http(settings, new RoleAccess(AccountRole.Administrator)).SetProjectSettings(request, Org, Project);
+
+        var unsupported = result.ShouldBeOfType<ObjectResult>();
+        unsupported.StatusCode.ShouldBe((int)HttpStatusCode.UnsupportedMediaType);
+        unsupported.Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.InvalidContentType);
+        settings.Calls.ShouldBeEmpty();
+    }
+
+    // Two Content-Type headers are refused like a list in one.
+    [Fact]
+    public async Task Put_WithTwoContentTypeHeaders_IsUnsupported()
+    {
+        var settings = new FakeProjectSettings();
+        var request = BodyRequest("PUT", """{ "Types": { "sbt": { "Color": "pink" } } }""", "application/json");
+        request.Headers.TryAddWithoutValidation(HeaderNames.ContentType, "application/merge-patch+json");
+
+        var result = await Http(settings, new RoleAccess(AccountRole.Administrator)).SetProjectSettings(WithContext(request), Org, Project);
+
+        result.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe((int)HttpStatusCode.UnsupportedMediaType);
+        settings.Calls.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("application/json")]
     [InlineData("application/json; charset=utf-8")]
@@ -432,6 +465,7 @@ public class ProjectSettingsHttpTests
     [InlineData("\"DateFormat\"")]
     [InlineData("{ \"DateFormat\": ")]
     [InlineData("{ \"DateFormat\": null, \"DateFormat\": \"yyyy-mm-dd\" }")]
+    [InlineData("{ \"Types\": { \"sbt\": { \"Label\": \"\\ud800\" } } }")]
     public async Task Patch_OfABodyThatIsNoJsonObject_IsAnInvalidPatch(string body)
     {
         var settings = new FakeProjectSettings();

@@ -342,7 +342,9 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
         "Lists the audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, purged, "
         + "re-protected, exported or imported secrets, changed the policy, the keys, the recipients or the project "
         + "settings, and the binding reads of secrets counted per hour (BindingRead with Count). Each event has Time, View, "
-        + "Key, Version, Protection, Operation, Actor, Channel and CorrelationId; never a value. Administrator only.")]
+        + "Key, Version, Protection, Operation, Actor, Channel and CorrelationId; never a value. A ProjectSettingsChange "
+        + "says what changed in Detail (the old and the new version of the settings and the changed parts, e.g. "
+        + "'v1→v2: Types.sbt, DateFormat'), not in View, Key or Version. Administrator only.")]
     public async Task<CallToolResult> GetKeyValueAudit(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,

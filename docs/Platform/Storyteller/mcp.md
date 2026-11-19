@@ -296,7 +296,7 @@ Tools carry the MCP hints: reads are read-only; deletes, purges, resets and repl
 | `list_projects` | The person's projects with role, description and [settings](access.md#project-settings): the names, colors and icons of the annotation types by type code, the default time zone and the date format |
 | `list_views` | The registered views of a project |
 
-A project can name its annotation types, for example `rst` as "Solution". The tool's description and the server's instructions ask the assistant to talk to the person in those names ("Solution CRM" for `rst.crm`) and to use the type codes and keys in every call. A type missing from `Settings.Types` keeps its built-in name; a missing `DefaultTimeZone` is `UTC` and a missing `DateFormat` is `yyyy-mm-dd`. The server reads the settings only; an Administrator changes them with `sform project settings` or in the admin UI.
+A project can name its annotation types, for example `rst` as "Solution". The tool's description and the server's instructions ask the assistant to talk to the person in those names ("Solution CRM" for `rst.crm`) and to use the type codes and keys in every call. A type missing from `Settings.Types` keeps its built-in name; a missing `DefaultTimeZone` is `UTC` and a missing `DateFormat` is `yyyy-mm-dd`. The server reads the settings only; an Administrator or an Owner of the project changes them with `sform project settings` or in the admin UI.
 
 ### Annotations
 
