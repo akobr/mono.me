@@ -91,6 +91,10 @@ const sameSettings = (value: ProjectSettingsDraft, saved: ProjectSettingsState) 
 const savingSettings = ref(false)
 // A 412: someone saved the settings since they were read; they are read again, the draft stays.
 const settingsConflict = ref(false)
+// Whether the settings were read again after the 412: until then, the settings this page holds are the old ones, so
+// they cannot be loaded as the new ones, and a failed read offers a retry.
+const settingsConflictRead = ref(false)
+const readingConflictSettings = ref(false)
 // A 400 InvalidSettings: the problems the API found, each with its JSON path.
 const settingsProblems = ref<{ path?: string; message: string }[]>()
 
@@ -112,6 +116,7 @@ watch(
     }
     if (key !== previousKey) {
       settingsConflict.value = false
+      settingsConflictRead.value = false
       settingsProblems.value = undefined
     }
   },
@@ -167,12 +172,15 @@ async function saveSettings() {
   const sent = draft.value
   savingSettings.value = true
   settingsConflict.value = false
+  settingsConflictRead.value = false
   settingsProblems.value = undefined
   try {
     // A browser cannot read the ETag of another origin; the Version of the body makes the same tag.
     const answer = await setProjectSettings(org, project, toApi(sent, base), {
       headers: { 'If-Match': projectSettingsEntityTag(base.version) },
     })
+    // A read still on its way would put the settings before this save back into the cache.
+    await queryClient.cancelQueries({ queryKey: getGetProjectSettingsQueryKey(org, project) })
     queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
     // The fields show what is stored, unless the user went on editing; further changes start from the stored settings.
     if (context.projectKey === projectKey) {
@@ -189,12 +197,7 @@ async function saveSettings() {
   } catch (error) {
     if (hasErrorCode(error, 'SettingsPreconditionFailed') || isPreconditionFailed(error)) {
       settingsConflict.value = true
-      await settingsQuery.refetch()
-      // The user is told of the other change now: a second Save stores the draft over the settings read again.
-      const latest = queryClient.getQueryData<ProjectSettings>(getGetProjectSettingsQueryKey(org, project))
-      if (context.projectKey === projectKey && latest) {
-        draftBase.value = fromApi(latest)
-      }
+      await readConflictSettings()
     } else if (hasErrorCode(error, 'InvalidSettings')) {
       settingsProblems.value = problemsOf(error)
     } else {
@@ -209,10 +212,36 @@ async function saveSettings() {
   }
 }
 
-/** After a 412: the draft starts again from the settings saved meanwhile. */
+/**
+ * After a 412: reads the settings again. Only a read that succeeds makes them the base of the draft, so a second Save
+ * stores the draft over them, and lets the user load them; a failed read keeps the conflict and offers a retry.
+ */
+async function readConflictSettings() {
+  const { org, project, projectKey } = context
+  if (!org || !project || !projectKey || readingConflictSettings.value) {
+    return
+  }
+  readingConflictSettings.value = true
+  try {
+    const result = await settingsQuery.refetch()
+    const latest = queryClient.getQueryData<ProjectSettings>(getGetProjectSettingsQueryKey(org, project))
+    if (!result.isError && latest && context.projectKey === projectKey && settingsConflict.value) {
+      draftBase.value = fromApi(latest)
+      settingsConflictRead.value = true
+    }
+  } finally {
+    readingConflictSettings.value = false
+  }
+}
+
+/** After a 412 and a read of the new settings: the draft starts again from them. */
 function loadSavedSettings() {
+  if (!settingsConflictRead.value) {
+    return
+  }
   startDraft(savedSettings.value)
   settingsConflict.value = false
+  settingsConflictRead.value = false
   settingsProblems.value = undefined
 }
 
@@ -270,7 +299,11 @@ async function saveLegacySettings() {
       { headers: { 'If-Match': projectSettingsEntityTag(0) } },
     )
     removeLegacyProjectSettings(projectKey)
-    legacySettings.value = undefined
+    // Another project may be open by now: its offer stays.
+    if (context.projectKey === projectKey) {
+      legacySettings.value = undefined
+    }
+    await queryClient.cancelQueries({ queryKey: getGetProjectSettingsQueryKey(org, project) })
     queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
     toast.add({ title: 'Project settings saved', color: 'success', icon: 'i-lucide-check' })
     await invalidateProject(queryClient, projectKey)
@@ -660,9 +693,26 @@ async function downloadCa() {
             variant="subtle"
             icon="i-lucide-git-compare"
             title="Someone changed the project settings meanwhile; your changes were not saved"
-            description="Load the new settings, or save yours over them."
+            :description="
+              settingsConflictRead || readingConflictSettings
+                ? 'Load the new settings, or save yours over them.'
+                : 'The new settings could not be read. Try again before you load them or save yours over them.'
+            "
             :actions="[
-              { label: 'Load the new settings', color: 'neutral', variant: 'outline', onClick: loadSavedSettings },
+              settingsConflictRead || readingConflictSettings
+                ? {
+                    label: 'Load the new settings',
+                    color: 'neutral',
+                    variant: 'outline',
+                    disabled: !settingsConflictRead,
+                    onClick: loadSavedSettings,
+                  }
+                : {
+                    label: 'Read them again',
+                    color: 'neutral',
+                    variant: 'outline',
+                    onClick: readConflictSettings,
+                  },
             ]"
           />
           <UAlert

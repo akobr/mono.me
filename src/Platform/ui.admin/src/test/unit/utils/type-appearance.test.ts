@@ -51,6 +51,13 @@ describe('sanitizeTypeAppearances', () => {
     expect(sanitizeTypeAppearances({ exe: { label: 'Batch\u200Djob\u00A0x' } }).exe?.label).toBe('Batch\u200Djob\u00A0x')
   })
 
+  it('trims as the API does, so a name with U+FEFF that the API accepted stays as it is', () => {
+    expect(sanitizeTypeAppearances({ exe: { label: '\uFEFFJob', plural: 'Jobs\uFEFF' } })).toEqual({
+      exe: { label: '\uFEFFJob', plural: 'Jobs\uFEFF' },
+    })
+    expect(sanitizeTypeAppearances({ exe: { label: '\u00A0 Job \u3000' } }).exe?.label).toBe('Job')
+  })
+
   it('drops a plural without a name, because names come as a pair', () => {
     expect(sanitizeTypeAppearances({ exe: { plural: 'Jobs', color: 'red' } })).toEqual({ exe: { color: 'red' } })
   })

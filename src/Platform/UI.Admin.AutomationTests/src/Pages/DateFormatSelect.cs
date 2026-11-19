@@ -79,11 +79,21 @@ public sealed partial class DateFormatSelect(App app, ILocator combobox)
         return new DateOnly(parts[0], parts[1], parts[2]);
     }
 
-    // Waits until the select shows the format's item: today's date in the format and " (<pattern>)".
+    // Waits until the select shows the format's item, " (<pattern>)" after the date, then checks that date: today in the
+    // format, as the browser saw it before or after the wait (a wait across midnight sees both days).
     public async Task ExpectFormatAsync(string format)
     {
-        var today = await TodayAsync();
-        await Expect(combobox).ToHaveTextAsync($"{FormatDate(today, format)} ({format})");
+        var before = await TodayAsync();
+        await Expect(combobox).ToHaveTextAsync(new Regex(Regex.Escape($" ({format})") + @"\s*$", RegexOptions.CultureInvariant));
+        var after = await TodayAsync();
+
+        var shown = (await combobox.InnerTextAsync()).Trim();
+        var expected = new[] { before, after }.Distinct().Select(day => $"{FormatDate(day, format)} ({format})").ToArray();
+
+        if (!expected.Contains(shown, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException($"The date format select shows '{shown}', not {string.Join(" or ", expected.Select(text => $"'{text}'"))}.");
+        }
     }
 
     // Picks the format by its pattern and waits until the select shows it.

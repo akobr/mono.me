@@ -163,9 +163,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 // oxlint-disable-next-line no-control-regex -- the controls are what the rule refuses
 const controlCharacters = /[\u0000-\u001F\u007F-\u009F\u2028\u2029\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g
 
+// The trim of the API (.NET string.Trim): Unicode's White_Space at both ends. String.prototype.trim also removes U+FEFF,
+// which the API keeps, so a name the API accepted would change on the next save.
+const edgeWhiteSpace =
+  /^[\t-\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+|[\t-\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+$/g
+
+const trimWhiteSpace = (value: string) => value.replace(edgeWhiteSpace, '')
+
 function cleanName(value: unknown): string | undefined {
   return typeof value === 'string'
-    ? value.replace(controlCharacters, '').trim().slice(0, maxTypeNameLength).trim() || undefined
+    ? trimWhiteSpace(trimWhiteSpace(value.replace(controlCharacters, '')).slice(0, maxTypeNameLength)) || undefined
     : undefined
 }
 

@@ -229,6 +229,34 @@ describe('the project settings in Settings', () => {
     expect(document.body.textContent).not.toContain('Someone changed the project settings meanwhile')
   })
 
+  it('keeps the conflict when the settings cannot be read again, and offers to read them again', async () => {
+    const view = await mountSettings()
+    timeZone(view).vm.$emit('update:modelValue', 'Asia/Tokyo')
+    await settle()
+    storeSettings('acme.billing', { Types: {}, DateFormat: 'dd.mm.yyyy' })
+    server.use(
+      http.get(
+        '*/api/v1/:org/:project/settings',
+        () => HttpResponse.json({ Message: 'Storage failed.' }, { status: 500 }),
+        { once: true },
+      ),
+    )
+
+    saveButton()!.click()
+    await vi.waitFor(() => expect(buttonNamed('Read them again')).toBeDefined())
+    expect(document.body.textContent).toContain('The new settings could not be read.')
+    expect(buttonNamed('Load the new settings')).toBeUndefined()
+    expect(timeZone(view).props('modelValue')).toBe('Asia/Tokyo')
+
+    buttonNamed('Read them again')!.click()
+    await vi.waitFor(() => expect(buttonNamed('Load the new settings')?.disabled).toBe(false))
+    buttonNamed('Load the new settings')!.click()
+    await settle()
+    expect(timeZone(view).props('modelValue')).toBe('UTC')
+    expect(dateFormat(view).props('modelValue')).toBe('dd.mm.yyyy')
+    expect(document.body.textContent).not.toContain('Someone changed the project settings meanwhile')
+  })
+
   it('saves over the settings of someone else after a 412 with their version', async () => {
     const writes = recordWrites()
     const view = await mountSettings()

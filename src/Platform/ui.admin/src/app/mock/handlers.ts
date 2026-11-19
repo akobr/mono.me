@@ -154,9 +154,9 @@ export const accessHandlers: HttpHandler[] = [
     `${api}/access/points`,
     withDb((db) =>
       HttpResponse.json(
-        Object.values(db.accessPoints).filter(
-          (point) => roleRank(roleOf(db, point.Key ?? '')) >= roleRank('Administrator'),
-        ),
+        Object.values(db.accessPoints)
+          .filter((point) => roleRank(roleOf(db, point.Key ?? '')) >= roleRank('Administrator'))
+          .map((point) => pointOf(db, point)),
       ),
     ),
   ),
