@@ -35,3 +35,7 @@ Storyteller is the actor that holds the catalog. The pages below explain how a p
 - [How to model a product](modeling) — which noun becomes a subject, a context, or a responsibility
 - [Using the platform](using-the-platform) — the scopes, the reads a service makes, and the writes that build the catalog
 - [Examples](examples/) — a B2B SaaS, a consumer finance suite, a distributed platform, a versioned monolith, a physical product, and a device fleet
+
+## For developers
+
+Want to plug a service in rather than read about it? The [developer guide](documentation/) is the short, friendly tour of every package we ship: the .NET configuration provider, Hosting, Aspire, the SDKs, `sform` and the MCP server. Its [quick start](documentation/quick-start) gets a .NET service reading its configuration in five steps.
