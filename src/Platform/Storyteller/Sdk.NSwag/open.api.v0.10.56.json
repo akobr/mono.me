@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.55.3770"
+    "version": "0.10.56.10738"
   },
   "servers": [
     {
@@ -15196,7 +15196,7 @@
             "description": "The settings of the project, with the ETag of their version.",
             "headers": {
               "ETag": {
-                "description": "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body. For If-None-Match of a read and If-Match of a write.",
+                "description": "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body of a 200. A 304 has no body: keep the cached body together with its tag. For If-None-Match of a read and If-Match of a write.",
                 "schema": {
                   "type": "string"
                 }
@@ -15250,7 +15250,7 @@
             "description": "The settings are unchanged since the ETag sent in If-None-Match.",
             "headers": {
               "ETag": {
-                "description": "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body. For If-None-Match of a read and If-Match of a write.",
+                "description": "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body of a 200. A 304 has no body: keep the cached body together with its tag. For If-None-Match of a read and If-Match of a write.",
                 "schema": {
                   "type": "string"
                 }
@@ -15293,7 +15293,7 @@
         "tags": [
           "Access"
         ],
-        "description": "Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version, Modified and Format in the body are ignored, so a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.",
+        "description": "Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version and Modified in the body are ignored, and Format is optional: when it is given, it must be 2s.project-settings.v1. So a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.",
         "operationId": "SetProjectSettings",
         "parameters": [
           {
@@ -15339,7 +15339,7 @@
             "description": "The stored settings, with the ETag of their version; also for a write that changed nothing.",
             "headers": {
               "ETag": {
-                "description": "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body. For If-None-Match of a read and If-Match of a write.",
+                "description": "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body of a 200. A 304 has no body: keep the cached body together with its tag. For If-None-Match of a read and If-Match of a write.",
                 "schema": {
                   "type": "string"
                 }
@@ -15414,7 +15414,7 @@
             }
           },
           "415": {
-            "description": "The body is application/merge-patch+json or application/json-patch+json (ErrorCode InvalidContentType): a PUT replaces the whole settings, so a partial body would reset every type it leaves out. Send a merge patch with PATCH.",
+            "description": "The body is application/merge-patch+json or application/json-patch+json (ErrorCode InvalidContentType): a PUT replaces the whole settings, so a partial body would reset every type it leaves out. Send a merge patch with PATCH. A Content-Type with several media types, or one that is no media type, is refused the same way.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15499,7 +15499,7 @@
             "description": "The stored settings, with the ETag of their version; also for a patch that changed nothing.",
             "headers": {
               "ETag": {
-                "description": "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body. For If-None-Match of a read and If-Match of a write.",
+                "description": "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body of a 200. A 304 has no body: keep the cached body together with its tag. For If-None-Match of a read and If-Match of a write.",
                 "schema": {
                   "type": "string"
                 }
