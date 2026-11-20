@@ -14,15 +14,6 @@ sform account set -p house.main
 
 The last line makes `house.main` the default project of every later command, so you don't have to type it again.
 
-::: warning The sform on nuget.org is older than this guide
-Until the next release lands, pack `sform` from the [repository](https://github.com/akobr/mono.me) and install that one:
-
-```bash
-dotnet pack src/Platform/Cli/src -o ./packages
-dotnet tool install 42.Platform.Cli --global --prerelease --add-source ./packages
-```
-:::
-
 **You now have:** a terminal that talks to your project.
 
 ## 2. Describe one customer using one module

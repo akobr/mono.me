@@ -18,10 +18,6 @@
 npm install @42for.net/2splatform.sdk
 ```
 
-::: info
-The version on npm today is an old `0.8` from before this guide. Until the new one is published, build it from `src/Platform/Storyteller/sdk.typescript/src` of the [repository](https://github.com/akobr/mono.me) with `npm ci && npm run build && npm pack`, and install the `.tgz`.
-:::
-
 | Entry point | What | Needs |
 | --- | --- | --- |
 | `@42for.net/2splatform.sdk` | Request functions, models, errors, keys, paging, conditional reads and writes, key/value helpers | nothing |

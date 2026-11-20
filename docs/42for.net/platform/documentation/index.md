@@ -111,9 +111,7 @@ Hosting the platform yourself? The `2sInitDb` tool (`42.Platform.Storyteller.DbC
 
 ## Getting the bits
 
-::: warning Fresh out of the oven
-The packages are prereleases (`0.10.x-alpha`), so add `--prerelease` when you install them. The first versions are on their way to nuget.org and npm. Until a package is there, pack it from the [repository](https://github.com/akobr/mono.me): `dotnet pack src/Libraries/Platform/Storyteller/Configuration/src -o ./packages`, and add `./packages` as a NuGet source.
-:::
+Every package is on [nuget.org](https://www.nuget.org/) (and the TypeScript SDK on npm). We ship fast, so new versions arrive as prereleases first: add `--prerelease` to get the newest. Our prereleases are tested and safe to use.
 
 Every .NET package targets .NET 10. The packages are released together, so keep their versions together too: let `Hosting` bring `Configuration`, rather than updating one of them on its own.
 

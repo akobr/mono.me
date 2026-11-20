@@ -12,7 +12,7 @@ sform account                   # sign in through your browser
 sform account set -p house.main # the default project (and -v for a view)
 ```
 
-The `sform` on nuget.org is older than this guide; the [quick start](quick-start) shows how to install one packed from the repository. Every command has `--help`, and the help says which role a command needs.
+`--prerelease` gets the newest version; our prereleases are safe to use. Every command has `--help`, and the help says which role a command needs.
 
 ## Ten commands to start with
 
@@ -66,7 +66,7 @@ A **federated** machine trusts the job's own token (GitHub Actions OIDC, Kuberne
 - `output-file` writes the configuration to a file too, as `env`, `flat`, `properties`, `yaml` or `json`.
 - Pin a commit: the action has no release tags yet.
 
-The whole story, including secrets over mTLS and packing `sform` in the workflow, is on the [GitHub Action page](/cli/github-action).
+The whole story, including secrets over mTLS, is on the [GitHub Action page](/cli/github-action).
 
 ## Exit codes worth knowing
 
