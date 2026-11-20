@@ -218,6 +218,17 @@ Settings are validated at start; a missing or wrong value stops the host. `Mcp:A
 
 With the exchange off, every tool answers that the API has the user token exchange turned off. Under Entra ID, on a machine where the App ID URI cannot be the local URL, set `Mcp:Authentication:Audience` to `api://<MCP app client id>`, list that in `SubjectAudiences` instead of the local URL, and use a client that does not send the `resource` parameter.
 
+## Running in Azure
+
+The production server runs at `https://mcp.2s.42for.net/mcp` on Azure Container Apps, scaled to zero between calls: the Container App `prod-2s-mcp-ca` in the environment `prod-2s-cae`, as its own managed identity `prod-2s-mcp-mi`, which has no Azure role. The [runbook](../Deployment/runbook-mcp-server.md) deploys it, the [cookbook](../Deployment/cookbook-azure-production.md#17a-the-mcp-server-container-apps-later) explains every setting, and the [decisions](../Deployment/decisions.md#the-mcp-server) say why it runs this way.
+
+- **The image** is built by the .NET SDK without a Dockerfile (`dotnet publish -t:PublishContainer`; `ContainerRepository` and `ContainerFamily` in `Mcp.csproj`): ASP.NET Core's chiseled Ubuntu image, the non-root user `app`, port 8080, no shell, no ICU and no tzdata. The workflow `Platform.Storyteller.Mcp.yml` runs the unit tests on every change, and on `main` pushes `ghcr.io/akobr/2s-platform-mcp:<commit>` (a public package) and, after the approval of the environment `prod.42.Platform`, runs it on the Container App. A rollback is `az containerapp update -g prod-2s-eusec-rg -n prod-2s-mcp-ca --image ghcr.io/akobr/2s-platform-mcp:<an older commit>`.
+- **The settings** are the app's environment variables, written by `src/Platform/Deployment/modules/mcp.bicep`: `Mcp__Provider` `AuthKit`, `Mcp__ResourceUrl` `https://mcp.2s.42for.net/mcp`, `Mcp__Authentication__Issuer` the AuthKit domain, `Mcp__Authentication__Scope` `openid`, `Mcp__Actor__Id` `mcp` with a `ManagedIdentity` workload identity for `api://<the app id of 2S Platform Token Exchange>`, `Mcp__SecretTools__Enabled` `false`, and `Storyteller__BaseUrl` `https://api.2s.42for.net/api`. No secret exists.
+- **The scope is `openid`**, not a WorkOS permission (see [AuthKit](#authkit)): dynamically registered clients get no permission, and a default scope of the environment would be in the tokens of every 42for.net product. The API is the gate: the exchange refuses a person without an account, and the person's roles decide every call.
+- **The API** has the exchange on, the AuthKit domain as an additional issuer (until the custom AuthKit domain makes it the API's own issuer), and the actor `mcp` pinned to the identity's v1 tokens: the issuer `https://sts.windows.net/<tenant>/`, the identity's object id as the subject, `api://<app id>` as the audience, and `https://mcp.2s.42for.net/mcp` as its only subject audience (`src/Platform/Deployment/modules/functions.bicep`).
+- **Probes** check the port (TCP): the health endpoints exist only in Development. Logs go to the Log Analytics workspace `prod-2s-log`, in the tables `ContainerAppConsoleLogs` and `ContainerAppSystemLogs`; `az containerapp logs show -g prod-2s-eusec-rg -n prod-2s-mcp-ca --type console` streams them while a replica runs.
+- **Limits of the hosting:** the first call after about 5 idle minutes starts a replica (a cold start of a few seconds), and the ingress ends a request after 240 seconds, before the server's own five minutes for a call of the API.
+
 ## Connecting a client
 
 Clients discover everything from the server:
@@ -408,6 +419,7 @@ A value returned by a tool enters the model's context, the client's transcript a
 ## Limits
 
 - Under Entra ID: one tenant per deployment, and no dynamic client registration; clients use pre-registered client ids.
+- In production on Azure Container Apps a request ends after 240 seconds (the ingress), so a tool call that waits longer for the API is cut off; check a write with the matching read ([Running in Azure](#running-in-azure)).
 - No sessions, subscriptions, server-initiated requests or elicitation. So no `notifications/tools/list_changed` either: a change of the tool list shows on the client's next `tools/list`.
 - Not offered: view and key/value export and import, BYOK setup, key rotation, Hyok writes and decryption, recipients, shared certificates, trusted issuers, invitations and members, the access audit, and project settings writes (`list_projects` reads them; `sform project settings` and the admin UI change them).
 - Search reads stored documents, not effective ones: a value inherited from an ancestor is found on the ancestor.

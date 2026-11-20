@@ -1,6 +1,6 @@
 # Cookbook: Create the Production Environment of the 2S Platform in Azure
 
-This cookbook builds the production environment of the 2S Platform by hand, step by step, with the Azure CLI. It follows the spec [Azure Production Environment of the 2S Platform](specs/2026-11-09%20Azure%20Production%20Environment%20of%20the%202S%20Platform.md) and the answers in [Decisions That Cannot Be Changed Later](decisions.md). Steps 1–15 are also Bicep templates and scripts in [`src/Platform/Deployment`](../../../src/Platform/Deployment/README.md) (spec, section 2); this cookbook stays the explanation of every setting and the checklist, and steps 16–17 are done by hand either way. The [runbook](runbook-azure-production.md) is the whole first deployment with the templates, in order, with every `what-if`. Build a new environment with one of the two, not a mix: the templates name the Flex plan `prod-2s-api-asp` and turn on site-scoped certificates when they create the Function App, which an app created by the CLI can't get later.
+This cookbook builds the production environment of the 2S Platform by hand, step by step, with the Azure CLI. It follows the spec [Azure Production Environment of the 2S Platform](specs/2026-11-09%20Azure%20Production%20Environment%20of%20the%202S%20Platform.md) and the answers in [Decisions That Cannot Be Changed Later](decisions.md). Steps 1–15 and the MCP server of step 17a are also Bicep templates and scripts in [`src/Platform/Deployment`](../../../src/Platform/Deployment/README.md) (spec, section 2); this cookbook stays the explanation of every setting and the checklist, and steps 16–17 are done by hand either way. The [runbook](runbook-azure-production.md) is the whole first deployment with the templates, in order, with every `what-if`. Build a new environment with one of the two, not a mix: the templates name the Flex plan `prod-2s-api-asp` and turn on site-scoped certificates when they create the Function App, which an app created by the CLI can't get later.
 
 Work through the steps in order. Each step says what it creates, the commands, and how to check it. Steps marked **once** are never repeated; steps marked **irreversible** can't be undone without losing data or breaking clients.
 
@@ -327,7 +327,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | `Auth__AuthKit__Audience` | tokens must carry this `aud` (the JWT template, step 13): `https://2s.42for.net`, shared by every application of the environment (see "Open points") |
 | `Auth__AuthKit__Audiences__<n>` | not set yet: the audiences of the 2S applications, which replace the single value; set them before WorkOS gets a second application (see "Open points") |
 | `Auth__AuthKit__DefaultUserScopes__0` | every signed-in user gets `User.Impersonation`, and their roles decide the rest; without it (and without a permission map) every user gets `401` |
-| `Auth__TokenExchange__Enabled=false` | no MCP server in this phase |
+| `Auth__TokenExchange__Enabled=false` | no MCP server yet; [step 17a](#17a-the-mcp-server-container-apps-later) turns it on with the server as its actor |
 | `MachineAuth__DisabledCredentialKinds__*` | no mTLS yet: projects can't enable certificate machines or issue shared certificates |
 | `MachineAuth__IsCertificateHeaderFromClientAllowed=false` | the API never reads `X-ARR-ClientCert`, so nobody can fake a certificate with it |
 | `MachineAuth__TrustDomain`, `__Federation__PublicBaseUrl` | the issuer and audience of Storyteller tokens, and the token endpoint that federation rules pin; **final** (decisions 1 and 2) |
@@ -470,6 +470,7 @@ These roles are the least that deploying code needs. The identity gets nothing o
 | `api.2s` | CNAME | `$FUNC_HOST` (step 8.1) | the API |
 | `asuid.api.2s` | TXT | `az functionapp show -g "$RG" -n "$FUNC" --query customDomainVerificationId -o tsv` | domain ownership for the Function App |
 | `app.2s` | CNAME | `$SWA_HOST` (step 9) | the admin UI |
+| `mcp.2s`, `asuid.mcp.2s` | CNAME, TXT | the MCP server's default host name and domain verification id (step 17a) | the MCP server, once it runs |
 | `auth` | CNAME | the target WorkOS shows for the custom AuthKit domain (step 13) | AuthKit sign-in |
 | | | any TXT/CNAME records WorkOS asks for | WorkOS domain verification |
 
@@ -525,6 +526,7 @@ In the repository settings, **Environments → New environment → `prod.42.Plat
 | variable | `AZURE_RESOURCE_GROUP` | `prod-2s-eusec-rg` |
 | variable | `AZURE_FUNCTIONAPP_NAME` | `prod-2s-api-fa` |
 | variable | `AZURE_KEYVAULT_NAME` | `prod-2s-42fornet-kv` |
+| variable | `AZURE_MCP_APP_NAME` | `prod-2s-mcp-ca`, once the MCP server exists (step 17a) |
 | variable | `STORYTELLER_BASE_ACCOUNT_ID` | your WorkOS production user id |
 | variable | `VITE_API_BASE_URL` | `https://api.2s.42for.net/api` |
 | variable | `VITE_AUTH_API_HOSTNAME` | empty until the custom AuthKit domain exists; then `auth.42for.net` |
@@ -608,6 +610,100 @@ The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with
 | Who can sign in | WorkOS dashboard as an Admin, every environment | impersonation off; the named members with their roles, each with MFA, or SSO enforced through an identity provider whose MFA is checked to be enforced (SSO alone is not enough); recorded in the ISO 27001 supplier notes |
 | API errors | an invalid message on the queue `configuration-transfers` ([error reporting](../Storyteller/error-reporting.md#check-it-in-production)) | one event in `2s-api` with the transaction `queue ProcessViewTransfer`, the environment `production` and the API's release |
 
+## 17a. The MCP server (Container Apps, later)
+
+The [MCP server](../Storyteller/mcp.md) lets an AI assistant work with the platform as the signed-in person, at `https://mcp.2s.42for.net/mcp`. It is not part of the first deployment: the templates create it with `mcpEnabled` of `parameters/prod.bicepparam`, in the order of its own [runbook](runbook-mcp-server.md) (spec [Deploy the MCP Server to Azure Container Apps](specs/2026-11-17%20Deploy%20the%20MCP%20Server%20to%20Azure%20Container%20Apps.md)). This step says what they create and why; the commands do the same by hand. It assumes the API accepts only the audiences of the 2S applications ([424-239](https://linear.app/424fun/issue/424-239), `Auth__AuthKit__Audiences__<n>`).
+
+| What | Name | Why |
+| --- | --- | --- |
+| Entra application | `2S Platform Token Exchange` | the audience `api://<app id>` of the server's actor tokens: it stands for the Storyteller exchange only, so its tokens are no credential anywhere else. No secret, no certificate, no redirect URI, v1 tokens |
+| Managed identity | `prod-2s-mcp-mi` | the server's own identity, not the API's: it proves the server to the API as the actor `mcp` and has **no Azure role** (the API's identity reads every secret of the vault) |
+| Container Apps environment | `prod-2s-cae` | workload profiles with the Consumption profile only: no base fee, scale to zero, the monthly free grant of Container Apps. No virtual network, no zone redundancy. Its console and system logs go to `prod-2s-log` through a diagnostic setting (the tables `ContainerAppConsoleLogs` and `ContainerAppSystemLogs`), under the workspace's daily cap, with no shared key of the workspace |
+| Container App | `prod-2s-mcp-ca` | the server: 0.25 vCPU, 0.5 GiB, 0 to 3 replicas (one more for every 20 concurrent requests), external HTTPS ingress on port 8080, TCP probes (the health endpoints exist only in Development), single revision mode, the identity above, no secret |
+| Image | `ghcr.io/akobr/2s-platform-mcp:<commit>` | built by the .NET SDK without a Dockerfile (chiseled Ubuntu, non-root, port 8080) by the workflow `Platform.Storyteller.Mcp.yml` on `main`; a public package, so the app pulls it without a credential |
+| Custom domain | `mcp.2s.42for.net` | a free managed certificate of the environment, validated by the CNAME |
+
+```sh
+MCP_HOST="mcp.2s.42for.net"
+CAE="prod-2s-cae"
+MCP_APP="prod-2s-mcp-ca"
+MCP_MI="prod-2s-mcp-mi"
+AUTHKIT_DOMAIN="https://<subdomain>.authkit.app"      # the AuthKit domain of step 13 (https://auth.42for.net later)
+MCP_IMAGE="ghcr.io/akobr/2s-platform-mcp:<commit>"    # the first build of Platform.Storyteller.Mcp.yml
+
+# The audience of the actor tokens (scripts/New-TokenExchangeApplication.ps1 does the same, and checks it).
+EXCHANGE_APP_ID=$(az ad app create --display-name "2S Platform Token Exchange" --sign-in-audience AzureADMyOrg --query appId -o tsv)
+az ad app update --id "$EXCHANGE_APP_ID" --identifier-uris "api://$EXCHANGE_APP_ID"
+az ad sp create --id "$EXCHANGE_APP_ID" --output none
+
+# The server's identity, with no role.
+az identity create -g "$RG" -n "$MCP_MI" -l "$LOCATION" --tags $TAGS --output none
+MCP_MI_ID=$(az identity show -g "$RG" -n "$MCP_MI" --query id -o tsv)
+MCP_MI_CLIENT_ID=$(az identity show -g "$RG" -n "$MCP_MI" --query clientId -o tsv)
+MCP_MI_PRINCIPAL_ID=$(az identity show -g "$RG" -n "$MCP_MI" --query principalId -o tsv)
+
+# The environment (the Consumption profile), and its logs into the workspace.
+az containerapp env create -g "$RG" -n "$CAE" -l "$LOCATION" --enable-workload-profiles \
+  --logs-destination azure-monitor --tags $TAGS --output none
+az monitor diagnostic-settings create --name log-analytics \
+  --resource "$(az containerapp env show -g "$RG" -n "$CAE" --query id -o tsv)" \
+  --workspace "$(az monitor log-analytics workspace show -g "$RG" -n "$LAW" --query id -o tsv)" \
+  --export-to-resource-specific true \
+  --logs '[{"category":"ContainerAppConsoleLogs","enabled":true},{"category":"ContainerAppSystemLogs","enabled":true}]' --output none
+
+# The server. The template also sets TCP startup, readiness and liveness probes on 8080.
+az containerapp create -g "$RG" -n "$MCP_APP" --environment "$CAE" --workload-profile-name Consumption \
+  --image "$MCP_IMAGE" --cpu 0.25 --memory 0.5Gi --min-replicas 0 --max-replicas 3 \
+  --scale-rule-name http --scale-rule-http-concurrency 20 \
+  --ingress external --target-port 8080 --transport auto \
+  --user-assigned "$MCP_MI_ID" --revisions-mode single --tags $TAGS \
+  --env-vars ASPNETCORE_ENVIRONMENT=Production Mcp__Provider=AuthKit \
+    "Mcp__ResourceUrl=https://$MCP_HOST/mcp" "Mcp__Authentication__Issuer=$AUTHKIT_DOMAIN" Mcp__Authentication__Scope=openid \
+    Mcp__Actor__Id=mcp Mcp__Actor__WorkloadIdentity__Kind=ManagedIdentity \
+    "Mcp__Actor__WorkloadIdentity__Audience=api://$EXCHANGE_APP_ID" "Mcp__Actor__WorkloadIdentity__ClientId=$MCP_MI_CLIENT_ID" \
+    "AZURE_CLIENT_ID=$MCP_MI_CLIENT_ID" Mcp__SecretTools__Enabled=false "Storyteller__BaseUrl=https://$API_HOST/api" \
+  --output none
+```
+
+| Setting of the server | Value | Why |
+| --- | --- | --- |
+| `Mcp__Provider`, `Mcp__Authentication__Issuer` | `AuthKit`, the AuthKit domain | people sign in at the AuthKit domain, where MCP clients register themselves (dynamic client registration), not through the WorkOS API like the admin UI |
+| `Mcp__ResourceUrl` | `https://mcp.2s.42for.net/mcp` | the `aud` every accepted token must carry (the resource indicator), and the base of the resource metadata |
+| `Mcp__Authentication__Scope` | `openid` | dynamically registered clients get no WorkOS permission, and an environment-wide default scope would be in every token of every 42for.net product. The gate is the API: a person needs a Storyteller account, and their roles decide every call |
+| `Mcp__Actor__*` | the actor `mcp`, the managed identity, `api://<exchange app id>` | the server proves itself to the API with a token of its identity; no secret exists |
+| `Mcp__SecretTools__Enabled` | `false` | the API's actor withholds secrets (`NoSecretReveal`) |
+| `Storyteller__BaseUrl` | `https://api.2s.42for.net/api` | the exchange and every call go to the API |
+
+**The API** turns the exchange on and trusts the server as the actor `mcp` (the template writes these with `mcpEnabled`; by hand, add them to the settings of step 8.3):
+
+```sh
+az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
+  Auth__TokenExchange__Enabled=true \
+  "Auth__TokenExchange__AdditionalIssuers__0__Issuer=$AUTHKIT_DOMAIN" \
+  "Auth__TokenExchange__AdditionalIssuers__0__JwksUri=$AUTHKIT_DOMAIN/oauth2/jwks" \
+  Auth__TokenExchange__Actors__0__Id=mcp \
+  "Auth__TokenExchange__Actors__0__Authentication__WorkloadIdentity__Issuer=https://sts.windows.net/$TENANT_ID/" \
+  "Auth__TokenExchange__Actors__0__Authentication__WorkloadIdentity__Subject=$MCP_MI_PRINCIPAL_ID" \
+  "Auth__TokenExchange__Actors__0__Authentication__WorkloadIdentity__Audience=api://$EXCHANGE_APP_ID" \
+  "Auth__TokenExchange__Actors__0__SubjectAudiences__0=https://$MCP_HOST/mcp" \
+  --output none
+```
+
+| Setting of the API | Why |
+| --- | --- |
+| `Auth__TokenExchange__AdditionalIssuers__0__*` | MCP sign-ins come from the AuthKit domain, while the API's own issuer is the WorkOS API (until the custom domain, 424-247). The API exchanges such tokens and never accepts them on its routes. **With the custom domain** both issuers are `https://auth.42for.net`: the entry goes away in the same change, or the API doesn't start (the template drops it by itself) |
+| `…__WorkloadIdentity__Issuer`, `__Subject`, `__Audience` | the v1 tokens of the identity: the tenant's v1 issuer, the identity's object id, the App ID URI. The API reads the keys through the issuer's discovery document |
+| `…__SubjectAudiences__0` | the MCP resource URL, the only `aud` the actor may exchange. The API also refuses a token with it on its routes, so a leaked MCP token can't call the API directly. It stays out of `Auth__AuthKit__Audiences__<n>` |
+| (defaults) | `Scopes` `User.Impersonation`, `NoSecretReveal`, `AllowedClientIds` empty (MCP clients register dynamically; the API warns once at start), 10-minute tokens, actor tokens up to 24 hours old (Azure.Identity caches them) |
+
+**The custom domain:** the records `mcp.2s` (CNAME to the app's `properties.configuration.ingress.fqdn`) and `asuid.mcp.2s` (TXT, its `properties.customDomainVerificationId`) in the zone `42for.net` (step 12). A CAA record of the zone, if there is one, must allow `digicert.com`. Then `az containerapp hostname bind -g "$RG" -n "$MCP_APP" --hostname "$MCP_HOST" --environment "$CAE" --validation-method CNAME`. The template binds it with `mcpCustomDomain`: the host name with the binding type `Auto` and the managed certificate.
+
+**WorkOS production** (step 13): dynamic client registration on, and the resource indicator `https://mcp.2s.42for.net/mcp`, the default one only if staging showed that it leaves the `aud` of the admin UI's tokens alone (runbook, phase 1).
+
+**The deployment identity** (step 11.2) gets **Container Apps Contributor on the Container App only**, enough for `az containerapp update --image`, which PATCHes the containers and nothing else, so it needs no role on the environment or the server's identity: `az role assignment create --assignee-object-id "$DEPLOY_SP_ID" --assignee-principal-type ServicePrincipal --role "Container Apps Contributor" --scope "$(az containerapp show -g "$RG" -n "$MCP_APP" --query id -o tsv)"`. The workflow runs it with `--no-wait` and polls the app: the CLI's own wait reads an operation at subscription scope, where the identity has no role. The GitHub environment gets the variable `AZURE_MCP_APP_NAME` (step 15).
+
+Check: `curl -s -i -X POST https://mcp.2s.42for.net/mcp` answers `401` with `WWW-Authenticate: Bearer resource_metadata="https://mcp.2s.42for.net/.well-known/oauth-protected-resource/mcp"`, and that document names the AuthKit domain and `openid`. The full verification is phase 9 of the runbook.
+
 ## 18. Costs to expect
 
 | Item | Monthly |
@@ -619,6 +715,7 @@ The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with
 | Key Vault (keys and operations; HSM keys only when a project allows them) | under 1 USD |
 | Log Analytics, Application Insights (capped) | 0 |
 | Sentry Developer (5k errors a month for both projects; the API sends at most 40 a day per instance) | 0 |
+| Container Apps, the MCP server (step 17a: scale to zero, within the monthly free grant of 180,000 vCPU-seconds, 360,000 GiB-seconds and 2 million requests; its logs under the workspace's cap; the managed certificate is free) | 0 |
 | **Total** | **about 0–2 USD** |
 
 What raises it: Cosmos DB throughput above 1000 RU/s, a second region or zone redundancy, an always-ready instance, HSM keys (about 1 USD per key a month), a NAT gateway (about 35 USD), a Managed HSM (thousands of USD). The budget of step 2 warns at 2.50 USD.
