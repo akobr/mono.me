@@ -68,3 +68,16 @@ param logDailyCapGb = '1'
 
 // The month of the first run; if that is a later month, set its first day before the run, then never change it.
 param budgetStartDate = '2026-11-01'
+
+// The MCP server on Container Apps (docs/Platform/Deployment/runbook-mcp-server.md), off until its phase 4. Then:
+// mcpEnabled = true, mcpExchangeAppId the application id that New-TokenExchangeApplication.ps1 prints (phase 2) and
+// mcpInitialImage the image of the first build (phase 3). Once the app exists and its DNS records too (phase 6):
+// mcpAppExists = true, so later runs keep the image that Platform.Storyteller.Mcp.yml deployed, and mcpCustomDomain =
+// true, which binds mcp.2s.42for.net with a managed certificate. mcpEnabled = false turns the API's exchange off again
+// and leaves the Container App as it is.
+param mcpEnabled = false
+param mcpHostName = 'mcp.2s.42for.net'
+param mcpExchangeAppId = ''
+param mcpInitialImage = ''
+param mcpAppExists = false
+param mcpCustomDomain = false

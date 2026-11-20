@@ -1,5 +1,6 @@
-# Shared steps of New-ByokApplication.ps1 and New-DeploymentApplication.ps1: find or create an Entra application, its
-# service principal and a federated identity credential, with the Azure CLI. Bicep does not manage Entra objects.
+# Shared steps of New-ByokApplication.ps1, New-DeploymentApplication.ps1 and New-TokenExchangeApplication.ps1: find or
+# create an Entra application, its service principal and a federated identity credential, with the Azure CLI. Bicep does
+# not manage Entra objects.
 
 Set-StrictMode -Version Latest
 
@@ -28,7 +29,7 @@ function Get-OrCreateApplication {
         }
 
         if ($app.passwords -gt 0 -or $app.certificates -gt 0) {
-            Write-Warning "Application '$DisplayName' has $($app.passwords) secret(s) and $($app.certificates) certificate(s): it is meant to have none, its credential is the federation."
+            Write-Warning "Application '$DisplayName' has $($app.passwords) secret(s) and $($app.certificates) certificate(s): it is meant to have none (its credential is a federation, or it has none at all)."
         }
 
         return $app.appId

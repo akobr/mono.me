@@ -2,7 +2,7 @@
 
 Steps 1–15 of the [cookbook](../../../docs/Platform/Deployment/cookbook-azure-production.md) as Bicep templates and small PowerShell scripts: the production environment in Sweden Central, as cheap as the free tiers allow. The names, settings and decisions are those of the [spec](../../../docs/Platform/Deployment/specs/2026-11-09%20Azure%20Production%20Environment%20of%20the%202S%20Platform.md) and the [decisions](../../../docs/Platform/Deployment/decisions.md); why the templates look the way they do is in [Bicep Templates for the Production Environment](../../../docs/Platform/Deployment/specs/2026-11-09%20Bicep%20Templates%20for%20the%20Production%20Environment.md).
 
-Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
+Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook. The MCP server on Container Apps (cookbook, step 17a) is off by default (`mcpEnabled`) and has its own [runbook](../../../docs/Platform/Deployment/runbook-mcp-server.md).
 
 ## What is where
 
@@ -17,10 +17,14 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `modules/keyvault.bicep` | 7 | `prod-2s-42fornet-kv`: Premium, RBAC, **purge protection**, delete lock, the secret `cosmos-connection`, the identity's roles |
 | `modules/functions.bicep` | 8 | `prod-2s-api-asp` and `prod-2s-api-fa`: Flex Consumption, .NET 10 isolated, 512 MB, at most 10 instances, the app settings |
 | `modules/staticwebapp.bicep` | 9 | `prod-2s-app-swa`: Free, `eastus2` (metadata only; West Europe, the only European one, refuses new tenants) |
-| `modules/access.bicep` | 6, 7, 11.2 | the owner's roles, and the deployment identity's roles once it exists |
+| `modules/access.bicep` | 6, 7, 11.2, 17a | the owner's roles, and the deployment identity's roles once it exists (with the MCP server also Container Apps Contributor on its Container App only) |
 | `domains.bicep`, `modules/hostname-binding.bicep` | 10 | `api.2s.42for.net` with a managed certificate, `app.2s.42for.net` |
+| `modules/mcp.bicep` | 17a | with `mcpEnabled`: the Container Apps environment `prod-2s-cae` (the Consumption profile only, logs into `prod-2s-log` through a diagnostic setting) and the MCP server `prod-2s-mcp-ca` (0.25 vCPU, 0.5 GiB, 0–3 replicas, its settings, no secret); with `mcpCustomDomain` also `mcp.2s.42for.net` with the environment's free managed certificate (a Container App has no binding of its own, so the template that writes the app binds its domain) |
+| `modules/mcp-existing.bicep` | 17a | the MCP server as it runs: a later run keeps the image that `Platform.Storyteller.Mcp.yml` deployed and the bound certificate |
+| `modules/identity.bicep` (second call) | 17a | with `mcpEnabled`: the MCP server's own identity `prod-2s-mcp-mi`, with no Azure role |
 | `scripts/New-ByokApplication.ps1` | 11.1 | the Entra app `2S Platform Customer Keys` and its federation with the identity |
 | `scripts/New-DeploymentApplication.ps1` | 11.2 | the Entra app `2S Platform Deployment` and its federation with GitHub |
+| `scripts/New-TokenExchangeApplication.ps1` | 17a | the Entra app `2S Platform Token Exchange` (`api://<app id>`, no credential): the audience of the MCP server's actor tokens; with `-McpIdentityName` only that identity gets tokens for it |
 | — (outputs of `main.bicep`) | 12 | the DNS records |
 | — (by hand, cookbook) | 13, 14 | WorkOS production, Sentry (the projects `2s-admin-ui` and `2s-api`), PostHog |
 | `scripts/Set-GitHubEnvironment.ps1` | 15 | the GitHub environment `prod.42.Platform`, its variables and its one secret |
@@ -50,6 +54,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `budgetStartDate` | the budget's first month, never moved afterwards | the month of the first run |
 | `exhibitionOrganization`, `exhibitionProject`, `exhibitionOwner` | `Exhibition__Organization`, `Exhibition__Project` and `Exhibition__Owner`: the exhibition, the demo project that the admin UI offers to a new user, and the id of the account that owns it ([access](../../../docs/Platform/Storyteller/access.md#exhibition)). All three or none: the template leaves the three settings out unless all three are set, and the API then has no exhibition | the seed of the exhibition ([runbook](../../../docs/Platform/Deployment/runbook-azure-production.md#turning-the-exhibition-on)); `prod.bicepparam` does not set them yet |
 | `stepUpEnabled` | `Auth__StepUp__Enabled`: `''` (the default, the setting left out: on under AuthKit), `'true'` or `'false'`, the escape hatch when a client cannot satisfy the [step-up](../../../docs/Platform/Storyteller/authentication.md#recent-sign-in-step-up) | optional, any time |
+| `mcpEnabled`, `mcpHostName`, `mcpExchangeAppId`, `mcpInitialImage`, `mcpAppExists`, `mcpCustomDomain` | the MCP server (cookbook, step 17a): `mcpEnabled` creates its identity, environment and app, and turns the API's user token exchange on with the server as the actor `mcp` (`Auth__TokenExchange__*`); `false` (the default) leaves all of it out and keeps the exchange off. `mcpHostName` gives the resource URL `https://<host>/mcp`, `mcpExchangeAppId` the actor's audience `api://<id>`, `mcpInitialImage` the image of the run that creates the app; `mcpAppExists = true` once it exists, so later runs keep the image the workflow deployed and the bound certificate; `mcpCustomDomain = true` once the DNS records exist binds `mcpHostName` with a managed certificate. A missing value fails the deployment before anything is written. `mcpScope` (`openid`) and `mcpMaxReplicas` (3) have defaults | the [MCP runbook](../../../docs/Platform/Deployment/runbook-mcp-server.md): phase 2 (`mcpExchangeAppId`), phase 3 (`mcpInitialImage`), phase 4 (`mcpEnabled`), phase 6 (`mcpAppExists`, `mcpCustomDomain`) |
 | `stepUpMaxAgeSeconds` | `Auth__StepUp__MaxAge` in seconds: `null` (the default, 10 minutes) or `60` to `86400` (24 hours), the range the API accepts at start; the build and the deployment refuse any other number, and the template writes it as the `TimeSpan` the API reads (`900` → `00:15:00`, `86400` → `1.00:00:00`) | optional, any time |
 
 Only the owner's personal values come from environment variables, so the repository doesn't hold them:
@@ -154,6 +159,7 @@ Run `what-if`, then `create`, from an up-to-date checkout with the two owner var
 - **The step-up of users** (secrets, roles and machine credentials need a sign-in of the last 10 minutes; on by default under AuthKit): `stepUpMaxAgeSeconds` changes the window and `stepUpEnabled = 'false'` turns it off, both in `prod.bicepparam`, never in the portal (the next run would remove them). The what-if shows the change of `Auth__StepUp__…` in `prod-2s-api-fa/appsettings`: `+` when the setting is new, `~` when an override changes, `-` when an override goes back to `''` or `null`; changing the app settings restarts the Function App. Deploy the admin UI with the API that brings the step-up, or before it: an older admin UI cannot satisfy it ([rollout](../../../docs/Platform/Storyteller/authentication.md#rollout-of-the-step-up)).
 - **The managed identity is never re-created**: its principal id is the subject of the BYOK federation.
 - **Rotating the Cosmos DB keys** (cookbook, step 7): switch `cosmosConnectionKey` to the other key, run `main.bicep`, restart the Function App (the app setting references the secret without a version, which the app refreshes only about once a day), then regenerate the key no longer in use.
+- **The MCP server's image belongs to its workflow.** `Platform.Storyteller.Mcp.yml` changes it on every merge of the server; with `mcpAppExists = true` a run of `main.bicep` reads the running image and the bound certificate first and writes them back (`modules/mcp-existing.bicep`, the pattern of the Azure Developer CLI). Its settings and its custom domain belong to the template, like the API's settings: change them in `modules/mcp.bicep` or the parameters, never in the portal (the next run would undo it). Don't run `main.bicep` while the workflow's `deploy` job runs or waits for approval: the template could write the earlier image back.
 - `domains.bicep` is not part of a normal run. A rerun reads the site's current binding first and keeps an existing SNI binding as it is, then puts the certificate again (an existing managed certificate is kept, not reissued) and binds its current thumbprint, so TLS stays on.
 - `MachineAuth__DisabledCredentialKinds__*` is read by the API only once [424-232](https://linear.app/424fun/issue/424-232/turn-off-machine-credential-kinds-per-deployment) is merged. Until then the setting has no effect. That is safe: with `IsCertificateHeaderFromClientAllowed=false` a certificate machine can't sign in anyway, but projects can still enable the kinds.
 
@@ -172,6 +178,13 @@ az functionapp config appsettings list -g prod-2s-eusec-rg -n prod-2s-api-fa --q
 ```
 
 The rest of the checks are in the cookbook (steps 5, 7, 8.4 and 17).
+
+The MCP server, once it runs:
+
+```powershell
+az containerapp show -g prod-2s-eusec-rg -n prod-2s-mcp-ca --query "{image:properties.template.containers[0].image, fqdn:properties.configuration.ingress.fqdn, domains:properties.configuration.ingress.customDomains[].{name:name, binding:bindingType}}" -o json
+curl.exe -s -o NUL -w "%{http_code}`n" -X POST https://mcp.2s.42for.net/mcp   # 401
+```
 
 ## Not here yet
 

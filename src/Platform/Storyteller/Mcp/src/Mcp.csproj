@@ -12,6 +12,22 @@
     <UserSecretsId>5d1f6b0e-8c3a-4f7e-9b52-2a6c4d8e1f30</UserSecretsId>
   </PropertyGroup>
 
+  <!--
+    The container image, built by the SDK without a Dockerfile (dotnet publish -t:PublishContainer): ASP.NET Core's
+    chiseled Ubuntu image, no shell, the non-root user app, port 8080. No ICU or tzdata, which InvariantGlobalization and
+    the server do without. The registry (ghcr.io) and the tags (the commit) come from Platform.Storyteller.Mcp.yml.
+  -->
+  <PropertyGroup>
+    <ContainerRepository>akobr/2s-platform-mcp</ContainerRepository>
+    <ContainerFamily>noble-chiseled</ContainerFamily>
+    <ContainerDescription>The MCP server of the 2S Platform: an AI assistant works with the platform as the signed-in person.</ContainerDescription>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The package on ghcr.io belongs to the repository (RepositoryUrl of Directory.Build.props is a folder URL). -->
+    <ContainerLabel Include="org.opencontainers.image.source" Value="https://github.com/akobr/mono.me" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="42.Platform.Storyteller.Mcp.UnitTests" />
     <InternalsVisibleTo Include="42.Platform.Storyteller.Mcp.IntegrationTests" />
