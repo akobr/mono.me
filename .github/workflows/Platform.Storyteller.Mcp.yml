@@ -1,0 +1,217 @@
+name: Platform.Storyteller.Mcp
+
+# The MCP server (src/Platform/Storyteller/Mcp): its unit tests on every pull request and push to main that touches it or
+# a project it builds on. On main (a push, or by hand) also its container image, built by the .NET SDK without a
+# Dockerfile and pushed to ghcr.io/akobr/2s-platform-mcp with the commit as its tag, and then, after the approval of the
+# environment prod.42.Platform, that image on the Container App (az containerapp update --image, as the deployment
+# identity, which has Container Apps Contributor on that Container App only). The image holds no setting and no secret: the Container
+# App gives them. docs/Platform/Deployment/runbook-mcp-server.md.
+on:
+  pull_request:
+    paths:
+      - 'src/Platform/Storyteller/Mcp/**'
+      - 'src/Platform/Storyteller/Sdk.NSwag/**'
+      - 'src/Platform/Storyteller/Abstractions.Annotations/**'
+      - 'src/Platform/Storyteller/KeyValues.ClientEncryption/**'
+      - 'src/Platform/Storyteller/conformance/project-settings.json'
+      - 'src/Platform/Aspire.ServiceDefaults/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - '.github/workflows/Platform.Storyteller.Mcp.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/Platform/Storyteller/Mcp/**'
+      - 'src/Platform/Storyteller/Sdk.NSwag/**'
+      - 'src/Platform/Storyteller/Abstractions.Annotations/**'
+      - 'src/Platform/Storyteller/KeyValues.ClientEncryption/**'
+      - 'src/Platform/Storyteller/conformance/project-settings.json'
+      - 'src/Platform/Aspire.ServiceDefaults/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - '.github/workflows/Platform.Storyteller.Mcp.yml'
+  # A redeployment of main, e.g. the first image (runbook, phase 3).
+  workflow_dispatch:
+
+concurrency:
+  group: platform-storyteller-mcp-${{ github.ref }}
+  # A newer pull request run replaces an older one; on main a deployment is never cut off halfway, the next one waits.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  # ContainerRegistry (here) and ContainerRepository (Mcp.csproj).
+  IMAGE_NAME: ghcr.io/akobr/2s-platform-mcp
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # The whole history: the versioning of the build fails on a shallow clone.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: MCP server unit tests
+        run: dotnet test --project src/Platform/Storyteller/Mcp/test
+
+  image:
+    name: Container image
+    needs: test
+    # Only main is ever built into an image; a manual run of another branch tests it and stops here.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # The SDK pushes with the credentials docker login stores. The first push links the package to this repository;
+      # if it comes out private, make it public once in its settings (runbook, phase 3), so the Container App pulls it
+      # without a credential.
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Two tags: the commit, which every deployment uses, and latest for convenience. The quotes keep the ';' inside
+      # the one property value.
+      - name: Build and push the image
+        id: publish
+        run: |
+          set -euo pipefail
+          tags="\"${GITHUB_SHA};latest\""
+          dotnet publish src/Platform/Storyteller/Mcp/src -c Release --os linux --arch x64 \
+            -t:PublishContainer -p:ContainerRegistry=ghcr.io "-p:ContainerImageTags=${tags}"
+          echo "image=${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Pushed \`${IMAGE_NAME}:${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to the Container App
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A required reviewer and the branch main only; its federated credential is the deployment identity's.
+    environment: prod.42.Platform
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      APP_NAME: ${{ vars.AZURE_MCP_APP_NAME }}
+      IMAGE: ${{ needs.image.outputs.image }}
+    steps:
+      - name: Check the environment's variables
+        run: |
+          if [ -z "$APP_NAME" ] || [ -z "$RESOURCE_GROUP" ]; then
+            echo "::error::AZURE_MCP_APP_NAME and AZURE_RESOURCE_GROUP of the environment prod.42.Platform must be set (Set-GitHubEnvironment.ps1; runbook-mcp-server.md, phase 8)."
+            exit 1
+          fi
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Only the image changes: az containerapp update PATCHes the containers alone (no environment, no identity), which
+      # Container Apps Contributor on the app allows. The settings belong to main.bicep, which keeps this image on its
+      # later runs. A suffix per run gives a new revision even for an image that runs already (a redeployment).
+      # --no-wait: the CLI's own wait polls an operation at subscription scope, where the identity has no role; the next
+      # step polls the app instead.
+      - name: Run the new image
+        run: |
+          set -euo pipefail
+          suffix="gh${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          az containerapp update --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --image "$IMAGE" \
+            --revision-suffix "$suffix" --no-wait --output none
+          echo "REVISION_SUFFIX=$suffix" >> "$GITHUB_ENV"
+
+      # The revision of the new image serves once it is provisioned and the latest ready one (single revision mode moves
+      # all traffic to it then). Then the resource metadata, built from Mcp:ResourceUrl, must answer at the public URL,
+      # which also wakes the app from zero replicas and so proves that the new image starts.
+      - name: Check the new revision
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 900))
+          while true; do
+            app=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" \
+              --query "{state: properties.provisioningState, latest: properties.latestRevisionName, ready: properties.latestReadyRevisionName, image: properties.template.containers[0].image, resourceUrl: properties.template.containers[0].env[?name=='Mcp__ResourceUrl'].value | [0]}" -o json)
+            state=$(jq -r '.state // ""' <<< "$app")
+            latest=$(jq -r '.latest // ""' <<< "$app")
+            ready=$(jq -r '.ready // ""' <<< "$app")
+
+            if [ "$state" = "Failed" ]; then
+              echo "::error::The update of $APP_NAME failed; see az containerapp logs show --type system."
+              exit 1
+            fi
+
+            if [[ "$latest" == *"--${REVISION_SUFFIX}" ]]; then
+              revision=$(az containerapp revision show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --revision "$latest" \
+                --query "{provisioning: properties.provisioningState, running: properties.runningState}" -o json)
+              provisioning=$(jq -r '.provisioning // ""' <<< "$revision")
+              running=$(jq -r '.running // ""' <<< "$revision")
+              echo "App $state, revision $latest $provisioning/$running, the latest ready one ${ready:-none}"
+
+              if [ "$provisioning" = "Failed" ] || [ "$running" = "Failed" ] || [ "$running" = "Degraded" ]; then
+                echo "::error::The revision $latest is $provisioning/$running; see az containerapp logs show --type system."
+                exit 1
+              fi
+
+              if [ "$state" = "Succeeded" ] && [ "$provisioning" = "Provisioned" ] && [ "$ready" = "$latest" ]; then
+                break
+              fi
+            else
+              echo "App $state, waiting for the revision *--${REVISION_SUFFIX} (the latest is ${latest:-none})"
+            fi
+
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::The revision of $IMAGE is not ready after 15 minutes."
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+          image=$(jq -r '.image // ""' <<< "$app")
+          if [ "$image" != "$IMAGE" ]; then
+            echo "::error::The Container App runs $image, not $IMAGE."
+            exit 1
+          fi
+
+          resource_url=$(jq -r '.resourceUrl // ""' <<< "$app")
+          origin=$(sed -E 's#^(https://[^/]+).*$#\1#' <<< "$resource_url")
+          metadata_url="${origin}/.well-known/oauth-protected-resource${resource_url#"$origin"}"
+          echo "Revision $latest is ready; reading $metadata_url"
+          curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors --max-time 30 "$metadata_url" \
+            | jq -e --arg url "$resource_url" '.resource == $url' > /dev/null
+          echo "The MCP server runs \`$IMAGE\` as revision \`$latest\` at $resource_url." >> "$GITHUB_STEP_SUMMARY"

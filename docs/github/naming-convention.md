@@ -48,6 +48,7 @@ project uses the project's path, a workflow that spans a whole area uses the are
 | `Platform.Deployment.yml` | the Azure deployment templates |
 | `Platform.Storyteller-conformance.yml` | the Storyteller conformance suite |
 | `Platform.Storyteller.CosmosDb.yml` | the Cosmos DB suites of the Storyteller backend |
+| `Platform.Storyteller.Mcp.yml` | the MCP server: its tests, its container image and its deployment |
 | `Platform.Storyteller.Sdk-release.yml` | the release of the Storyteller SDKs |
 | `Platform.GitHubAction-release.yml` | the release of the GitHub Action |
 
