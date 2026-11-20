@@ -69,23 +69,24 @@ The part after the view, `exe.northwind.invoicing.production`, is the **annotati
 
 ## Which package do I need?
 
+**Writing .NET?**
+
 ```mermaid
-flowchart TD
-  q([What are you building?])
-  q --> a["A .NET service<br/>for one customer"]
-  q --> b["A .NET worker that<br/>serves every customer"]
-  q --> c["An Aspire AppHost"]
-  q --> d["A tool or script<br/>that talks to the API"]
-  q --> e["A web app or<br/>Node script"]
-  q --> f["A CI pipeline"]
-  q --> g["A chat with<br/>your AI assistant"]
-  a --> A["Configuration<br/>+ KeyVault for secrets"]
-  b --> B["Hosting"]
-  c --> C["Aspire.Hosting"]
-  d --> D["C# SDK"]
-  e --> E["TypeScript SDK"]
-  f --> F["sform + GitHub Action"]
-  g --> G["MCP server"]
+flowchart LR
+  a["A service for one customer"] --> A["Configuration"]
+  s["…that needs Key Vault secrets"] --> S["Configuration.KeyVault"]
+  b["A worker that serves every customer"] --> B["Hosting"]
+  c["An Aspire AppHost"] --> C["Aspire.Hosting"]
+  d["A tool or script that talks to the API"] --> D["C# SDK"]
+```
+
+**Something else?**
+
+```mermaid
+flowchart LR
+  e["A web app or Node script"] --> E["TypeScript SDK"]
+  f["A CI pipeline"] --> F["sform + GitHub Action"]
+  g["A chat with your AI assistant"] --> G["MCP server"]
 ```
 
 ## The package map
