@@ -1,5 +1,7 @@
 // Cookbook, step 3: the API's only identity. It reads the vault and the storage, and is the federated credential of
 // the BYOK application: its principal id is the subject there, so the identity must never be re-created.
+// main.bicep also creates the MCP server's own identity with this module (step 17a), with no role: its object id is the
+// subject the API's actor mcp pins, so a re-created identity needs a run of main.bicep before the server works again.
 
 param name string
 param location string

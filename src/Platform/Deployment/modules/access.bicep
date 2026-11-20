@@ -7,6 +7,10 @@
 //   nothing on the resource group, so it can't list the Cosmos DB keys or read other secrets directly. That is no
 //   isolation from the API's secrets: the code it deploys runs as the app's managed identity, which reads every secret
 //   of the vault (keyvault.bicep), so the deployment identity is trusted with all of them.
+//   With the MCP server, also Container Apps Contributor on its Container App only (Platform.Storyteller.Mcp.yml runs az
+//   containerapp update --image, a PATCH of the containers alone): nothing on the environment, the server's identity or
+//   anything else of the group. The code it deploys runs as the server's identity, which has no Azure role and proves
+//   only the actor mcp to the API.
 
 @description('The object id of the owner (an Entra user).')
 param ownerObjectId string
@@ -20,11 +24,15 @@ param keyVaultName string
 param cosmosSecretName string
 param functionAppName string
 
+@description('The MCP server\'s Container App; empty without the MCP server (mcpEnabled).')
+param mcpAppName string = ''
+
 var roles = {
   keyVaultAdministrator: '00482a5a-887f-4fb3-b363-3b7fe8e74483'
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
   storageBlobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
   websiteContributor: 'de139f84-1756-47ae-9be6-808fbbe84772'
+  containerAppsContributor: '358470bc-b998-42bd-ab17-a7e34c199c0f'
 }
 
 var hasDeploymentPrincipal = !empty(deploymentPrincipalId)
@@ -51,6 +59,10 @@ resource vault 'Microsoft.KeyVault/vaults@2025-05-01' existing = {
 
 resource functionApp 'Microsoft.Web/sites@2025-03-01' existing = {
   name: functionAppName
+}
+
+resource mcpApp 'Microsoft.App/containerApps@2026-07-01' existing = if (!empty(mcpAppName)) {
+  name: mcpAppName
 }
 
 resource ownerVault 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -98,6 +110,16 @@ resource deploymentPackages 'Microsoft.Authorization/roleAssignments@2022-04-01'
   scope: storage::blobService::deploymentContainer
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageBlobDataContributor)
+    principalId: deploymentPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource deploymentMcpApp 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (hasDeploymentPrincipal && !empty(mcpAppName)) {
+  name: guid(mcpApp.id, deploymentPrincipalId, roles.containerAppsContributor)
+  scope: mcpApp
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.containerAppsContributor)
     principalId: deploymentPrincipalId
     principalType: 'ServicePrincipal'
   }

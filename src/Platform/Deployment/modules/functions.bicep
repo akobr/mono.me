@@ -101,6 +101,21 @@ param alwaysReadyInstances int
 @description('true: authKitDomain is the custom AuthKit domain and issues the user tokens. false: the WorkOS API issues them.')
 param authKitCustomDomain bool
 
+@description('The user token exchange for the MCP server (Auth:TokenExchange); false keeps it off with no actor.')
+param tokenExchangeEnabled bool
+
+@description('The id of the MCP server\'s actor, Mcp:Actor:Id of the server.')
+param mcpActorId string
+
+@description('The MCP resource URL, e.g. https://mcp.2s.42for.net/mcp: the only aud of the person\'s tokens the actor may exchange.')
+param mcpResourceUrl string
+
+@description('The object id of the MCP server\'s managed identity: the sub of its actor tokens.')
+param mcpIdentityPrincipalId string
+
+@description('The App ID URI of "2S Platform Token Exchange", api://<app id>: the aud of the actor tokens.')
+param mcpExchangeAudience string
+
 // Without a custom domain, the user tokens the admin UI and sform get from the WorkOS API (user_management/authenticate)
 // carry iss https://api.workos.com/user_management/<client id> (checked on a production token, 2026-11-11).
 var authKitIssuer = authKitCustomDomain ? 'https://${authKitDomain}' : 'https://api.workos.com/user_management/${authKitClientId}'
@@ -123,8 +138,6 @@ var baseSettings = {
   Auth__AuthKit__Audience: authKitAudience
   // Every signed-in user gets User.Impersonation and their roles decide the rest; without it every user gets 401.
   Auth__AuthKit__DefaultUserScopes__0: 'User.Impersonation'
-  // No MCP server in this phase.
-  Auth__TokenExchange__Enabled: 'false'
 
   MachineAuth__DefaultCredentialKind: 'ApiKey'
   // The API never reads X-ARR-ClientCert, so nobody can fake a certificate with it.
@@ -162,6 +175,36 @@ var authKitDomainSetting = empty(authKitDomain) ? {} : { Auth__AuthKit__AuthKitD
 var authKitApiKeySetting = authKitApiKeyEnabled
   ? { Auth__AuthKit__ApiKey: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=authkit-api-key)' }
   : {}
+
+// The user token exchange of the MCP server (docs/Platform/Storyteller/mcp.md, "Registering the actor in the API"). The
+// server's sign-ins come from the AuthKit domain; while the API's issuer is another one (the WorkOS API, before the custom
+// domain), the domain is an additional issuer, accepted for the exchange only. With the custom domain both are the same,
+// and listing it would stop the API at start. The actor proves itself with a v1 token of its managed identity for the
+// exchange application: issuer the tenant's v1 issuer, sub the identity's object id, aud the App ID URI; the API finds
+// its keys through the issuer's discovery document (https://sts.windows.net/<tenant>/.well-known/openid-configuration).
+// The defaults stay: Scopes User.Impersonation, NoSecretReveal (AllowSecrets off), any MCP client (dynamic
+// registration), 10-minute tokens, actor tokens up to 24 hours old (Azure.Identity caches them).
+var authKitDomainIssuer = 'https://${authKitDomain}'
+var tokenExchangeIssuerSettings = !tokenExchangeEnabled || empty(authKitDomain) || authKitDomainIssuer == authKitIssuer
+  ? {}
+  : {
+      Auth__TokenExchange__AdditionalIssuers__0__Issuer: authKitDomainIssuer
+      Auth__TokenExchange__AdditionalIssuers__0__JwksUri: '${authKitDomainIssuer}/oauth2/jwks'
+    }
+
+var tokenExchangeSettings = tokenExchangeEnabled
+  ? {
+      Auth__TokenExchange__Enabled: 'true'
+      Auth__TokenExchange__Actors__0__Id: mcpActorId
+      Auth__TokenExchange__Actors__0__Authentication__WorkloadIdentity__Issuer: 'https://sts.windows.net/${tenant().tenantId}/'
+      Auth__TokenExchange__Actors__0__Authentication__WorkloadIdentity__Subject: mcpIdentityPrincipalId
+      Auth__TokenExchange__Actors__0__Authentication__WorkloadIdentity__Audience: mcpExchangeAudience
+      Auth__TokenExchange__Actors__0__SubjectAudiences__0: mcpResourceUrl
+    }
+  : {
+      // No MCP server: the exchange answers unsupported_grant_type.
+      Auth__TokenExchange__Enabled: 'false'
+    }
 
 var byokSetting = empty(byokClientId) ? {} : { KeyValues__Protection__Byok__ClientId: byokClientId }
 
@@ -270,7 +313,7 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
 resource appSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   parent: site
   name: 'appsettings'
-  properties: union(baseSettings, disabledKindSettings, authKitAudienceSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting, sentryDsnSetting, exhibitionSettings, stepUpEnabledSetting, stepUpMaxAgeSetting)
+  properties: union(baseSettings, disabledKindSettings, authKitAudienceSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, tokenExchangeSettings, tokenExchangeIssuerSettings, byokSetting, sentryDsnSetting, exhibitionSettings, stepUpEnabledSetting, stepUpMaxAgeSetting)
 }
 
 resource scmCredentials 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2025-03-01' = {

@@ -20,6 +20,9 @@ type resourceNamesType = {
   functionPlan: string
   functionApp: string
   staticWebApp: string
+  containerAppsEnvironment: string
+  mcpApp: string
+  mcpIdentity: string
 }
 
 @export()
@@ -36,6 +39,9 @@ func resourceNames(environment environmentName, product string, company string, 
   functionPlan: '${environment}-${product}-api-asp'
   functionApp: '${environment}-${product}-api-fa'
   staticWebApp: '${environment}-${product}-app-swa'
+  containerAppsEnvironment: '${environment}-${product}-cae'
+  mcpApp: '${environment}-${product}-mcp-ca'
+  mcpIdentity: '${environment}-${product}-mcp-mi'
 }
 
 @export()

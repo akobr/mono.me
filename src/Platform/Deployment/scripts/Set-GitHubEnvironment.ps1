@@ -11,6 +11,9 @@
     Needs the Azure CLI signed in to the environment's subscription and the GitHub CLI signed in as an admin of the
     repository. Variables whose value is empty are left as they are. Safe to run again.
 
+    AZURE_MCP_APP_NAME, the Container App of the MCP server that Platform.Storyteller.Mcp.yml deploys, is -McpAppName or
+    the output mcpAppName of the deployment, which is empty while mcpEnabled is false (runbook-mcp-server.md, phase 8).
+
 .EXAMPLE
     ./scripts/Set-GitHubEnvironment.ps1 -DeploymentClientId <appId> -BaseAccountId user_01... `
         -SentryDsn https://...@o0.ingest.de.sentry.io/0 -PostHogProjectToken phc_...
@@ -38,6 +41,9 @@ param(
     [string] $SentryDsn = '',
     [string] $PostHogProjectToken = '',
     [string] $PostHogHost = 'https://eu.i.posthog.com',
+
+    [Parameter(HelpMessage = 'AZURE_MCP_APP_NAME: the Container App of the MCP server; the output mcpAppName of the deployment by default.')]
+    [string] $McpAppName = '',
 
     [Parameter(HelpMessage = 'The GitHub login of the required reviewer; the signed-in user by default.')]
     [string] $Reviewer = ''
@@ -85,6 +91,20 @@ function Get-Output([string] $Name) {
     return $outputs.$Name.value
 }
 
+# An output that a deployment of an older template doesn't have yet: empty then.
+function Get-OptionalOutput([string] $Name) {
+    $output = $outputs.PSObject.Properties[$Name]
+    if ($null -eq $output) {
+        return ''
+    }
+
+    return [string] $output.Value.value
+}
+
+if (-not $McpAppName) {
+    $McpAppName = Get-OptionalOutput 'mcpAppName'
+}
+
 if (-not $Reviewer) {
     $Reviewer = gh api user --jq .login
 }
@@ -118,6 +138,7 @@ Set-GitHubVariable 'AZURE_SUBSCRIPTION_ID' (Get-Output 'subscriptionId')
 Set-GitHubVariable 'AZURE_RESOURCE_GROUP' (Get-Output 'resourceGroupName')
 Set-GitHubVariable 'AZURE_FUNCTIONAPP_NAME' (Get-Output 'functionAppName')
 Set-GitHubVariable 'AZURE_KEYVAULT_NAME' (Get-Output 'keyVaultName')
+Set-GitHubVariable 'AZURE_MCP_APP_NAME' $McpAppName
 Set-GitHubVariable 'STORYTELLER_BASE_ACCOUNT_ID' $BaseAccountId
 Set-GitHubVariable 'VITE_API_BASE_URL' (Get-Output 'apiBaseUrl')
 Set-GitHubVariable 'VITE_AUTH_API_HOSTNAME' (Get-Output 'authApiHostname')

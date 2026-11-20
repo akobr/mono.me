@@ -138,8 +138,51 @@ param disabledCredentialKinds string[] = [
 @description('AZURE_FUNCTIONS_ENVIRONMENT and DOTNET_ENVIRONMENT of the API.')
 param runtimeEnvironment string = 'Production'
 
+@description('The MCP server on Container Apps (docs/Platform/Deployment/runbook-mcp-server.md): its identity, environment and app, and the API\'s user token exchange with the server as its actor. false (the default) creates none of it and keeps the exchange off.')
+param mcpEnabled bool = false
+
+@description('The host name of the MCP server, e.g. mcp.2s.42for.net; its resource URL is https://<host>/mcp. Required with mcpEnabled.')
+param mcpHostName string = ''
+
+@description('The application id of "2S Platform Token Exchange" (scripts/New-TokenExchangeApplication.ps1): the server\'s actor tokens are issued for api://<this id>. Required with mcpEnabled.')
+param mcpExchangeAppId string = ''
+
+@description('The image of the run that creates the Container App, e.g. ghcr.io/akobr/2s-platform-mcp:<commit>. Once the app exists (mcpAppExists), the template keeps the image it runs and this is ignored.')
+param mcpInitialImage string = ''
+
+@description('true once the Container App exists: the template then keeps the image that Platform.Storyteller.Mcp.yml deployed, and the binding of its custom domain. false only for the run that creates it.')
+param mcpAppExists bool = false
+
+@description('Binds mcpHostName to the MCP server with a free managed certificate; true only once its CNAME and TXT records (the output dnsRecords) exist. false (the default) leaves the app on its default host name, and removes a bound domain.')
+param mcpCustomDomain bool = false
+
+@description('The scope MCP clients request (Mcp:Authentication:Scope): openid, since dynamically registered clients get no WorkOS permission; the API is the gate.')
+param mcpScope string = 'openid'
+
+@description('The most replicas of the MCP server (a cap on cost); it scales to zero without calls.')
+@minValue(1)
+@maxValue(10)
+param mcpMaxReplicas int = 3
+
 var names = resourceNames(environment, product, company, regionCode)
 var tags = resourceTags(environment)
+
+// The MCP server's actor at the API: Mcp:Actor:Id of the server, Auth:TokenExchange:Actors:0:Id of the API.
+var mcpActorId = 'mcp'
+
+// Checked when the server is on, before anything is written: a missing value would give the API an actor that can never
+// prove itself, or the server a setting that stops it.
+var mcpResourceUrl = !mcpEnabled
+  ? ''
+  : empty(mcpHostName) ? fail('mcpHostName is required with mcpEnabled, e.g. mcp.2s.42for.net.') : 'https://${mcpHostName}/mcp'
+var mcpExchangeAudience = !mcpEnabled
+  ? ''
+  : length(mcpExchangeAppId) != 36
+      ? fail('mcpExchangeAppId must be the application id (a GUID) of "2S Platform Token Exchange" with mcpEnabled: New-TokenExchangeApplication.ps1 prints it.')
+      : 'api://${mcpExchangeAppId}'
+var mcpAuthKitIssuer = !mcpEnabled
+  ? ''
+  : empty(authKitDomain) ? fail('authKitDomain is required with mcpEnabled: people sign in to the MCP server there.') : 'https://${authKitDomain}'
 
 func relativeName(hostName string, zone string) string =>
   endsWith(hostName, '.${zone}') ? substring(hostName, 0, length(hostName) - length(zone) - 1) : hostName
@@ -255,6 +298,57 @@ module keyVault 'modules/keyvault.bicep' = {
   }
 }
 
+// The MCP server's own identity, separate from the API's: its only use is to prove the server to the API as the actor
+// mcp. It has no Azure role. Created before the API's settings, which name its object id.
+module mcpIdentity 'modules/identity.bicep' = if (mcpEnabled) {
+  name: 'platform-mcp-identity'
+  scope: group
+  params: {
+    name: names.mcpIdentity
+    location: location
+    tags: tags
+  }
+}
+
+// The app as it runs, read before it is written again.
+module mcpExisting 'modules/mcp-existing.bicep' = if (mcpEnabled) {
+  name: 'platform-mcp-existing'
+  scope: group
+  params: {
+    appName: names.mcpApp
+    exists: mcpAppExists
+  }
+}
+
+module mcp 'modules/mcp.bicep' = if (mcpEnabled) {
+  name: 'platform-mcp'
+  scope: group
+  params: {
+    environmentName: names.containerAppsEnvironment
+    appName: names.mcpApp
+    location: location
+    tags: tags
+    logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
+    image: mcpAppExists
+      ? mcpExisting!.outputs.image
+      : empty(mcpInitialImage)
+          ? fail('mcpInitialImage is required for the run that creates the MCP server\'s Container App (mcpAppExists = false).')
+          : mcpInitialImage
+    hostName: mcpHostName
+    customDomainEnabled: mcpCustomDomain
+    existingCustomDomains: mcpExisting!.outputs.customDomains
+    identityId: mcpIdentity!.outputs.id
+    identityClientId: mcpIdentity!.outputs.clientId
+    resourceUrl: mcpResourceUrl
+    authKitIssuer: mcpAuthKitIssuer
+    scope: mcpScope
+    actorId: mcpActorId
+    exchangeAudience: mcpExchangeAudience
+    apiBaseUrl: 'https://${apiHostName}/api'
+    maxReplicas: mcpMaxReplicas
+  }
+}
+
 // Step 8.
 module functions 'modules/functions.bicep' = {
   name: 'platform-functions'
@@ -294,6 +388,11 @@ module functions 'modules/functions.bicep' = {
     maximumInstanceCount: functionMaximumInstanceCount
     instanceMemoryMB: functionInstanceMemoryMB
     alwaysReadyInstances: functionAlwaysReadyInstances
+    tokenExchangeEnabled: mcpEnabled
+    mcpActorId: mcpActorId
+    mcpResourceUrl: mcpResourceUrl
+    mcpIdentityPrincipalId: mcpEnabled ? mcpIdentity!.outputs.principalId : ''
+    mcpExchangeAudience: mcpExchangeAudience
   }
 }
 
@@ -320,6 +419,7 @@ module access 'modules/access.bicep' = {
     keyVaultName: keyVault.outputs.name
     cosmosSecretName: keyVault.outputs.cosmosSecretName
     functionAppName: functions.outputs.name
+    mcpAppName: mcpEnabled ? mcp!.outputs.appName : ''
   }
 }
 
@@ -350,8 +450,31 @@ output authApiHostname string = authKitCustomDomain ? authKitDomain : ''
 // AUTH_LOCAL_STORAGE_SESSION of the admin UI: true only without a custom AuthKit domain.
 output authLocalStorageSession bool = !authKitCustomDomain
 
-@description('The records of step 12 in the zone dnsZone. The auth record (and its verification) comes from WorkOS.')
-output dnsRecords object[] = [
+// The MCP server; empty while mcpEnabled is false. mcpAppName is AZURE_MCP_APP_NAME of the GitHub environment.
+output mcpAppName string = mcpEnabled ? mcp!.outputs.appName : ''
+output mcpDefaultHostName string = mcpEnabled ? mcp!.outputs.defaultHostName : ''
+output mcpResourceUrl string = mcpResourceUrl
+output mcpIdentityClientId string = mcpEnabled ? mcpIdentity!.outputs.clientId : ''
+output mcpIdentityPrincipalId string = mcpEnabled ? mcpIdentity!.outputs.principalId : ''
+
+// The MCP server's records, once it exists: the CNAME to the app and the TXT record that validates the custom domain.
+var mcpDnsRecords = mcpEnabled
+  ? [
+      {
+        name: relativeName(mcpHostName, dnsZone)
+        type: 'CNAME'
+        value: mcp!.outputs.defaultHostName
+      }
+      {
+        name: 'asuid.${relativeName(mcpHostName, dnsZone)}'
+        type: 'TXT'
+        value: mcp!.outputs.customDomainVerificationId
+      }
+    ]
+  : []
+
+@description('The records of step 12 in the zone dnsZone, and the MCP server\'s with mcpEnabled. The auth record (and its verification) comes from WorkOS.')
+output dnsRecords object[] = concat([
   {
     name: relativeName(apiHostName, dnsZone)
     type: 'CNAME'
@@ -367,4 +490,4 @@ output dnsRecords object[] = [
     type: 'CNAME'
     value: staticWebApp.outputs.defaultHostName
   }
-]
+], mcpDnsRecords)
