@@ -620,7 +620,7 @@ The [MCP server](../Storyteller/mcp.md) lets an AI assistant work with the platf
 | Managed identity | `prod-2s-mcp-mi` | the server's own identity, not the API's: it proves the server to the API as the actor `mcp` and has **no Azure role** (the API's identity reads every secret of the vault) |
 | Container Apps environment | `prod-2s-cae` | workload profiles with the Consumption profile only: no base fee, scale to zero, the monthly free grant of Container Apps. No virtual network, no zone redundancy. Its console and system logs go to `prod-2s-log` through a diagnostic setting (the tables `ContainerAppConsoleLogs` and `ContainerAppSystemLogs`), under the workspace's daily cap, with no shared key of the workspace |
 | Container App | `prod-2s-mcp-ca` | the server: 0.25 vCPU, 0.5 GiB, 0 to 3 replicas (one more for every 20 concurrent requests), external HTTPS ingress on port 8080, TCP probes (the health endpoints exist only in Development), single revision mode, the identity above, no secret |
-| Image | `ghcr.io/akobr/2s-platform-mcp:<commit>` | built by the .NET SDK without a Dockerfile (chiseled Ubuntu, non-root, port 8080) by the workflow `Platform.Storyteller.Mcp.yml` on `main`; a public package, so the app pulls it without a credential |
+| Image | `ghcr.io/akobr/2s-platform-mcp:<commit>` | built once per commit by the .NET SDK without a Dockerfile (chiseled Ubuntu, non-root, port 8080) by the workflow `Platform.Storyteller.Mcp.yml` on `main`, which deploys it by its digest; a public package, so the app pulls it without a credential |
 | Custom domain | `mcp.2s.42for.net` | a free managed certificate of the environment, validated by the CNAME |
 
 ```sh

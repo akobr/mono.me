@@ -183,6 +183,9 @@ var mcpExchangeAudience = !mcpEnabled
 var mcpAuthKitIssuer = !mcpEnabled
   ? ''
   : empty(authKitDomain) ? fail('authKitDomain is required with mcpEnabled: people sign in to the MCP server there.') : 'https://${authKitDomain}'
+var mcpInitialImageChecked = mcpEnabled && !mcpAppExists && empty(mcpInitialImage)
+  ? fail('mcpInitialImage is required for the run that creates the MCP server\'s Container App (mcpAppExists = false).')
+  : mcpInitialImage
 
 func relativeName(hostName string, zone string) string =>
   endsWith(hostName, '.${zone}') ? substring(hostName, 0, length(hostName) - length(zone) - 1) : hostName
@@ -329,11 +332,7 @@ module mcp 'modules/mcp.bicep' = if (mcpEnabled) {
     location: location
     tags: tags
     logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
-    image: mcpAppExists
-      ? mcpExisting!.outputs.image
-      : empty(mcpInitialImage)
-          ? fail('mcpInitialImage is required for the run that creates the MCP server\'s Container App (mcpAppExists = false).')
-          : mcpInitialImage
+    image: mcpAppExists ? mcpExisting!.outputs.image : mcpInitialImageChecked
     hostName: mcpHostName
     customDomainEnabled: mcpCustomDomain
     existingCustomDomains: mcpExisting!.outputs.customDomains
@@ -419,7 +418,10 @@ module access 'modules/access.bicep' = {
     keyVaultName: keyVault.outputs.name
     cosmosSecretName: keyVault.outputs.cosmosSecretName
     functionAppName: functions.outputs.name
-    mcpAppName: mcpEnabled ? mcp!.outputs.appName : ''
+    // The name always, so the skipped role assignment never has an empty scope; the module's output makes the role wait
+    // for the app.
+    mcpEnabled: mcpEnabled
+    mcpAppName: mcpEnabled ? mcp!.outputs.appName : names.mcpApp
   }
 }
 

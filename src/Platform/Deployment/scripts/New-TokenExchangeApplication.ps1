@@ -109,6 +109,10 @@ if ($McpIdentityName) {
 }
 else {
     Write-Host "Put mcpExchangeAppId = '$appId' into parameters/prod.bicepparam and commit it."
+
+    if ((az ad sp show --id $appId --query appRoleAssignmentRequired -o tsv) -eq 'true') {
+        Write-Warning "'$DisplayName' requires an assignment: only assigned identities get tokens for it. Run the script with -McpIdentityName for a new or re-created MCP server identity."
+    }
 }
 
 [pscustomobject]@{
