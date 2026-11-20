@@ -89,6 +89,11 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Two runs of one commit (a push and a manual run) look for, build and read its image one after the other, so the
+    # commit's tag is pushed once; runs of other commits go on in parallel.
+    concurrency:
+      group: platform-storyteller-mcp-image-${{ github.sha }}
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: write
@@ -105,16 +110,30 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # A commit is built once: its tag never moves after a rerun or a redeployment, so a rollback to it gets the same
-      # image, and the deployment pins the digest anyway.
+      # image, and the deployment pins the digest anyway. Only a registry answer that the tag (or the package, before its
+      # first push) doesn't exist counts as absent; any other failure is retried, then stops the job without a build.
       - name: Look for the commit's image
         id: existing
         run: |
-          if docker buildx imagetools inspect "${IMAGE_NAME}:${GITHUB_SHA}" > /dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Reusing \`${IMAGE_NAME}:${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          set -uo pipefail
+          for attempt in 1 2 3 4; do
+            if output=$(docker buildx imagetools inspect "${IMAGE_NAME}:${GITHUB_SHA}" 2>&1); then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              echo "Reusing \`${IMAGE_NAME}:${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            if grep -qiE 'not found|manifest unknown|name unknown|denied' <<< "$output"; then
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "The registry didn't answer (attempt $attempt): $output"
+            sleep $((attempt * 10))
+          done
+
+          echo "::error::Could not tell whether ${IMAGE_NAME}:${GITHUB_SHA} exists; nothing was built."
+          exit 1
 
       - uses: actions/checkout@v4
         if: steps.existing.outputs.exists != 'true'
@@ -127,14 +146,13 @@ jobs:
         with:
           global-json-file: global.json
 
-      # Two tags: the commit and latest for convenience. The quotes keep the ';' inside the one property value.
+      # One tag, the commit: nothing uses a moving tag, and runs of main may finish out of order.
       - name: Build and push the image
         if: steps.existing.outputs.exists != 'true'
         run: |
           set -euo pipefail
-          tags="\"${GITHUB_SHA};latest\""
           dotnet publish src/Platform/Storyteller/Mcp/src -c Release --os linux --arch x64 \
-            -t:PublishContainer -p:ContainerRegistry=ghcr.io "-p:ContainerImageTags=${tags}"
+            -t:PublishContainer -p:ContainerRegistry=ghcr.io "-p:ContainerImageTag=${GITHUB_SHA}"
           echo "Pushed \`${IMAGE_NAME}:${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
 
       # The deployment runs the image by its digest: what the reviewer approves is what every replica pulls.
@@ -155,7 +173,7 @@ jobs:
     name: Deploy to the Container App
     needs: image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     # A required reviewer and the branch main only; its federated credential is the deployment identity's.
     environment: prod.42.Platform
     # One deployment at a time. A newer one that waits replaces an older waiting one; approve only the newest.
@@ -189,8 +207,12 @@ jobs:
       # --no-wait: the CLI's own wait polls an operation at subscription scope, where the identity has no role; the next
       # step polls the app instead.
       - name: Run the new image
+        id: update
         run: |
           set -euo pipefail
+          previous=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" \
+            --query "properties.template.containers[0].image" -o tsv)
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
           suffix="gh${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           az containerapp update --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --image "$IMAGE" \
             --revision-suffix "$suffix" --no-wait --output none
@@ -255,3 +277,36 @@ jobs:
           curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors --max-time 30 "$metadata_url" \
             | jq -e --arg url "$resource_url" '.resource == $url' > /dev/null
           echo "The MCP server runs \`$IMAGE\` (the commit \`${GITHUB_SHA}\`) as revision \`$latest\` at $resource_url." >> "$GITHUB_STEP_SUMMARY"
+
+      # A failed check leaves the image that ran before, not the new one: main.bicep would otherwise keep the new image
+      # on its later runs too. Nothing is rolled back when the previous image is the new one (a redeployment).
+      - name: Roll back to the previous image
+        if: failure() && steps.update.outputs.previous != '' && steps.update.outputs.previous != env.IMAGE
+        env:
+          PREVIOUS: ${{ steps.update.outputs.previous }}
+        run: |
+          set -euo pipefail
+          suffix="gh${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-rb"
+          az containerapp update --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --image "$PREVIOUS" \
+            --revision-suffix "$suffix" --no-wait --output none
+
+          # The job stays failed either way; this only says whether the previous image serves again. Bounded to
+          # 10 minutes, within the job's timeout after the check's 15.
+          deadline=$((SECONDS + 600))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            app=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" \
+              --query "{latest: properties.latestRevisionName, ready: properties.latestReadyRevisionName}" -o json)
+            latest=$(jq -r '.latest // ""' <<< "$app")
+            ready=$(jq -r '.ready // ""' <<< "$app")
+            if [[ "$latest" == *"--${suffix}" ]] && [ "$ready" = "$latest" ]; then
+              echo "::warning::The check failed; the Container App runs $PREVIOUS again (revision $latest)."
+              echo "Rolled back to \`$PREVIOUS\` (revision \`$latest\`) after the failed check of \`$IMAGE\`." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "::error::The rollback to $PREVIOUS was submitted but its revision is not ready after 10 minutes; check az containerapp revision list."
+          echo "The rollback to \`$PREVIOUS\` was submitted but is not ready; check the revisions by hand." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
