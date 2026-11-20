@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # Configuration provider
 
 **`42.Platform.Storyteller.Configuration`** puts the configuration of one key into your `IConfiguration`, and keeps it fresh while the app runs. It's the package most services need, and usually the only one.

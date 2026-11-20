@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # Aspire
 
 **`42.Platform.Storyteller.Aspire.Hosting`** teaches a .NET Aspire AppHost about Storyteller. Declare the platform once, reference it from your projects, and every one of them starts with the right `STORYTELLER_*` variables.

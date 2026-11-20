@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # Configuration formats
 
 **`42.Platform.Storyteller.ConfigurationFormats`** turns one configuration document into the flat shapes the rest of the world eats: .NET `IConfiguration` keys, Spring Boot `.properties`, `.env` files and YAML.

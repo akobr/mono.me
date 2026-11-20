@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # Developer guide <Badge type="warning" text="preview" />
 
 > One catalog of your product. Every customer, every environment, every odd little difference, written down **once**. Your code asks for its configuration and gets the merge. That's it. That's the trick.
@@ -93,16 +97,16 @@ flowchart LR
 
 Everything we serve, at a glance. You usually install **one** of the first four and the rest arrives with it.
 
-| Package | Get it from | In one line | Read |
+| Package | From | In one line | Read |
 | --- | --- | --- | --- |
-| `42.Platform.Storyteller.Configuration` | NuGet | Your configuration in `IConfiguration`, kept fresh, survives outages | [Configuration provider](configuration) |
-| `42.Platform.Storyteller.Configuration.KeyVault` | NuGet | Secrets resolved by your app, with your app's own identity | [Key Vault secrets](key-vault) |
-| `42.Platform.Storyteller.Hosting` | NuGet | "Who am I?", the catalog, and a worker for every customer | [Hosting](hosting) |
-| `42.Platform.Storyteller.Aspire.Hosting` | NuGet | An Aspire AppHost hands the right variables to every project | [Aspire](aspire) |
-| `42.Platform.Storyteller.ConfigurationFormats` | NuGet, comes with the provider | One document as flat JSON, `.properties`, `.env` or YAML | [Configuration formats](formats) |
-| `42.Platform.Storyteller.Sdk.NSwag` | NuGet, comes with the provider | The whole API as typed C# clients, with machine sign-in | [C# SDK](csharp-sdk) |
-| `42.Platform.Storyteller.Abstractions.Annotations` | NuGet, comes along | Keys and models: `AnnotationKey`, `FullKey`, `AnnotationType` | [C# SDK](csharp-sdk#the-packages-that-come-along) |
-| `42.Platform.Storyteller.KeyValues.ClientEncryption` | NuGet, comes along | Encrypt a secret on your side, so not even the platform can read it | [C# SDK](csharp-sdk#secrets-the-platform-cannot-read) |
+| `42.Platform.Storyteller.`<br>`Configuration` | NuGet | Your configuration in `IConfiguration`, kept fresh, survives outages | [Configuration provider](configuration) |
+| `42.Platform.Storyteller.`<br>`Configuration.KeyVault` | NuGet | Secrets resolved by your app, with your app's own identity | [Key Vault secrets](key-vault) |
+| `42.Platform.Storyteller.`<br>`Hosting` | NuGet | "Who am I?", the catalog, and a worker for every customer | [Hosting](hosting) |
+| `42.Platform.Storyteller.`<br>`Aspire.Hosting` | NuGet | An Aspire AppHost hands the right variables to every project | [Aspire](aspire) |
+| `42.Platform.Storyteller.`<br>`ConfigurationFormats` | NuGet, comes with the provider | One document as flat JSON, `.properties`, `.env` or YAML | [Configuration formats](formats) |
+| `42.Platform.Storyteller.`<br>`Sdk.NSwag` | NuGet, comes with the provider | The whole API as typed C# clients, with machine sign-in | [C# SDK](csharp-sdk) |
+| `42.Platform.Storyteller.`<br>`Abstractions.Annotations` | NuGet, comes along | Keys and models: `AnnotationKey`, `FullKey`, `AnnotationType` | [C# SDK](csharp-sdk#the-packages-that-come-along) |
+| `42.Platform.Storyteller.`<br>`KeyValues.ClientEncryption` | NuGet, comes along | Encrypt a secret on your side, so not even the platform can read it | [C# SDK](csharp-sdk#secrets-the-platform-cannot-read) |
 | `@42for.net/2splatform.sdk` | npm | The whole API for TypeScript, with Vue Query, Zod and MSW mocks | [TypeScript SDK](typescript-sdk) |
 | `42.Platform.Cli` (`sform`) | NuGet, a dotnet tool | The platform's command line, for you and for your pipelines | [sform & CI](cli) |
 | The GitHub Action | `uses:` in a workflow | A resolved configuration in the environment of a GitHub Actions job | [sform & CI](cli#the-github-action) |

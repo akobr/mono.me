@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # Hosting
 
 **`42.Platform.Storyteller.Hosting`** answers the big questions a process asks itself: *who am I*, *who do I work for*, and *what changed since I last looked*. It brings the [configuration provider](configuration) along, so one set of variables drives both.

@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # Cheat sheet
 
 Everything you'll look up twice, on one page. Print it, pin it, tattoo it (we don't judge).

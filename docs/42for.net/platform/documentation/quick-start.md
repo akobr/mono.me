@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # Quick start
 
 Five steps from "never heard of it" to a .NET service whose options change while it runs. Put the kettle on; it will still be warm at the end.

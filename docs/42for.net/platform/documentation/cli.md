@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # sform & CI
 
 **`sform`** is the platform's command line: for you at the keyboard, and for your pipelines at 2 a.m. The **GitHub Action** wraps it, so a workflow gets a resolved configuration in one step.

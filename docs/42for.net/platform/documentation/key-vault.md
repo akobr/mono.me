@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # Key Vault secrets
 
 **`42.Platform.Storyteller.Configuration.KeyVault`** lets your configuration *point at* a secret in your Azure Key Vault, and lets **your app** fetch it, with **its own** identity. The platform stores the address of the secret, never the secret.

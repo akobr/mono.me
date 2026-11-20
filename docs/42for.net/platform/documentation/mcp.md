@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # AI assistants (MCP)
 
 The **MCP server** lets an AI assistant work with your catalog, **as you**: browse annotations, explain where a value comes from, write configurations, revert a bad change. It speaks the [Model Context Protocol](https://modelcontextprotocol.io/), so any MCP client can use it.

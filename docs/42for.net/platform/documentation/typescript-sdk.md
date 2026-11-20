@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # TypeScript SDK
 
 **`@42for.net/2splatform.sdk`** is the whole Storyteller API for TypeScript: plain `fetch` functions, TanStack Query composables for Vue, Zod schemas and MSW mocks. The admin UI is built on it, so it gets a workout every day.

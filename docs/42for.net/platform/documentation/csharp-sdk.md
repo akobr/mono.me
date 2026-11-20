@@ -1,3 +1,7 @@
+---
+pageClass: dev-guide
+---
+
 # C# SDK
 
 **`42.Platform.Storyteller.Sdk.NSwag`** is the whole Storyteller API as typed C# clients: annotations, configurations, schemas, templates, key/value pairs, access and transfers. It's what `sform` is built on, and what you reach for when the provider and Hosting aren't enough: tools, migrations, admin scripts, integrations.
