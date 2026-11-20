@@ -49,7 +49,7 @@ az provider show --namespace Microsoft.Insights --query registrationState -o tsv
 Before production, check how WorkOS issues MCP tokens with Multiple Applications on. In the WorkOS dashboard, environment **Staging**:
 
 1. Turn on **dynamic client registration** and add the resource indicator `https://localhost:7180/mcp` (the local server).
-2. Run the server locally against the local API (`dotnet run --project src/Platform/Aspire.Host/src`, start `mcp`; mcp.md, "Local development") with `Mcp:Authentication:Scope` `openid`.
+2. Run the server locally against the local API with `Mcp:Authentication:Scope` `openid` (mcp.md, "Local development"): from the repository root, `dotnet run --project src/Platform/Aspire.Host/src`, then start `mcp` in the dashboard. Come back to `src/Platform/Deployment` for the rest of the runbook.
 3. Connect an MCP client to `https://localhost:7180/mcp`, sign in, and decode the token the client sends, locally only (`Read-JwtClaims` of the production runbook, "Enabling Multiple Applications in WorkOS"). **Expect:** `iss` `https://<staging subdomain>.authkit.app`, `aud` `https://localhost:7180/mcp`, `sub` `user_…`, `scope` containing `openid`.
 4. Sign in to the local admin UI and decode its token: its `aud` is still the 2S application's (the value 424-239 put into the API's audiences), not the resource URL.
 5. Make the resource indicator the **default** one and repeat 4. If the admin UI's `aud` changed, put it back to non-default: production keeps it non-default too (phase 7).
@@ -74,7 +74,7 @@ Expect `2S Platform Token Exchange`, `AzureADMyOrg`, `["api://<id>"]`, version `
 
 ## 3. The first image [S3, S7]
 
-1. The merge of the implementation to `main` already ran the workflow **Platform.Storyteller.Mcp** (it changes the server's project and adds the workflow): its `test` and `image` jobs pushed `ghcr.io/akobr/2s-platform-mcp:<merge commit>` and `:latest`, and its `deploy` job waits for the approval of `prod.42.Platform`. **Reject** that deployment, because the Container App doesn't exist yet, and take `<commit>` from the run (the step summary of the `image` job names the image and its digest). Run the workflow by hand on `main` (**Actions → Platform.Storyteller.Mcp → Run workflow**) only if there is no such run or it failed; reject its deployment too.
+1. The merge of the implementation to `main` already ran the workflow **Platform.Storyteller.Mcp** (it changes the server's project and adds the workflow): its `test` and `image` jobs pushed `ghcr.io/akobr/2s-platform-mcp:<merge commit>`, and its `deploy` job waits for the approval of `prod.42.Platform`. **Reject** that deployment, because the Container App doesn't exist yet, and take `<commit>` from the run (the step summary of the `image` job names the image and its digest). Run the workflow by hand on `main` (**Actions → Platform.Storyteller.Mcp → Run workflow**) only if there is no such run or it failed; reject its deployment too.
 2. Check the package's visibility: **github.com/akobr → Packages → 2s-platform-mcp**, or `gh api /users/akobr/packages/container/2s-platform-mcp --jq .visibility` (needs `read:packages`). If it is `private`: **Package settings → Danger Zone → Change visibility → Public** (it can't be made private again; the image holds nothing secret). It is linked to the repository, so later pushes of the workflow need no setting.
 3. Check that it can be pulled without signing in, and note the tag (the commit of the run):
 
@@ -183,7 +183,7 @@ param mcpAppExists = true
 param mcpCustomDomain = true
 ```
 
-`mcpAppExists` makes every later run keep the image that the workflow deployed (and the bound certificate); `mcpCustomDomain` puts `mcp.2s.42for.net` on the app with the binding type `Auto` and creates the environment's free managed certificate, which the platform binds as soon as it is issued. Commit through a pull request, pull `main`, then the what-if of phase 4.
+`mcpAppExists` makes every later run keep the image that the workflow deployed (and the bound certificate); the template refuses `mcpCustomDomain` without it. `mcpCustomDomain` puts `mcp.2s.42for.net` on the app with the binding type `Auto` and creates the environment's free managed certificate, which the platform binds as soon as it is issued. Commit through a pull request, pull `main`, then the what-if of phase 4.
 
 **Expect:**
 
@@ -231,7 +231,9 @@ Run the workflow **Platform.Storyteller.Mcp** by hand on `main` and **approve** 
 az containerapp revision list -g prod-2s-eusec-rg -n prod-2s-mcp-ca --query "[].{name:name, active:properties.active, image:properties.template.containers[0].image}" -o table
 ```
 
-From now on every merge to `main` that changes the server builds an image and waits for your approval to run it. Deployments queue one at a time, and a newer one that waits replaces an older waiting one: approve the newest and reject older ones, or an older image could follow a newer one.
+From now on every merge to `main` that changes the server builds an image and waits for your approval to run it. If the check after the update fails, the job puts the image that ran before back (a new revision) and stays red.
+
+**Don't run `main.bicep` while a deployment of the workflow runs or waits for approval.** The template reads the running image and writes it back, so a run that overlaps an update can put the earlier image back. Let the `deploy` job finish (or reject it) first; after a run that may have overlapped, check the image with the revision list above and run the workflow again if needed. Deployments queue one at a time, and a newer one that waits replaces an older waiting one: approve the newest and reject older ones, or an older image could follow a newer one.
 
 If the job fails with `AuthorizationFailed` on `Microsoft.App/containerApps/write`, the role assignment of phase 4 hasn't reached the identity yet (wait a few minutes and re-run the job), or Container Apps Contributor doesn't cover the write: then change `containerAppsContributor` in `modules/access.bicep` to Contributor (`b24988ac-6180-42a0-ab88-20f7382dd24c`), still scoped to the app, and run `main.bicep`.
 

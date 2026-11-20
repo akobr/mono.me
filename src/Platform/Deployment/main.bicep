@@ -177,12 +177,15 @@ var mcpResourceUrl = !mcpEnabled
   : empty(mcpHostName) ? fail('mcpHostName is required with mcpEnabled, e.g. mcp.2s.42for.net.') : 'https://${mcpHostName}/mcp'
 var mcpExchangeAudience = !mcpEnabled
   ? ''
-  : length(mcpExchangeAppId) != 36
+  : length(mcpExchangeAppId) != 36 || length(split(mcpExchangeAppId, '-')) != 5
       ? fail('mcpExchangeAppId must be the application id (a GUID) of "2S Platform Token Exchange" with mcpEnabled: New-TokenExchangeApplication.ps1 prints it.')
       : 'api://${mcpExchangeAppId}'
 var mcpAuthKitIssuer = !mcpEnabled
   ? ''
   : empty(authKitDomain) ? fail('authKitDomain is required with mcpEnabled: people sign in to the MCP server there.') : 'https://${authKitDomain}'
+var mcpCustomDomainChecked = mcpEnabled && mcpCustomDomain && !mcpAppExists
+  ? fail('mcpCustomDomain needs mcpAppExists = true: bind the domain on a later run, once the app and its DNS records exist.')
+  : mcpCustomDomain
 var mcpInitialImageChecked = mcpEnabled && !mcpAppExists && empty(mcpInitialImage)
   ? fail('mcpInitialImage is required for the run that creates the MCP server\'s Container App (mcpAppExists = false).')
   : mcpInitialImage
@@ -334,7 +337,7 @@ module mcp 'modules/mcp.bicep' = if (mcpEnabled) {
     logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
     image: mcpAppExists ? mcpExisting!.outputs.image : mcpInitialImageChecked
     hostName: mcpHostName
-    customDomainEnabled: mcpCustomDomain
+    customDomainEnabled: mcpCustomDomainChecked
     existingCustomDomains: mcpExisting!.outputs.customDomains
     identityId: mcpIdentity!.outputs.id
     identityClientId: mcpIdentity!.outputs.clientId
