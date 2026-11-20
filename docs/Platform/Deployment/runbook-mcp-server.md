@@ -74,7 +74,7 @@ Expect `2S Platform Token Exchange`, `AzureADMyOrg`, `["api://<id>"]`, version `
 
 ## 3. The first image [S3, S7]
 
-1. Run the workflow **Platform.Storyteller.Mcp** by hand on `main` (**Actions → Platform.Storyteller.Mcp → Run workflow**). The `test` and `image` jobs run and push `ghcr.io/akobr/2s-platform-mcp:<commit>` and `:latest`. The `deploy` job waits for the approval of `prod.42.Platform`: **reject** it, because the Container App doesn't exist yet.
+1. The merge of the implementation to `main` already ran the workflow **Platform.Storyteller.Mcp** (it changes the server's project and adds the workflow): its `test` and `image` jobs pushed `ghcr.io/akobr/2s-platform-mcp:<merge commit>` and `:latest`, and its `deploy` job waits for the approval of `prod.42.Platform`. **Reject** that deployment, because the Container App doesn't exist yet, and take `<commit>` from the run (the step summary of the `image` job names the image and its digest). Run the workflow by hand on `main` (**Actions → Platform.Storyteller.Mcp → Run workflow**) only if there is no such run or it failed; reject its deployment too.
 2. Check the package's visibility: **github.com/akobr → Packages → 2s-platform-mcp**, or `gh api /users/akobr/packages/container/2s-platform-mcp --jq .visibility` (needs `read:packages`). If it is `private`: **Package settings → Danger Zone → Change visibility → Public** (it can't be made private again; the image holds nothing secret). It is linked to the repository, so later pushes of the workflow need no setting.
 3. Check that it can be pulled without signing in, and note the tag (the commit of the run):
 
@@ -144,9 +144,11 @@ It answers as before, and the admin UI still signs in. Application Insights (`pr
 **Restrict the exchange application to the server's identity** (recommended): only `prod-2s-mcp-mi` then gets tokens for `api://<id>` from Entra; the API pins its object id anyway.
 
 ```powershell
-./scripts/New-TokenExchangeApplication.ps1 -McpIdentityName prod-2s-mcp-mi
+$exchange = ./scripts/New-TokenExchangeApplication.ps1 -McpIdentityName prod-2s-mcp-mi
 az ad sp show --id $exchange.ClientId --query appRoleAssignmentRequired   # true
 ```
+
+From then on, a new or re-created `prod-2s-mcp-mi` (a new object id) gets no token for the application until this command runs again for it; the script warns about it when it runs without `-McpIdentityName`.
 
 ## 5. DNS records [S4]
 
@@ -166,10 +168,11 @@ In the zone `42for.net`, add the two new records (TTL 300), straight to the app 
 ```powershell
 Resolve-DnsName mcp.2s.42for.net -Type CNAME
 Resolve-DnsName asuid.mcp.2s.42for.net -Type TXT
-Resolve-DnsName 42for.net -Type CAA
+# Resolve-DnsName has no CAA type: ask a public resolver over HTTPS (an empty answer means no CAA record), or look in the zone.
+foreach ($name in 'mcp.2s.42for.net', '2s.42for.net', '42for.net') { $name; (Invoke-RestMethod "https://dns.google/resolve?name=$name&type=CAA").Answer.data }
 ```
 
-If the zone has CAA records, one must allow `digicert.com` (`0 issue "digicert.com"`), the authority of the managed certificates; no CAA record allows every authority.
+A certificate authority uses the CAA records of the closest of the three names that has any. If there are such records, one must allow `digicert.com` (`0 issue "digicert.com"`), the authority of the managed certificates; no CAA record at all allows every authority. The API's managed certificate (`api.2s.42for.net`) comes from the same authority, so it is likely fine already.
 
 ## 6. The custom domain [S4]
 
@@ -208,7 +211,7 @@ If the certificate fails (`Failed`), the host name stays without TLS: fix the DN
 In the WorkOS dashboard, environment **Production**:
 
 1. **Dynamic client registration:** on.
-2. **Resource indicator:** add `https://mcp.2s.42for.net/mcp`. Make it the default only if phase 1 showed that a default doesn't change the admin UI's `aud`.
+2. **Resource indicator:** add `https://mcp.2s.42for.net/mcp`. Make it the default only if phase 1 showed that a default doesn't change the admin UI's `aud`. Without the default, only MCP clients that send the `resource` parameter (RFC 8707) can sign in; a client that omits it gets the environment's client id as `aud`, which the server refuses. The MCP authorization spec requires `resource`, and Claude Code sends it.
 3. Nothing else: no permission, no change of the JWT template, no new application.
 
 **Check:** sign out of the admin UI, sign in again, and check that it loads your organizations (its `aud` is unchanged).
@@ -222,13 +225,13 @@ gh variable list --repo akobr/mono.me --env prod.42.Platform | Select-String AZU
 
 The script takes `AZURE_MCP_APP_NAME` from the output `mcpAppName` of `prod-2s-main` (or `-McpAppName`) and leaves the other variables as they are when their parameter is empty.
 
-Run the workflow **Platform.Storyteller.Mcp** by hand on `main` and **approve** the `deploy` job. It runs `az containerapp update --image ghcr.io/akobr/2s-platform-mcp:<commit> --revision-suffix gh<run>-<attempt> --no-wait`, waits until that revision is provisioned and the latest ready one, and reads the resource metadata from `https://mcp.2s.42for.net`. **Check** that the job is green and the revision runs the commit:
+Run the workflow **Platform.Storyteller.Mcp** by hand on `main` and **approve** the `deploy` job. The run reuses the image of its commit if one exists (a commit is built once, so its tag never moves), and the deployment runs it by its digest: `az containerapp update --image ghcr.io/akobr/2s-platform-mcp@sha256:… --revision-suffix gh<run>-<attempt> --no-wait`. It waits until that revision is provisioned and the latest ready one, and reads the resource metadata from `https://mcp.2s.42for.net`. **Check** that the job is green and the revision runs the digest of the step summary:
 
 ```powershell
 az containerapp revision list -g prod-2s-eusec-rg -n prod-2s-mcp-ca --query "[].{name:name, active:properties.active, image:properties.template.containers[0].image}" -o table
 ```
 
-From now on every merge to `main` that changes the server builds an image and waits for your approval to run it.
+From now on every merge to `main` that changes the server builds an image and waits for your approval to run it. Deployments queue one at a time, and a newer one that waits replaces an older waiting one: approve the newest and reject older ones, or an older image could follow a newer one.
 
 If the job fails with `AuthorizationFailed` on `Microsoft.App/containerApps/write`, the role assignment of phase 4 hasn't reached the identity yet (wait a few minutes and re-run the job), or Container Apps Contributor doesn't cover the write: then change `containerAppsContributor` in `modules/access.bicep` to Contributor (`b24988ac-6180-42a0-ab88-20f7382dd24c`), still scoped to the app, and run `main.bicep`.
 
@@ -252,11 +255,13 @@ A request through the ingress ends after 240 seconds: a tool call that waits lon
 
 ## 10. Rolling back
 
-- **A bad image:** `az containerapp update -g prod-2s-eusec-rg -n prod-2s-mcp-ca --image ghcr.io/akobr/2s-platform-mcp:<previous commit>` (the revision list of phase 8 has the earlier ones). A later run of `main.bicep` keeps that image.
+- **A bad image:** `az containerapp update -g prod-2s-eusec-rg -n prod-2s-mcp-ca --image <the image of an earlier revision>` (the revision list of phase 8 has their digests; `ghcr.io/akobr/2s-platform-mcp:<previous commit>` is the same image, since a commit's tag never moves). A later run of `main.bicep` keeps that image.
 - **The server unreachable at once, everything kept:** `az containerapp ingress disable -g prod-2s-eusec-rg -n prod-2s-mcp-ca`. The next run of `main.bicep` turns the ingress on again, so for longer use the next point.
-- **The exchange off in the API:** set `mcpEnabled = false` in `parameters/prod.bicepparam`, pull request, what-if (only `prod-2s-api-fa/appsettings`: `Auth__TokenExchange__Enabled` → `false`, the `AdditionalIssuers__0__*` and `Actors__0__*` settings removed), then create: every MCP call answers that the exchange is off. The identity, the environment, the app, its certificate, the role assignment and the exchange application stay (a template run doesn't delete them). Delete them by hand if wanted: `az containerapp delete`, `az containerapp env delete`, `az identity delete -n prod-2s-mcp-mi`, the role assignment (`az role assignment list --all --assignee <deployment principal id>`), `az ad app delete --id <mcpExchangeAppId>`, the DNS records and the GitHub variable `AZURE_MCP_APP_NAME`; then set `mcpAppExists = false` and `mcpCustomDomain = false`.
-- **The custom domain off:** `mcpCustomDomain = false` and a run of `main.bicep` removes the binding; the certificate stays in the environment until it is deleted (`az containerapp env certificate delete`).
+- **The exchange off in the API:** set `mcpEnabled = false` in `parameters/prod.bicepparam`, pull request, what-if (only `prod-2s-api-fa/appsettings`: `Auth__TokenExchange__Enabled` → `false`, the `AdditionalIssuers__0__*` and `Actors__0__*` settings removed), then create: every MCP call answers that the exchange is off. The identity, the environment, the app, its certificate, the role assignment and the exchange application stay (a template run doesn't delete them). Delete them by hand if wanted: `az containerapp delete`, `az containerapp env delete`, `az identity delete -n prod-2s-mcp-mi`, the role assignment (`az role assignment list --all --assignee <deployment principal id>`), `az ad app delete --id <mcpExchangeAppId>`, the DNS records and the GitHub variable `AZURE_MCP_APP_NAME`; then set `mcpAppExists = false` and `mcpCustomDomain = false`. If the exchange application stays while the identity goes, a later identity needs phase 4's `New-TokenExchangeApplication.ps1 -McpIdentityName prod-2s-mcp-mi` again, because the application requires an assignment.
+- **The custom domain off:** `mcpCustomDomain = false` and a run of `main.bicep` removes the binding; the certificate stays in the environment until it is deleted (`az containerapp env certificate delete`). This takes the server out of service: its resource URL and the API's subject audience stay `https://mcp.2s.42for.net/mcp`, so clients can't sign in, and the workflow's last check fails until the domain is bound again. To stop the server, use one of the two points above.
 
 ## Later: the custom AuthKit domain
 
 When [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer) sets `authKitDomain = 'auth.42for.net'` and `authKitCustomDomain = true`, the same run of `main.bicep` moves the server's issuer (`Mcp__Authentication__Issuer`) to `https://auth.42for.net` and removes the API's additional issuer, which would then equal `Auth__AuthKit__Issuer` (the API refuses to start with the same domain in both). Its what-if shows both changes. MCP clients find the new authorization server in the resource metadata and register again; people sign in once more. Dynamic client registration and the resource indicator are settings of the WorkOS environment and stay.
+
+The API then checks MCP tokens with the keys of its own issuer, `https://api.workos.com/sso/jwks/<client id>`, not with the AuthKit domain's `…/oauth2/jwks`, which signs them: there is no setting for a second key set of the same issuer. On 2026-11-20 both URLs of production published the same single key (`sso_oidc_key_pair_01M3MMVAKJ4P2WW5CJ2B4D1T4E`). Compare the `kid` values of both again right before the switch, and after it run the check **The exchange** of phase 9 (`get_my_account` through the MCP server). If the keys differ, the switch needs a change of the API first.

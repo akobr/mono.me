@@ -24,8 +24,11 @@ param keyVaultName string
 param cosmosSecretName string
 param functionAppName string
 
-@description('The MCP server\'s Container App; empty without the MCP server (mcpEnabled).')
-param mcpAppName string = ''
+@description('Whether the MCP server exists (mcpEnabled of main.bicep).')
+param mcpEnabled bool
+
+@description('The MCP server\'s Container App.')
+param mcpAppName string
 
 var roles = {
   keyVaultAdministrator: '00482a5a-887f-4fb3-b363-3b7fe8e74483'
@@ -61,7 +64,7 @@ resource functionApp 'Microsoft.Web/sites@2025-03-01' existing = {
   name: functionAppName
 }
 
-resource mcpApp 'Microsoft.App/containerApps@2026-07-01' existing = if (!empty(mcpAppName)) {
+resource mcpApp 'Microsoft.App/containerApps@2026-07-01' existing = {
   name: mcpAppName
 }
 
@@ -115,7 +118,7 @@ resource deploymentPackages 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
-resource deploymentMcpApp 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (hasDeploymentPrincipal && !empty(mcpAppName)) {
+resource deploymentMcpApp 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (hasDeploymentPrincipal && mcpEnabled) {
   name: guid(mcpApp.id, deploymentPrincipalId, roles.containerAppsContributor)
   scope: mcpApp
   properties: {

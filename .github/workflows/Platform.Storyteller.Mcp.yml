@@ -3,9 +3,12 @@ name: Platform.Storyteller.Mcp
 # The MCP server (src/Platform/Storyteller/Mcp): its unit tests on every pull request and push to main that touches it or
 # a project it builds on. On main (a push, or by hand) also its container image, built by the .NET SDK without a
 # Dockerfile and pushed to ghcr.io/akobr/2s-platform-mcp with the commit as its tag, and then, after the approval of the
-# environment prod.42.Platform, that image on the Container App (az containerapp update --image, as the deployment
-# identity, which has Container Apps Contributor on that Container App only). The image holds no setting and no secret: the Container
-# App gives them. docs/Platform/Deployment/runbook-mcp-server.md.
+# environment prod.42.Platform, that image by its digest on the Container App (az containerapp update --image, as the
+# deployment identity, which has Container Apps Contributor on that Container App only). The image holds no setting and
+# no secret: the Container App gives them. docs/Platform/Deployment/runbook-mcp-server.md.
+#
+# The version files (version.json, src/Platform/version.json) are left out of the paths on purpose: a version bump alone
+# would ask for a production deployment of the same code.
 on:
   pull_request:
     paths:
@@ -15,9 +18,12 @@ on:
       - 'src/Platform/Storyteller/KeyValues.ClientEncryption/**'
       - 'src/Platform/Storyteller/conformance/project-settings.json'
       - 'src/Platform/Aspire.ServiceDefaults/**'
+      - 'src/.stylecop/**'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
       - 'global.json'
+      - 'nuget.config'
+      - 'stylecop.json'
       - '.github/workflows/Platform.Storyteller.Mcp.yml'
   push:
     branches: [ main ]
@@ -28,16 +34,20 @@ on:
       - 'src/Platform/Storyteller/KeyValues.ClientEncryption/**'
       - 'src/Platform/Storyteller/conformance/project-settings.json'
       - 'src/Platform/Aspire.ServiceDefaults/**'
+      - 'src/.stylecop/**'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
       - 'global.json'
+      - 'nuget.config'
+      - 'stylecop.json'
       - '.github/workflows/Platform.Storyteller.Mcp.yml'
-  # A redeployment of main, e.g. the first image (runbook, phase 3).
+  # A redeployment of main: an existing image of the commit is reused, not built again.
   workflow_dispatch:
 
+# A newer pull request run replaces an older one. Runs of main don't wait for each other here, so a deployment that waits
+# for its approval doesn't hold back the tests and images of later merges; the deploy job queues on its own group.
 concurrency:
-  group: platform-storyteller-mcp-${{ github.ref }}
-  # A newer pull request run replaces an older one; on main a deployment is never cut off halfway, the next one waits.
+  group: platform-storyteller-mcp-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -83,17 +93,8 @@ jobs:
       contents: read
       packages: write
     outputs:
-      image: ${{ steps.publish.outputs.image }}
+      image: ${{ steps.digest.outputs.image }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
       # The SDK pushes with the credentials docker login stores. The first push links the package to this repository;
       # if it comes out private, make it public once in its settings (runbook, phase 3), so the Container App pulls it
       # without a credential.
@@ -103,17 +104,52 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Two tags: the commit, which every deployment uses, and latest for convenience. The quotes keep the ';' inside
-      # the one property value.
+      # A commit is built once: its tag never moves after a rerun or a redeployment, so a rollback to it gets the same
+      # image, and the deployment pins the digest anyway.
+      - name: Look for the commit's image
+        id: existing
+        run: |
+          if docker buildx imagetools inspect "${IMAGE_NAME}:${GITHUB_SHA}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Reusing \`${IMAGE_NAME}:${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.existing.outputs.exists != 'true'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.existing.outputs.exists != 'true'
+        with:
+          global-json-file: global.json
+
+      # Two tags: the commit and latest for convenience. The quotes keep the ';' inside the one property value.
       - name: Build and push the image
-        id: publish
+        if: steps.existing.outputs.exists != 'true'
         run: |
           set -euo pipefail
           tags="\"${GITHUB_SHA};latest\""
           dotnet publish src/Platform/Storyteller/Mcp/src -c Release --os linux --arch x64 \
             -t:PublishContainer -p:ContainerRegistry=ghcr.io "-p:ContainerImageTags=${tags}"
-          echo "image=${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "Pushed \`${IMAGE_NAME}:${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+
+      # The deployment runs the image by its digest: what the reviewer approves is what every replica pulls.
+      - name: Read the digest
+        id: digest
+        run: |
+          set -euo pipefail
+          digest=$(docker buildx imagetools inspect "${IMAGE_NAME}:${GITHUB_SHA}" --format '{{json .Manifest}}' | jq -r '.digest')
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::No digest for ${IMAGE_NAME}:${GITHUB_SHA} (got '$digest')."
+            exit 1
+          fi
+
+          echo "image=${IMAGE_NAME}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "\`${IMAGE_NAME}:${GITHUB_SHA}\` is \`${IMAGE_NAME}@${digest}\`." >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: Deploy to the Container App
@@ -122,6 +158,10 @@ jobs:
     timeout-minutes: 30
     # A required reviewer and the branch main only; its federated credential is the deployment identity's.
     environment: prod.42.Platform
+    # One deployment at a time. A newer one that waits replaces an older waiting one; approve only the newest.
+    concurrency:
+      group: platform-storyteller-mcp-deploy
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -214,4 +254,4 @@ jobs:
           echo "Revision $latest is ready; reading $metadata_url"
           curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors --max-time 30 "$metadata_url" \
             | jq -e --arg url "$resource_url" '.resource == $url' > /dev/null
-          echo "The MCP server runs \`$IMAGE\` as revision \`$latest\` at $resource_url." >> "$GITHUB_STEP_SUMMARY"
+          echo "The MCP server runs \`$IMAGE\` (the commit \`${GITHUB_SHA}\`) as revision \`$latest\` at $resource_url." >> "$GITHUB_STEP_SUMMARY"
