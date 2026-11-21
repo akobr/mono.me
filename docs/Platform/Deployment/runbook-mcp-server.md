@@ -231,7 +231,7 @@ Run the workflow **Platform.Storyteller.Mcp** by hand on `main` and **approve** 
 az containerapp revision list -g prod-2s-eusec-rg -n prod-2s-mcp-ca --query "[].{name:name, active:properties.active, image:properties.template.containers[0].image}" -o table
 ```
 
-From now on every merge to `main` that changes the server builds an image and waits for your approval to run it. If the check after the update fails, the job puts the image that ran before back (a new revision) and stays red.
+From now on every merge to `main` that changes the server builds an image and waits for your approval to run it. If the check after the update fails, the job tries to put back the image of the revision that served before (a new revision) and stays red either way. That rollback revision may also not become ready within its 10 minutes, and then the previous image is not confirmed: the step **Roll back to the previous image** of the job says which, and the revision list above shows what runs.
 
 **Don't run `main.bicep` while a deployment of the workflow runs or waits for approval.** The template reads the running image and writes it back, so a run that overlaps an update can put the earlier image back. Let the `deploy` job finish (or reject it) first; after a run that may have overlapped, check the image with the revision list above and run the workflow again if needed. Deployments queue one at a time, and a newer one that waits replaces an older waiting one: approve the newest and reject older ones, or an older image could follow a newer one.
 
