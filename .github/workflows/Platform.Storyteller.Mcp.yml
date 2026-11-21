@@ -210,8 +210,15 @@ jobs:
         id: update
         run: |
           set -euo pipefail
-          previous=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" \
-            --query "properties.template.containers[0].image" -o tsv)
+          # The rollback goes to the image of the revision that serves now (the latest ready one), not to the
+          # template's, which may be an earlier update that never became ready.
+          ready=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" \
+            --query "properties.latestReadyRevisionName" -o tsv)
+          previous=""
+          if [ -n "$ready" ]; then
+            previous=$(az containerapp revision show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --revision "$ready" \
+              --query "properties.template.containers[0].image" -o tsv)
+          fi
           echo "previous=$previous" >> "$GITHUB_OUTPUT"
           suffix="gh${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           az containerapp update --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --image "$IMAGE" \
