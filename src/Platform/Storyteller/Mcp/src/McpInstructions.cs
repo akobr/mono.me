@@ -21,5 +21,6 @@ public static class McpInstructions
         Safety:
         - Ask the person before a destructive call and before any tool that returns secrets.
         - Machine credentials returned by create_machine or reset_machine are shown once; tell the person to copy them from the tool result instead of retyping them.
+        - When a tool answers that this client app may only read, tell the person to make the change in the admin UI or with sform; do not retry it.
         """;
 }

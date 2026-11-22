@@ -29,6 +29,14 @@ public static class ApiErrors
         + "(creating or resetting a machine with a Secrets scope, replacing its federation rules). Do this with sform or "
         + "the admin UI.";
 
+    // The API's ErrorCode for every change through a client app that may only read (the actor's ReadOnly restriction for
+    // a client app the API does not trust): no role and no new sign-in lifts it.
+    public const string ActorReadOnlyCode = "ActorReadOnly";
+
+    public const string ActorReadOnlyMessage =
+        "The 2S API lets this client app only read for you, so the change was not made. Make it in the admin UI or with "
+        + "sform, or ask the operator of the deployment to trust this app.";
+
     // The API's ErrorCode for what needs a recent sign-in of the person (Auth:StepUp, RFC 9470): a 401 with the window in
     // Details.MaxAge and in the WWW-Authenticate challenge.
     public const string StepUpRequiredCode = Sdk.StepUp.ErrorCode;
@@ -86,6 +94,11 @@ public static class ApiErrors
         else if (string.Equals(errorCode, ActorRestrictedCode, StringComparison.Ordinal))
         {
             message = ActorRestrictedMessage;
+            hint = null;
+        }
+        else if (string.Equals(errorCode, ActorReadOnlyCode, StringComparison.Ordinal))
+        {
+            message = ActorReadOnlyMessage;
             hint = null;
         }
         else if (status == 422)

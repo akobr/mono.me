@@ -35,32 +35,33 @@ public class SecretToolsRegistrationTests
     }
 
     [Fact]
-    public async Task WithoutTheSetting_SecretToolsAreNotListed_AndNoExchangeRuns()
+    public async Task WithoutTheSetting_SecretToolsAreNotListed_AndOneExchangeRuns()
     {
         using var host = new McpTestHost();
+        var inbound = TestTokens.Create("ada");
 
-        var names = await ListToolNamesAsync(host);
+        var names = await ListToolNamesAsync(host, inbound);
 
         names.ShouldNotContain(name => SecretNames.Contains(name));
         AlwaysListed.ShouldBeSubsetOf(names);
 
-        // The list is the same for everyone: no list filter, so no exchange.
-        host.Tokens.UserTokens.ShouldBeEmpty();
+        // The list follows the person's restrictions (ReadOnly), so the filter asks the exchange once.
+        host.Tokens.UserTokens.ShouldBe([inbound]);
     }
 
-    // Under 2025-11-25 an unset cache scope stays absent (Public): only the filter makes the list private. (From
-    // 2026-07-28 on the SDK sends Private for an unset scope, so that revision cannot tell the two apart.)
+    // Under 2025-11-25 an unset cache scope stays absent (Public): the filter, which is always registered, makes the list
+    // private, since it differs per person. (From 2026-07-28 on the SDK sends Private for an unset scope.)
     [Theory]
     [InlineData("without the setting", false)]
     [InlineData("with the setting", true)]
-    public async Task TheListIsPrivate_OnlyWithTheSecretTools(string because, bool secretTools)
+    public async Task TheListIsPrivate_WithOrWithoutTheSecretTools(string because, bool secretTools)
     {
         using var host = new McpTestHost(SecretToolsSetting(secretTools ? "true" : "false"));
         await using var client = await host.ConnectAsync(protocolVersion: "2025-11-25");
 
         var result = await client.ListToolsAsync(new ListToolsRequestParams());
 
-        result.CacheScope.ShouldBe(secretTools ? CacheScope.Private : null, because);
+        result.CacheScope.ShouldBe(CacheScope.Private, because);
     }
 
     [Fact]

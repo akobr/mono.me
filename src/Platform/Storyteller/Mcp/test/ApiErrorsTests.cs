@@ -98,6 +98,25 @@ public class ApiErrorsTests
     }
 
     [Fact]
+    public void ActorReadOnly_SaysTheClientAppMayOnlyRead()
+    {
+        var response = new Sdk.ErrorResponse
+        {
+            Message = $"The token acts for the person through a client app that may only read; the change is refused. {Marker}",
+            Hint = Marker,
+            ErrorCode = ApiErrors.ActorReadOnlyCode,
+        };
+
+        var result = ApiErrors.ToResult(Error(403, response));
+
+        result.IsError.ShouldBe(true);
+        result.Text().ShouldBe($"Storyteller API answered 403 ActorReadOnly: {ApiErrors.ActorReadOnlyMessage}");
+        result.StructuredContent!.Value.GetProperty("ErrorCode").GetString().ShouldBe("ActorReadOnly");
+        result.StructuredContent.Value.GetProperty("Message").GetString().ShouldBe(ApiErrors.ActorReadOnlyMessage);
+        result.StructuredContent.Value.GetRawText().ShouldNotContain(Marker);
+    }
+
+    [Fact]
     public void ActorRestricted_SaysTheApiWithholdsSecretsFromTheAssistant()
     {
         var response = new Sdk.ErrorResponse
