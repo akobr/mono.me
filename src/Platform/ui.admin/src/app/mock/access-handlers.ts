@@ -435,7 +435,10 @@ export const accessManagementHandlers: HttpHandler[] = [
   http.delete<{ key: string; accountId: string }>(
     `${api}/access/points/:key/members/:accountId`,
     withDb((db, { params }) => {
-      const denied = requireRole(db, params.key, 'Administrator')
+      // As the API (RemoveMemberAsync): any member may leave, whatever the role (424-271); removing someone else needs
+      // Administrator, and Owner for an Owner. The last Owner stays either way.
+      const leaving = params.accountId === db.user.id
+      const denied = leaving ? undefined : requireRole(db, params.key, 'Administrator')
       if (denied) {
         return denied
       }
@@ -444,11 +447,14 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (!point || !current) {
         return errorResponse(404, 'The member does not exist.', 'MemberNotFound')
       }
+      if (!leaving && current === 'Owner' && roleOf(db, params.key) !== 'Owner') {
+        return errorResponse(403, 'Only Owners can remove an Owner.', 'ElevatedRole')
+      }
       if (current === 'Owner' && ownerCount(db, params.key) <= 1) {
         return errorResponse(409, 'The last Owner cannot be removed.', 'LastOwner')
       }
       // Leaving gives nothing out: only removing another member needs a recent sign-in.
-      const stale = params.accountId === db.user.id ? undefined : requireRecentSignIn()
+      const stale = leaving ? undefined : requireRecentSignIn()
       if (stale) {
         return stale
       }
