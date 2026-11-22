@@ -6,7 +6,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // The Organizations and Projects section's part of the Views page. A view's row is the list item of its link, with
 // the badges "production" (the default view) and "discovered" (a view that is not registered), its description and
-// its actions: "Compare" for Contributors and up, a link to Compare views of the default view with ?to=<view>, which
+// its actions: "Compare" for every member, a link to Compare views of the default view with ?to=<view>, which
 // the default view's own row has disabled (aria-disabled, no href) with a tooltip that says whether the project has
 // another view; and, for Administrators, "Register" for a discovered view or "Edit" for a registered one. Register
 // toasts "View <view> registered"; the dialog "Edit <view>" saves the description with "Description saved"; either
@@ -21,7 +21,7 @@ public sealed partial class ViewsPage
     // The list of the views: the ul that holds the default view's link.
     public ILocator ViewList => app.Page.GetByRole(AriaRole.List).Filter(new() { Has = View(AppRoutes.DefaultView) });
 
-    // Every Compare link of the list (Contributors and up).
+    // Every Compare link of the list (every member, a Reader too).
     public ILocator CompareLinks => ViewList.GetByRole(AriaRole.Link, new() { Name = "Compare", Exact = true });
 
     // Every Register button of the list (Administrators, discovered views).

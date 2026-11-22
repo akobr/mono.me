@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
@@ -7,11 +8,12 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // Modeling's Deleted tab (…/modeling/deleted, pages/…/modeling/deleted.vue): the deleted annotations of the view, the
 // roots of deletions by default, every deleted annotation with the switch "Show cascaded" (?cascaded=1), which adds the
 // column "Root" (the badge "root" on a root, else the root's key). A table row per annotation with the checkbox
-// "Select <key>", the button "Show <key>" (the read-only details) and the menu "Actions for <key>": "Show details",
-// "Restore" and "Restore without descendants" (Contributor and up), "Delete permanently" (Administrator and up). A
-// selection shows the toolbar "Bulk actions" with "<n> selected", "Restore", "Delete permanently" (Administrator and
-// up) and "Clear selection". Nothing deleted: "Nothing is deleted". Below md the table hides its Title and Descendants
-// columns; the checkbox and the menu stay.
+// "Select <key>" (Contributor and up, like "Select all" in the header), the button "Show <key>" (the read-only
+// details) and the menu "Actions for <key>": "Show details", "Restore" and "Restore without descendants" (Contributor
+// and up), "Delete permanently" (Administrator and up). A selection shows the toolbar "Bulk actions" with "<n>
+// selected", "Restore", "Delete permanently" (Administrator and up) and "Clear selection"; a Reader, who has no
+// selection, gets the rows, their details and Show cascaded only. Nothing deleted: "Nothing is deleted". Below md the
+// table hides its Title and Descendants columns; the checkbox and the menu stay.
 // The details are a slideover named by the key ("The deleted annotation, read-only, and its history."): the pre
 // "Annotation document" and the history with the banner "<key> is deleted". Delete permanently asks "Delete <key>
 // permanently?" (typed: the key) or "Delete <n> annotations permanently?" (typed: the count).
@@ -39,6 +41,18 @@ public sealed partial class ModelingDeletedPage(App app, AppRoutes routes)
 
     // The items of the open row menu, in their order.
     public ILocator MenuItems => app.Page.GetByRole(AriaRole.Menuitem);
+
+    // The empty state of a view without deleted annotations (with Show cascaded too).
+    public ILocator NothingDeleted => app.Page.GetByRole(AriaRole.Heading, new() { Name = "Nothing is deleted", Exact = true });
+
+    // The menu "Actions for <key>" of every row, in their order.
+    public ILocator ActionsButtons => app.Page.GetByRole(AriaRole.Button, new() { NameRegex = ActionsButtonName() });
+
+    // Every checkbox of the selection: "Select all" and "Select <key>" of each row (Contributor and up).
+    public ILocator SelectCheckboxes => app.Page.GetByRole(AriaRole.Checkbox, new() { NameRegex = SelectCheckboxName() });
+
+    // Retry of the error state of a list the API refused or did not answer in time.
+    private ILocator Retry => ErrorStates.RetryButton(app.Page.Locator("body")).First;
 
     // "<n> selected" of the toolbar.
     public ILocator SelectedCount(int count)
@@ -125,6 +139,17 @@ public sealed partial class ModelingDeletedPage(App app, AppRoutes routes)
         await Expect(ShowCascaded).ToBeVisibleAsync();
     }
 
+    // Waits until the list loaded, up to Target:ApiTimeoutMs: its first row or "Nothing is deleted"; the error state
+    // throws with its text.
+    public async Task WaitForListAsync()
+    {
+        await Expect(ActionsButtons.First.Or(NothingDeleted).Or(Retry).First).ToBeVisibleAsync(new() { Timeout = app.ApiTimeoutMs });
+        if (await Retry.IsVisibleAsync())
+        {
+            throw new PlaywrightException($"The deleted annotations did not load: {await ErrorStates.TextAsync(ErrorStates.Around(Retry))}");
+        }
+    }
+
     // Opens the menu "Actions for <key>" and waits for its first item.
     public async Task OpenActionsAsync(string key)
     {
@@ -169,4 +194,10 @@ public sealed partial class ModelingDeletedPage(App app, AppRoutes routes)
             ? throw new InvalidOperationException($"The deleted annotations have no column '{column}': {string.Join(", ", headers)}.")
             : Row(key).GetByRole(AriaRole.Cell).Nth(index);
     }
+
+    [GeneratedRegex("^Actions for ")]
+    private static partial Regex ActionsButtonName();
+
+    [GeneratedRegex("^Select ")]
+    private static partial Regex SelectCheckboxName();
 }

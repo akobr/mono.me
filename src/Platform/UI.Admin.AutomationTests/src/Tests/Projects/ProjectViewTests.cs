@@ -163,24 +163,33 @@ public sealed partial class ProjectViewTests : PlatformTest
         await Assert.That(string.Join(", ", await views.ListedAsync())).IsEqualTo(string.Join(", ", listed));
     }
 
-    // ORG-VEW-04: A Reader lists the views without Compare or managing actions.
-    // Compare views is a tab of Modeling, which a Reader cannot open, and only Administrators manage views: a Reader
-    // sees the list without New view, Compare, Register or Edit, and a view's link still opens its annotations.
+    // ORG-VEW-04: A Reader lists the views and compares them, without managing actions.
+    // Compare views is a tab of Modeling, which a Reader browses read-only, and only Administrators manage views: a
+    // Reader gets Compare in every row (disabled in the default view's own, else a link to Compare views of the
+    // default view with ?to=<view>) and no New view, Register or Edit, and a view's link still opens its annotations.
     [Test]
     [TestCase(37)]
     [UserRole(Role.Reader)]
-    public async Task Views_Reader_ListsWithoutActions()
+    public async Task Views_Reader_ListsWithoutManagingActions()
     {
         var views = new ViewsPage(App, Routes);
         await views.OpenAsync();
         await Expect(views.ViewProductionBadge(AppRoutes.DefaultView)).ToBeVisibleAsync();
+        await views.ExpectCompareDisabledAsync(AppRoutes.DefaultView);
 
-        // The absence checks look in the list, so the list itself must be there.
+        // Compare in every row, which also proves that the list the absence checks look in is there.
         await Expect(views.ViewList).ToBeVisibleAsync();
+        var listed = await views.ListedAsync();
+        await Expect(views.CompareLinks).ToHaveCountAsync(listed.Count);
         await Expect(views.NewViewButton).ToHaveCountAsync(0);
-        await Expect(views.CompareLinks).ToHaveCountAsync(0);
         await Expect(views.RegisterButtons).ToHaveCountAsync(0);
         await Expect(views.EditButtons).ToHaveCountAsync(0);
+
+        foreach (var view in listed.Where(view => !string.Equals(view, AppRoutes.DefaultView, StringComparison.Ordinal)))
+        {
+            await Expect(views.ViewCompareLink(view)).ToBeEnabledAsync();
+            await Expect(views.ViewCompareLink(view)).ToHaveAttributeAsync("href", views.CompareHref(view));
+        }
 
         await views.View(AppRoutes.DefaultView).ClickAsync();
         await App.ExpectAtAsync((Routes with { View = AppRoutes.DefaultView }).Annotations);

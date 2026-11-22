@@ -7,8 +7,8 @@ using static Microsoft.Playwright.Assertions;
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Modeling;
 
 // Tabs and Access: the tab shell of Modeling (path tabs, manual keyboard activation, browser Back), the redirects of the
-// old URLs of the merged pages, the locks of a Reader and of a Contributor, the remembered tab and the Discard changes?
-// guard of a dirty editor.
+// old URLs of the merged pages, the read-only tabs of a Reader, the Administrator locks of a Reader and of a
+// Contributor, the remembered tab and the Discard changes? guard of a dirty editor.
 [Area(Area.Modeling)]
 public sealed class ModelingTabsTests : PlatformTest
 {
@@ -133,14 +133,16 @@ public sealed class ModelingTabsTests : PlatformTest
         await Expect(templates.UnknownType).ToBeVisibleAsync();
     }
 
-    // MOD-TAB-03: A Reader gets the Contributors only lock on every Modeling URL.
-    // Below Contributor the whole of Modeling is one lock: every tab's URL, also a template's detail, shows "Contributors
-    // only" with its description and mounts nothing below it, so there are no tabs, no New schema, no detail, no Export
-    // or Import region, no Show cascaded and no key picker of Compare views.
+    // MOD-TAB-03: A Reader browses Modeling read-only, with the Administrators only lock on Export & Import.
+    // A Reader opens Modeling on Schemas with the four tabs of a Contributor and without New schema. The execution
+    // template is either "No execution template" without Create template or its document, read-only and without Save,
+    // Revert or Delete. Export & Import shows "Administrators only" under the four tabs with none selected; Deleted has
+    // Show cascaded but no selection, and a row's menu (a target with deletions) only its details; Compare views opens
+    // selected, with its key picker.
     [Test]
     [TestCase(42)]
     [UserRole(Role.Reader)]
-    public async Task Modeling_Reader_GetsContributorsOnlyLock()
+    public async Task Modeling_Reader_BrowsesReadOnly()
     {
         var modeling = new ModelingPage(App, Routes);
         var schemas = new ModelingSchemaPage(App, Routes);
@@ -148,31 +150,56 @@ public sealed class ModelingTabsTests : PlatformTest
         var exportImport = new ModelingExportImportPage(App, Routes);
         var deleted = new ModelingDeletedPage(App, Routes);
         var compare = new ModelingComparePage(App, Routes);
+        string[] readerTabs = ["Schemas", "Templates", "Deleted", "Compare views"];
 
         await App.GotoAsync(Routes.Modeling);
         await App.WaitForReadyAsync();
         await App.ExpectAtAsync(Routes.ModelingTab("schemas"));
-        await ExpectContributorsOnlyAsync(modeling);
+        await modeling.ExpectSelectedAsync("Schemas");
+        await Expect(modeling.HeaderTabs).ToHaveTextAsync(readerTabs);
+        await Expect(schemas.SchemaListSection("Type schemas")).ToBeVisibleAsync();
         await Expect(schemas.NewSchemaButton).ToHaveCountAsync(0);
 
-        await App.GotoAsync(Routes.Template("exe"));
-        await App.WaitForReadyAsync();
-        await ExpectContributorsOnlyAsync(modeling);
-        await Expect(templates.Panel.Root).ToHaveCountAsync(0);
+        // The lock that closed the whole of Modeling below Contributor until 424-272.
+        await Expect(Page.GetByText("Contributors only", new() { Exact = true })).ToHaveCountAsync(0);
+
+        // A deployed Reader project may have no execution template; the mock's northwind/portal has one.
+        await templates.OpenAsync("exe");
+        if (await templates.NoTemplate.IsVisibleAsync())
+        {
+            await Expect(templates.CreateTemplateButton).ToHaveCountAsync(0);
+        }
+        else
+        {
+            await Expect(templates.ReadOnlyBadge).ToBeVisibleAsync();
+            await Expect(templates.Document.Content).Not.ToBeEditableAsync();
+            await Expect(templates.SaveButton).ToHaveCountAsync(0);
+            await Expect(templates.RevertButton).ToHaveCountAsync(0);
+            await Expect(templates.DeleteButton).ToHaveCountAsync(0);
+        }
 
         await exportImport.OpenAsync();
-        await ExpectContributorsOnlyAsync(modeling);
+        await Expect(exportImport.AdministratorsOnly).ToBeVisibleAsync();
+        await Expect(exportImport.AdministratorsOnlyDescription).ToBeVisibleAsync();
+        await Expect(modeling.HeaderTabs).ToHaveTextAsync(readerTabs);
+        await Expect(modeling.SelectedTabs).ToHaveCountAsync(0);
         await Expect(exportImport.ExportRegion).ToHaveCountAsync(0);
         await Expect(exportImport.ImportRegion).ToHaveCountAsync(0);
 
-        await App.GotoAsync(Routes.Deleted());
-        await App.WaitForReadyAsync();
-        await ExpectContributorsOnlyAsync(modeling);
-        await Expect(deleted.ShowCascaded).ToHaveCountAsync(0);
+        // The selection only serves the bulk Restore and Delete permanently, so a Reader has none.
+        await deleted.OpenAsync();
+        await deleted.WaitForListAsync();
+        await Expect(deleted.SelectCheckboxes).ToHaveCountAsync(0);
+        await Expect(deleted.BulkActions).ToHaveCountAsync(0);
+        if (!await deleted.NothingDeleted.IsVisibleAsync())
+        {
+            await deleted.ActionsButtons.First.ClickAsync();
+            await Expect(deleted.MenuItems).ToHaveTextAsync(["Show details"]);
+        }
 
         await compare.OpenAsync();
-        await ExpectContributorsOnlyAsync(modeling);
-        await Expect(compare.KeyPicker).ToHaveCountAsync(0);
+        await modeling.ExpectSelectedAsync("Compare views");
+        await Expect(compare.KeyPicker).ToBeVisibleAsync();
     }
 
     // MOD-TAB-04: A Contributor gets four tabs, the Administrators only lock and no Delete permanently.
@@ -323,12 +350,5 @@ public sealed class ModelingTabsTests : PlatformTest
         await schema.OpenAnnotationAsync(key);
         await Expect(schema.Document.Content).ToContainTextAsync("\"string\"");
         await Expect(schema.Document.Content).Not.ToContainTextAsync("\"number\"");
-    }
-
-    private static async Task ExpectContributorsOnlyAsync(ModelingPage modeling)
-    {
-        await Expect(modeling.ContributorsOnly).ToBeVisibleAsync();
-        await Expect(modeling.ContributorsOnlyDescription).ToBeVisibleAsync();
-        await Expect(modeling.AllTabs).ToHaveCountAsync(0);
     }
 }

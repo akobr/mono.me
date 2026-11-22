@@ -13,8 +13,10 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // behind the tabs "Schema" and "Preview" below. A schema that does not exist starts with a starter document and the
 // button "Create" (no Delete); an existing one has "Delete", "Revert" and "Save". Saving (Ctrl/Cmd+S too) says "Schema
 // saved (v<n>)"; a change that existing configurations would break shows the alert "Existing configurations would not
-// comply" with "Save anyway" instead. Contributor and up; the never-saved editor counts as changed, so leaving it asks
-// "Discard changes?".
+// comply" with "Save anyway" instead. The writes are Contributor and up, and the never-saved editor counts as changed,
+// so leaving it asks "Discard changes?". A Reader gets an existing schema read-only, with the badge "Read-only" in the
+// editor's actions and without the footer, and a schema that does not exist as the empty state "No schema" instead of
+// the starter document.
 public sealed partial class ModelingSchemaPage(App app, AppRoutes routes)
 {
     public DetailPanel Panel { get; } = new(app, "schema-detail");
