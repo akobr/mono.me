@@ -311,8 +311,8 @@ If the job fails with `AuthorizationFailed` on `Microsoft.App/containerApps/writ
 | No passthrough | send the MCP token to `GET https://api.2s.42for.net/api/v1/access/account` | `401` |
 | Logs | Log Analytics `prod-2s-log`: `ContainerAppConsoleLogs \| where ContainerAppName == "prod-2s-mcp-ca" \| take 50`, and the API's Application Insights | the exchange logged with the actor `mcp` and the client, no token or body in any log |
 | Scale to zero | after 10 minutes without calls: `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` | no replica |
-| The budget | `az rest --url "https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Consumption/budgets/prod-2s-mcp-budget?api-version=2026-06-01" --query "properties.{amount:amount, start:timePeriod.startDate, spent:currentSpend.amount, filter:filter.dimensions}" -o json` (`az rest` fills in the subscription) | amount `1`, your start date, spent `0`, the filter `MeterCategory` `In` `Azure Container Apps` |
-| Cost | after a few days: Cost Management → Cost analysis, scope the subscription, group by **Service name** (the meter category), the server's resources only | `Azure Container Apps` at 0 USD, or no row yet (free usage isn't billed). If its usage shows under another meter category, the budget's filter in `main.bicep` must name that one |
+| The budget | `az rest --url "https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Consumption/budgets/prod-2s-mcp-budget?api-version=2026-06-01" --query "properties.{amount:amount, start:timePeriod.startDate, spent:currentSpend.amount, filter:filter.dimensions}" -o json` (`az rest` fills in the subscription) | amount `1`, your start date, spent `0` (a few cents: see the Cost row), the filter `MeterCategory` `In` `Azure Container Apps` |
+| Cost | after a few days: Cost Management → Cost analysis, scope the subscription, group by **Service name** (the meter category), the server's resources only | `Azure Container Apps` at 0 USD. If its usage shows under another meter category, the budget's filter in `main.bicep` must name that one. No row yet (free usage may not be listed) leaves the filter unconfirmed: phase 11 checks it again at the end of the month. A few cents while the server is far inside the grant (phase 11, step 1) mean Cost Management prices the free usage during the month: no misconfiguration, see phase 11, "A cost although the replica-minutes are inside the grant" |
 
 A request through the ingress ends after 240 seconds: a tool call that waits longer for the API is cut off, and the assistant checks a write with the matching read.
 
@@ -383,9 +383,11 @@ Turning dynamic client registration off in WorkOS production does the same for t
 
 ## 11. The cost of the MCP server
 
-The server costs nothing while it is warm for less than about 200 hours a month: that is the monthly free grant of Container Apps at 0.25 vCPU and 0.5 GiB, per subscription. Every request wakes a replica for about 5.5 minutes, a `401` or a scanner's request too, and each warm hour past the grant costs about 0.027 USD. The [decisions](decisions.md#the-mcp-server) have the whole range, up to about 53 USD a month with three replicas up all month; the spec is [Cost Range and Budget of the MCP Server](specs/2026-11-22%20Cost%20Range%20and%20Budget%20of%20the%20MCP%20Server.md).
+The server costs nothing while it is warm for less than about 200 hours a month: that is the monthly free grant of Container Apps at 0.25 vCPU and 0.5 GiB, per subscription. Every request wakes a replica for about 5.5 minutes, a `401` or a scanner's request too, and each warm hour past the grant costs about 0.027 USD. The [decisions](decisions.md#the-mcp-server) have the whole range, up to about 53 USD a month of compute with three replicas up all month, plus 0.40 USD per million requests past the grant's 2 million, which no setting caps; the spec is [Cost Range and Budget of the MCP Server](specs/2026-11-22%20Cost%20Range%20and%20Budget%20of%20the%20MCP%20Server.md).
 
 **The budget** `prod-2s-mcp-budget` holds the subscription's Container Apps cost, which is 0 inside the grant. It emails you at 50 % and 100 % of `mcpBudgetAmount` (1 by default, in the billing currency) and when the month's forecast reaches it. Cost data of a pay-as-you-go subscription can come up to three days late, and budgets are checked once a day: an email tells about the past few days, not the last hour.
+
+**Without an email**, at the end of the first month or two: run step 1 below. More than 12,000 replica-minutes in a month without an email means the budget's filter doesn't match: check the server's meter category in Cost analysis (phase 9, the Cost row) and fix the filter in `main.bicep`.
 
 When an email comes:
 
@@ -394,21 +396,23 @@ When an email comes:
    ```powershell
    $app = az containerapp show -g prod-2s-eusec-rg -n prod-2s-mcp-ca --query id -o tsv
    $now = (Get-Date).ToUniversalTime()
-   $minutes = 0
+   $minutes = 0; $peak = 0; $multi = 0
    for ($day = [datetime]::new($now.Year, $now.Month, 1, 0, 0, 0, [DateTimeKind]::Utc); $day -lt $now; $day = $day.AddDays(1)) {
      $maxima = az monitor metrics list --resource $app --metric Replicas --aggregation Maximum --interval PT1M `
        --start-time $day.ToString('o') --end-time $day.AddDays(1).ToString('o') `
        --query 'value[0].timeseries[0].data[].maximum' -o json | ConvertFrom-Json
      $minutes += ($maxima | Where-Object { $_ } | Measure-Object -Sum).Sum
+     $peak = [math]::Max($peak, [double](($maxima | Where-Object { $_ } | Measure-Object -Maximum).Maximum))
+     $multi += @($maxima | Where-Object { $_ -ge 2 }).Count
    }
-   '{0:N0} replica-minutes this month (the free grant: 12,000 a month, about 400 a day)' -f $minutes
+   '{0:N0} replica-minutes this month (the free grant: 12,000 a month, about 400 a day); at most {1} replicas, {2:N0} minutes with 2 or more' -f $minutes, $peak, $multi
    ```
 
 2. **Who wakes it.** The requests of the last 24 hours by status class, and in how many of those hours each came:
 
    ```powershell
    $series = az monitor metrics list --resource $app --metric Requests --aggregation Total --interval PT1H `
-     --start-time $now.AddDays(-1).ToString('o') --filter "statusCodeCategory eq '*'" `
+     --start-time $now.AddDays(-1).ToString('o') --end-time $now.ToString('o') --filter "statusCodeCategory eq '*'" `
      --query 'value[0].timeseries' -o json | ConvertFrom-Json
    $series | ForEach-Object {
      [pscustomobject]@{ Status = $_.metadatavalues[0].value; Requests = ($_.data.total | Measure-Object -Sum).Sum; Hours = @($_.data | Where-Object total).Count }
@@ -420,8 +424,8 @@ When an email comes:
 3. **What to change**, in `parameters/prod.bicepparam` through a pull request, then the what-if and the create of phase 4 (the what-if shows the changed value on `prod-2s-mcp-ca` or on the budget):
    - **Scanners, and more than about 400 replica-minutes a day:** `param mcpCooldownSeconds = 120` (about 2.5 minutes warm per request instead of 5.5) or `60` (a request every 5 minutes then still fits the grant). The price is a cold start of 10 to 30 seconds after every pause of a session that is longer than the cool-down. Check it once after the run: one `curl.exe -s -o NUL -X POST https://mcp.2s.42for.net/mcp`, then `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` every half minute until no replica is left: about the cool-down plus up to half a minute.
    - **People's use past the grant:** the server doing its work. Raise `mcpBudgetAmount` to what a month may cost.
-   - **A cost although the replica-minutes are inside the grant** (and no other Container App runs in the subscription): Cost Management prices the free usage during the month, and only the invoice subtracts the grant. Set `mcpBudgetAmount = 7`: the grant is worth about 5.40 USD at Sweden Central's prices, so the budget then warns past it.
-   - **Two or three replicas for long** (the per-minute maxima of step 1 at 2 or 3): more than 20 concurrent requests at a time; lower `mcpMaxReplicas`.
+   - **A cost although the replica-minutes are inside the grant** (and no other Container App runs in the subscription): Cost Management prices the free usage during the month, and only the invoice subtracts the grant. Set `mcpBudgetAmount = 11`: the grant is worth about 5.40 USD at Sweden Central's prices, so the first email, at 50 % (5.50 USD), then comes just past it.
+   - **Two or three replicas for long** (step 1 shows at most 2 or 3 replicas and many minutes with 2 or more): more than 20 concurrent requests at a time, which the cool-down doesn't govern; lower `mcpMaxReplicas`.
    - **At once:** `az containerapp ingress disable` (phase 10) stops every request, and the server with it.
 
 If scanners stay the cost even with a short cool-down, the next steps change the templates: rule-based routing of the environment, or `minReplicas` 1 (decisions, "The MCP server").
