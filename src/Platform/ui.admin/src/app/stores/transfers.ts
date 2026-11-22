@@ -188,12 +188,20 @@ export const useTransfersStore = defineStore('transfers', () => {
   }
 
   /** Fetches the archive of a finished export and saves it under the export's name. */
-  async function download(job: ExportJob): Promise<void> {
+  function download(job: ExportJob): Promise<void> {
+    return downloadArchive(job.scope, job.id, job.state.FileName)
+  }
+
+  /**
+   * Fetches the archive of an export by the id of its job and saves it under the file name: of a job this tab follows,
+   * and of one it only knows from the inbox of the view (424-31). A job that has expired answers 404.
+   */
+  async function downloadArchive(scope: Scope, id: string, fileName?: string | null): Promise<void> {
     // The download grows with the view: it gets the transfer limit, not the read limit.
-    const archive = await getViewExportArchive(job.scope.org, job.scope.project, job.scope.view, job.id, {
+    const archive = await getViewExportArchive(scope.org, scope.project, scope.view, id, {
       timeoutMs: apiTransferTimeoutMs,
     })
-    saveBlob(archive, job.state.FileName ?? `export-${job.scope.view}.zip`)
+    saveBlob(archive, fileName ?? `export-${scope.view}.zip`)
   }
 
   /** Follows the exports that were still running before a reload, and reads the latest import of each view again. */
@@ -435,6 +443,7 @@ export const useTransfersStore = defineStore('transfers', () => {
     startExport,
     startImport,
     download,
+    downloadArchive,
     resume,
     dismiss,
   }

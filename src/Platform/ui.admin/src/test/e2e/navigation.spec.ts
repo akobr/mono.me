@@ -229,8 +229,9 @@ for (const moved of movedPages) {
 }
 
 // The View section after 424-38: Templates, Schemas, Export & Import, Deleted and Compare views are the tabs of
-// Modeling. Every role sees the entry; a Reader sees it with the read-only lock of Annotations (424-272).
-test('lists Modeling in the View section of every role, read-only for a reader', async ({ page }, testInfo) => {
+// Modeling. Every role sees the entry; a Reader sees it with the read-only lock of Annotations (424-272). Inbox follows
+// it as the last entry (424-31) for a Contributor and up; a Reader, whom the inbox is closed to, does not see it.
+test('lists Modeling in the View section of every role, read-only for a reader, and Inbox from Contributor up', async ({ page }, testInfo) => {
   const moved = ['templates', 'schemas', 'compare', 'export-import', 'deleted']
 
   for (const [project, locked] of [
@@ -246,11 +247,19 @@ test('lists Modeling in the View section of every role, read-only for a reader',
       'Values store',
       'Graph',
       'Modeling',
+      ...(locked ? [] : ['Inbox']),
     ])
     const entry = navigation.getByRole('link', { name: 'Modeling', exact: true })
     await expect(entry).toHaveAttribute('href', `${project}/default/modeling`)
     // the lock badge of the entry
     await expect(entry.locator('[data-slot="linkTrailingBadge"]')).toHaveCount(locked ? 1 : 0)
+    const inbox = navigation.getByRole('link', { name: 'Inbox', exact: true })
+    if (locked) {
+      await expect(inbox).toHaveCount(0)
+    } else {
+      await expect(inbox).toHaveAttribute('href', `${project}/default/inbox`)
+      await expect(inbox.locator('[data-slot="linkTrailingBadge"]')).toHaveCount(0)
+    }
     for (const section of moved) {
       await expect(navigation.locator(`a[href^="${project}/default/${section}"]`)).toHaveCount(0)
     }

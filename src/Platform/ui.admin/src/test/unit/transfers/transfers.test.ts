@@ -119,6 +119,52 @@ describe('transfers store', () => {
     expect(sessionStorage.getItem('2s-admin:pending-exports')).toBeNull()
   })
 
+  // The inbox of a view leads to the exports of other tabs, people and machines (424-31): their archives are fetched
+  // by the id of the job, without following it.
+  it('downloads the archive of an export it does not follow, by its id and under the given name', async () => {
+    const transfers = useTransfersStore()
+    const finished: string[] = []
+    transfers.onFinished((job) => finished.push(`${job.kind}:${job.phase}`))
+    const { Id: id } = await startViewExport(scope.org, scope.project, scope.view, { Format: 'Folder' })
+    await getViewExport(scope.org, scope.project, scope.view, id!)
+    const ended = await getViewExport(scope.org, scope.project, scope.view, id!)
+
+    await transfers.downloadArchive(scope, id!, ended.FileName)
+
+    expect(vi.mocked(saveBlob)).toHaveBeenCalledOnce()
+    const [archive, fileName] = vi.mocked(saveBlob).mock.calls[0]!
+    expect(fileName).toBe(ended.FileName)
+    expect((await readZip(new Uint8Array(await archive.arrayBuffer()))).map((file) => file.name)).toContain(
+      'export.json',
+    )
+    // the job is neither tracked nor reported
+    expect(transfers.jobs).toEqual([])
+    expect(finished).toEqual([])
+    expect(sessionStorage.getItem('2s-admin:pending-exports')).toBeNull()
+  })
+
+  it('names a downloaded archive after the view when its job has no file name', async () => {
+    const transfers = useTransfersStore()
+    const { Id: id } = await startViewExport(scope.org, scope.project, scope.view, { Format: 'Folder' })
+    await getViewExport(scope.org, scope.project, scope.view, id!)
+    await getViewExport(scope.org, scope.project, scope.view, id!)
+
+    await transfers.downloadArchive(scope, id!)
+    await transfers.downloadArchive(scope, id!, null)
+
+    expect(vi.mocked(saveBlob).mock.calls.map(([, fileName]) => fileName)).toEqual([
+      'export-default.zip',
+      'export-default.zip',
+    ])
+  })
+
+  it('passes on the 404 of an archive whose export has expired, and saves nothing', async () => {
+    const transfers = useTransfersStore()
+
+    await expect(transfers.downloadArchive(scope, 'no-such-export', 'gone.zip')).rejects.toMatchObject({ status: 404 })
+    expect(vi.mocked(saveBlob)).not.toHaveBeenCalled()
+  })
+
   it('reports a failed export with the error of the server', async () => {
     server.use(
       http.get('*/api/v1/:org/:project/:view/exports/:id', () =>

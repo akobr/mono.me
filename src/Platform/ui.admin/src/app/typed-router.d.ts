@@ -247,6 +247,13 @@ declare module 'vue-router/auto-routes' {
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/[view]/inbox': RouteRecordInfo<
+      '/[org]/[project]/[view]/inbox',
+      '/:org/:project/:view/inbox',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
     '/[org]/[project]/[view]/key-values': RouteRecordInfo<
       '/[org]/[project]/[view]/key-values',
       '/:org/:project/:view/key-values',
@@ -791,6 +798,14 @@ declare module 'vue-router/auto-routes' {
     'app/pages/[org]/[project]/[view]/graph/[key]/versions.vue': {
       routes:
         | '/[org]/[project]/[view]/graph/[key]/versions'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/inbox.vue': {
+      routes:
+        | '/[org]/[project]/[view]/inbox'
       views:
         | never
       pathParamNames:

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
+import { dismissJobItem, invalidateInbox } from '@/queries/inbox'
 import { invalidateImport } from '@/queries/invalidation'
 import { useCatalogStore } from '@/stores/catalog'
 import type { Scope } from '@/stores/context'
@@ -10,6 +11,11 @@ import { exportCounts, exportImportPath, importCounts } from '@/utils/transfers'
 // The ends of exports and imports (spec 4.5 of the Export and Import of a View), wherever the user is by then: a toast,
 // and after an import that wrote documents, fresh queries of the kinds it wrote. An import that the Export & Import
 // page shows gets no toast; any other links to the page, where its result is.
+//
+// The back end also leaves the end of every job in the inbox of its view (424-31), for the other tabs and the other
+// Administrators. This tab has just shown that end, so it dismisses the job's item: the inbox must not report it a
+// second time, nor light the mark of the menu for the person who saw it. The item is then under Done, with its
+// Download or its result. What stays open is what nobody was shown.
 const toast = useToast()
 const queryClient = useQueryClient()
 const catalog = useCatalogStore()
@@ -77,7 +83,22 @@ async function refresh(job: ImportJob) {
   }
 }
 
+/**
+ * Whether the end the tab reported is the end of the job on the server. It is not when the tab gave up waiting or
+ * reading, or could not download the archive of an export that succeeded: the job's item then tells what this tab
+ * could not, so it stays open.
+ */
+const isReported = (job: TransferJob) =>
+  job.phase === 'done' ? job.state.Status === 'Succeeded' : job.state.Status === 'Failed'
+
+/** The inbox of the job's view, read again, after the item of a reported job was dismissed. Never a toast. */
+function settleInbox(job: TransferJob) {
+  void (isReported(job) ? dismissJobItem(queryClient, job.scope, job.id) : invalidateInbox(queryClient, job.scope))
+}
+
 const stop = transfers.onFinished((job: TransferJob) => {
+  settleInbox(job)
+
   if (job.kind === 'import' && job.phase === 'done') {
     void refresh(job)
   }

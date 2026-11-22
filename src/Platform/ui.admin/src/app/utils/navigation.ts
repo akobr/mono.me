@@ -19,6 +19,14 @@ export interface NavigationEntry {
   editRole?: AccountRoleName
   /** The tabs of the page, each with its own path; the command palette lists them after the entry (424-38). */
   tabs?: { label: string; icon: string; to: string }[]
+  /** The entry has something waiting: the Inbox with open items (424-31). Only set when it is true. */
+  marked?: boolean
+}
+
+/** What the menu marks; only the sidebar knows it, so the command palette passes nothing (424-31). */
+export interface NavigationMarks {
+  /** The inbox of the view has open items. */
+  inbox?: boolean
 }
 
 export interface NavigationSection {
@@ -87,10 +95,12 @@ export function navigationScope(
 /**
  * Sidebar sections (spec section 4): view scope, project scope and organization scope, plus global entries.
  * Entries the caller's role cannot use are hidden; read-only ones are marked as locked. The section of the default
- * view is flagged, so the sidebar can mark it as production (424-43).
+ * view is flagged, so the sidebar can mark it as production (424-43). `marks` sets `marked` on the Inbox entry, and
+ * on no other (424-31).
  */
 export function buildNavigation(
   context: NavigationContext,
+  marks?: NavigationMarks,
 ): { id: NavigationSection['id']; label?: string; defaultView: boolean; items: NavigationItem[] }[] {
   const sections: NavigationSection[] = []
   const { org, project, view } = context
@@ -119,6 +129,16 @@ export function buildNavigation(
             icon: tab.icon,
             to: modelingPath({ org, project, view }, tab.value),
           })),
+        },
+        // The inbox of the view (424-31): the results of background jobs and what the platform suggests. The last
+        // entry, so the positions of the others stay. The API serves it from Contributor up, and the page is closed,
+        // not read-only, for a Reader, so the entry is hidden below Contributor (minRole, 424-272).
+        {
+          label: 'Inbox',
+          icon: 'i-lucide-inbox',
+          to: `${base}/inbox`,
+          minRole: 'Contributor',
+          ...(marks?.inbox ? { marked: true } : {}),
         },
       ],
     })

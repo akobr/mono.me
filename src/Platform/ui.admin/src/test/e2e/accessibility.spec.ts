@@ -25,6 +25,7 @@ const screens: [string, string][] = [
   ['monitor usage', '/acme/billing/monitor'],
   ['monitor audit', '/acme/billing/monitor?tab=audit'],
   ['organization audit', '/acme/audit'],
+  ['inbox', '/acme/billing/default/inbox'],
   ['account', '/account'],
 ]
 

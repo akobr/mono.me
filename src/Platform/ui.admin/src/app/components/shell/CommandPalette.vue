@@ -157,6 +157,7 @@ defineShortcuts({
   'g-t': () => go(navigationBase.value && `${navigationBase.value}/modeling/templates`),
   'g-s': () => go(navigationBase.value && `${navigationBase.value}/modeling/schemas`),
   'g-e': () => go(navigationBase.value && `${navigationBase.value}/modeling/export-import`),
+  'g-i': () => go(navigationBase.value && `${navigationBase.value}/inbox`),
 })
 </script>
 
