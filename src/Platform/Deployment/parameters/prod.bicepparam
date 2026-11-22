@@ -79,5 +79,5 @@ param mcpEnabled = true
 param mcpHostName = 'mcp.2s.42for.net'
 param mcpExchangeAppId = '2399e89b-0b03-4d80-9f02-cf25a146509d'
 param mcpInitialImage = 'ghcr.io/akobr/2s-platform-mcp:20ef5b5a2e55db09753cf8ca5cadfef28b0e2b22'
-param mcpAppExists = false
-param mcpCustomDomain = false
+param mcpAppExists = true
+param mcpCustomDomain = true
