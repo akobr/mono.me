@@ -669,7 +669,7 @@ az containerapp create -g "$RG" -n "$MCP_APP" --environment "$CAE" --workload-pr
 | --- | --- | --- |
 | `Mcp__Provider`, `Mcp__Authentication__Issuer` | `AuthKit`, the AuthKit domain | people sign in at the AuthKit domain, where MCP clients register themselves (dynamic client registration), not through the WorkOS API like the admin UI |
 | `Mcp__ResourceUrl` | `https://mcp.2s.42for.net/mcp` | the `aud` every accepted token must carry (the resource indicator), and the base of the resource metadata |
-| `Mcp__Authentication__Scope` | `openid` | dynamically registered clients get no WorkOS permission, and an environment-wide default scope would be in every token of every 42for.net product. The gate is the API: a person needs a Storyteller account, and their roles decide every call |
+| `Mcp__Authentication__Scope` | `openid` | dynamically registered clients get no WorkOS permission, and an environment-wide default scope would be in every token of every 42for.net product. The gate is the API: a person needs a Storyteller account, their roles decide every call, and a client that isn't trusted only reads (`UntrustedClientRestrictions` below) |
 | `Mcp__Actor__*` | the actor `mcp`, the managed identity, `api://<exchange app id>` | the server proves itself to the API with a token of its identity; no secret exists |
 | `Mcp__SecretTools__Enabled` | `false` | the API's actor withholds secrets (`NoSecretReveal`) |
 | `Storyteller__BaseUrl` | `https://api.2s.42for.net/api` | the exchange and every call go to the API |
@@ -686,6 +686,8 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
   "Auth__TokenExchange__Actors__0__Authentication__WorkloadIdentity__Subject=$MCP_MI_PRINCIPAL_ID" \
   "Auth__TokenExchange__Actors__0__Authentication__WorkloadIdentity__Audience=api://$EXCHANGE_APP_ID" \
   "Auth__TokenExchange__Actors__0__SubjectAudiences__0=https://$MCP_HOST/mcp" \
+  Auth__TokenExchange__Actors__0__UntrustedClientRestrictions__0=ReadOnly \
+  Auth__TokenExchange__Actors__0__UntrustedClientRestrictions__1=NoSecretReveal \
   --output none
 ```
 
@@ -694,7 +696,9 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | `Auth__TokenExchange__AdditionalIssuers__0__*` | MCP sign-ins come from the AuthKit domain, while the API's own issuer is the WorkOS API (until the custom domain, 424-247). The API exchanges such tokens and never accepts them on its routes. **With the custom domain** both issuers are `https://auth.42for.net`: the entry goes away in the same change, or the API doesn't start (the template drops it by itself) |
 | `…__WorkloadIdentity__Issuer`, `__Subject`, `__Audience` | the v1 tokens of the identity: the tenant's v1 issuer, the identity's object id, the App ID URI. The API reads the keys through the issuer's discovery document |
 | `…__SubjectAudiences__0` | the MCP resource URL, the only `aud` the actor may exchange. The API also refuses a token with it on its routes, so a leaked MCP token can't call the API directly. It stays out of `Auth__AuthKit__Audiences__<n>` |
-| (defaults) | `Scopes` `User.Impersonation`, `NoSecretReveal`, `AllowedClientIds` empty (MCP clients register dynamically; the API warns once at start), 10-minute tokens, actor tokens up to 24 hours old (Azure.Identity caches them) |
+| `…__UntrustedClientRestrictions__0`, `__1` | `ReadOnly` and `NoSecretReveal` for every MCP client outside `TrustedClientIds`, and for a sign-in that names no client: it reads what the person may read, changes nothing and reveals no secret. The template writes `mcpUntrustedClientRestrictions` (these two by default, the only values its build accepts) ([424-302](https://linear.app/424fun/issue/424-302/arch-production-turns-on-the-mcp-token-exchange-with-no-client-allow)) |
+| `…__TrustedClientIds__<n>`, `…__AllowedClientIds__<n>`, `Auth__TokenExchange__DeniedClientIds__<n>` | none at first; the template writes `mcpTrustedClientIds`, `mcpAllowedClientIds` and `mcpDeniedClientIds` while they have entries. A trusted client gets the actor's own policy, the person's roles still without secrets (compared exactly; only clients with a Client ID Metadata Document of web redirects only, by the id the API recorded); with `AllowedClientIds`, every other client is refused (the switch for dynamically registered clients, whose ids are random); a denied client is refused for every actor (compared ignoring case; the switch for one client with a stable id). Every change restarts the API ([runbook](runbook-mcp-server.md#trust-a-client)) |
+| (defaults) | `Scopes` `User.Impersonation`, `NoSecretReveal`, `AllowedClientIds` empty (MCP clients register dynamically; the API logs once at start that it accepts any client and which restrictions the untrusted ones get), 10-minute tokens, actor tokens up to 24 hours old (Azure.Identity caches them) |
 
 **The custom domain:** the records `mcp.2s` (CNAME to the app's `properties.configuration.ingress.fqdn`) and `asuid.mcp.2s` (TXT, its `properties.customDomainVerificationId`) in the zone `42for.net` (step 12). A CAA record of the zone, if there is one, must allow `digicert.com`. Then `az containerapp hostname bind -g "$RG" -n "$MCP_APP" --hostname "$MCP_HOST" --environment "$CAE" --validation-method CNAME`. The template binds it with `mcpCustomDomain`: the host name with the binding type `Auto` and the managed certificate.
 

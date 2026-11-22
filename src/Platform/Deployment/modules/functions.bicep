@@ -116,6 +116,22 @@ param mcpIdentityPrincipalId string
 @description('The App ID URI of "2S Platform Token Exchange", api://<app id>: the aud of the actor tokens.')
 param mcpExchangeAudience string
 
+@description('The clients the actor accepts (Actors__0__AllowedClientIds); empty: any client.')
+param mcpAllowedClientIds string[]
+
+@description('The clients that act with the actor\'s own policy only (Actors__0__TrustedClientIds).')
+param mcpTrustedClientIds string[]
+
+@description('The restrictions of every client outside mcpTrustedClientIds (Actors__0__UntrustedClientRestrictions).')
+@allowed([
+  'ReadOnly'
+  'NoSecretReveal'
+])
+param mcpUntrustedClientRestrictions string[]
+
+@description('The clients the exchange refuses for every actor (Auth__TokenExchange__DeniedClientIds).')
+param mcpDeniedClientIds string[]
+
 // Without a custom domain, the user tokens the admin UI and sform get from the WorkOS API (user_management/authenticate)
 // carry iss https://api.workos.com/user_management/<client id> (checked on a production token, 2026-11-11).
 var authKitIssuer = authKitCustomDomain ? 'https://${authKitDomain}' : 'https://api.workos.com/user_management/${authKitClientId}'
@@ -182,8 +198,14 @@ var authKitApiKeySetting = authKitApiKeyEnabled
 // and listing it would stop the API at start. The actor proves itself with a v1 token of its managed identity for the
 // exchange application: issuer the tenant's v1 issuer, sub the identity's object id, aud the App ID URI; the API finds
 // its keys through the issuer's discovery document (https://sts.windows.net/<tenant>/.well-known/openid-configuration).
-// The defaults stay: Scopes User.Impersonation, NoSecretReveal (AllowSecrets off), any MCP client (dynamic
-// registration), 10-minute tokens, actor tokens up to 24 hours old (Azure.Identity caches them).
+// The defaults stay: Scopes User.Impersonation, NoSecretReveal (AllowSecrets off), 10-minute tokens, actor tokens up to
+// 24 hours old (Azure.Identity caches them).
+//
+// The client policy (the client is the subject token's azp, appid or client_id): any MCP client may sign in, as dynamic
+// registration needs, until AllowedClientIds lists the clients; a client of DeniedClientIds is refused for every actor;
+// every client outside TrustedClientIds, and a sign-in that names no client, gets UntrustedClientRestrictions (ReadOnly
+// and NoSecretReveal by default: it reads, changes nothing and reveals no secret). Each list is written only while it
+// has entries.
 var authKitDomainIssuer = 'https://${authKitDomain}'
 var tokenExchangeIssuerSettings = !tokenExchangeEnabled || empty(authKitDomain) || authKitDomainIssuer == authKitIssuer
   ? {}
@@ -205,6 +227,38 @@ var tokenExchangeSettings = tokenExchangeEnabled
       // No MCP server: the exchange answers unsupported_grant_type.
       Auth__TokenExchange__Enabled: 'false'
     }
+
+var allowedClientSettings = tokenExchangeEnabled
+  ? toObject(
+      range(0, length(mcpAllowedClientIds)),
+      i => 'Auth__TokenExchange__Actors__0__AllowedClientIds__${i}',
+      i => mcpAllowedClientIds[i]
+    )
+  : {}
+
+var trustedClientSettings = tokenExchangeEnabled
+  ? toObject(
+      range(0, length(mcpTrustedClientIds)),
+      i => 'Auth__TokenExchange__Actors__0__TrustedClientIds__${i}',
+      i => mcpTrustedClientIds[i]
+    )
+  : {}
+
+var untrustedClientRestrictionSettings = tokenExchangeEnabled
+  ? toObject(
+      range(0, length(mcpUntrustedClientRestrictions)),
+      i => 'Auth__TokenExchange__Actors__0__UntrustedClientRestrictions__${i}',
+      i => mcpUntrustedClientRestrictions[i]
+    )
+  : {}
+
+var deniedClientSettings = tokenExchangeEnabled
+  ? toObject(
+      range(0, length(mcpDeniedClientIds)),
+      i => 'Auth__TokenExchange__DeniedClientIds__${i}',
+      i => mcpDeniedClientIds[i]
+    )
+  : {}
 
 var byokSetting = empty(byokClientId) ? {} : { KeyValues__Protection__Byok__ClientId: byokClientId }
 
@@ -313,7 +367,7 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
 resource appSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   parent: site
   name: 'appsettings'
-  properties: union(baseSettings, disabledKindSettings, authKitAudienceSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, tokenExchangeSettings, tokenExchangeIssuerSettings, byokSetting, sentryDsnSetting, exhibitionSettings, stepUpEnabledSetting, stepUpMaxAgeSetting)
+  properties: union(baseSettings, disabledKindSettings, authKitAudienceSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, tokenExchangeSettings, tokenExchangeIssuerSettings, allowedClientSettings, trustedClientSettings, untrustedClientRestrictionSettings, deniedClientSettings, byokSetting, sentryDsnSetting, exhibitionSettings, stepUpEnabledSetting, stepUpMaxAgeSetting)
 }
 
 resource scmCredentials 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2025-03-01' = {

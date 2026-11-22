@@ -159,6 +159,25 @@ param mcpCustomDomain bool = false
 @description('The scope MCP clients request (Mcp:Authentication:Scope): openid, since dynamically registered clients get no WorkOS permission; the API is the gate.')
 param mcpScope string = 'openid'
 
+@description('The hard gate of the actor mcp (Auth:TokenExchange:Actors:0:AllowedClientIds): with entries, the exchange refuses every other client, and a sign-in that names no client. Empty (the default) accepts any client, which dynamic registration needs; set to mcpTrustedClientIds, it refuses every dynamically registered client (runbook, "Cut off every unlisted client").')
+param mcpAllowedClientIds string[] = []
+
+@description('The MCP clients that act with the actor\'s own policy only (Auth:TokenExchange:Actors:0:TrustedClientIds), compared exactly: the ids the API recorded for clients with a Client ID Metadata Document of web redirects only, never a dynamically registered id (runbook, "Trust a client").')
+param mcpTrustedClientIds string[] = []
+
+@description('The restrictions of every MCP client outside mcpTrustedClientIds, also of a sign-in that names no client (Auth:TokenExchange:Actors:0:UntrustedClientRestrictions): ReadOnly refuses every change, NoSecretReveal every secret value.')
+@allowed([
+  'ReadOnly'
+  'NoSecretReveal'
+])
+param mcpUntrustedClientRestrictions string[] = [
+  'ReadOnly'
+  'NoSecretReveal'
+]
+
+@description('The clients the exchange refuses for every actor, even an allowed or trusted one (Auth:TokenExchange:DeniedClientIds), compared ignoring case: the switch for one client with a stable id, not for a dynamically registered one, which registers again (runbook, "Cut off one client").')
+param mcpDeniedClientIds string[] = []
+
 @description('The fewest replicas of the MCP server: 0 (the default) scales it to zero without calls, inside the free grant, with a cold start of a few seconds on the next call; 1 keeps one replica, billed at the idle rate between calls (about 4-5 USD a month).')
 @minValue(0)
 @maxValue(10)
@@ -194,6 +213,18 @@ var mcpCustomDomainChecked = mcpEnabled && mcpCustomDomain && !mcpAppExists
 var mcpInitialImageChecked = mcpEnabled && !mcpAppExists && empty(mcpInitialImage)
   ? fail('mcpInitialImage is required for the run that creates the MCP server\'s Container App (mcpAppExists = false).')
   : mcpInitialImage
+// A blank client id would stop the API at start, and with it the admin UI and sform: the deployment fails instead.
+var mcpAllowedClientIdsChecked = mcpEnabled && hasBlankEntry(mcpAllowedClientIds)
+  ? fail('mcpAllowedClientIds entries must not be blank with mcpEnabled: the API would not start.')
+  : mcpAllowedClientIds
+var mcpTrustedClientIdsChecked = mcpEnabled && hasBlankEntry(mcpTrustedClientIds)
+  ? fail('mcpTrustedClientIds entries must not be blank with mcpEnabled: the API would not start.')
+  : mcpTrustedClientIds
+var mcpDeniedClientIdsChecked = mcpEnabled && hasBlankEntry(mcpDeniedClientIds)
+  ? fail('mcpDeniedClientIds entries must not be blank with mcpEnabled: the API would not start.')
+  : mcpDeniedClientIds
+
+func hasBlankEntry(values string[]) bool => !empty(filter(values, value => empty(trim(value))))
 
 func relativeName(hostName string, zone string) string =>
   endsWith(hostName, '.${zone}') ? substring(hostName, 0, length(hostName) - length(zone) - 1) : hostName
@@ -401,6 +432,10 @@ module functions 'modules/functions.bicep' = {
     mcpResourceUrl: mcpResourceUrl
     mcpIdentityPrincipalId: mcpEnabled ? mcpIdentity!.outputs.principalId : ''
     mcpExchangeAudience: mcpExchangeAudience
+    mcpAllowedClientIds: mcpAllowedClientIdsChecked
+    mcpTrustedClientIds: mcpTrustedClientIdsChecked
+    mcpUntrustedClientRestrictions: mcpUntrustedClientRestrictions
+    mcpDeniedClientIds: mcpDeniedClientIdsChecked
   }
 }
 
