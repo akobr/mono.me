@@ -709,6 +709,40 @@ public sealed class TokenExchangeProviderTests : IDisposable
         logged[0].Contains($"Auth:TokenExchange:Actors entry '{ExchangeFixture.ActorId}' lists in SubjectAudiences", StringComparison.Ordinal).ShouldBe(hinted);
     }
 
+    // A blocked client app (Auth:TokenExchange:DeniedClientIds) is no setup mistake of the actor: no hint about its
+    // SubjectAudiences, and the person gets the API's text.
+    [Fact]
+    public async Task BlockedClient_IsLoggedAsSuch_WithoutTheHint()
+    {
+        var fixture = TokenFileFixture();
+        fixture.Endpoint.Respond = _ => Task.FromResult(TokenEndpointHandler.Error("invalid_grant", StorytellerSignInRefusedException.ClientBlockedMessage));
+
+        var refused = await Should.ThrowAsync<StorytellerSignInRefusedException>(() => fixture.Provider.GetTokenAsync(TestTokens.Create(), CancellationToken.None));
+
+        refused.Message.ShouldBe(StorytellerSignInRefusedException.ClientBlockedMessage);
+        fixture.Logs.Entries.ShouldContain(entry => entry.Contains("The Storyteller API refused the token exchange: 400 invalid_grant; the API blocks the client app of this sign-in.", StringComparison.Ordinal));
+        fixture.Logs.Entries.ShouldNotContain(entry => entry.Contains("SubjectAudiences", StringComparison.Ordinal));
+    }
+
+    // Forget drops the cached answer only while it is the refused token, so the next call exchanges again.
+    [Fact]
+    public async Task Forget_DropsTheCachedToken_OnlyWhileItIsTheRefusedOne()
+    {
+        var fixture = TokenFileFixture();
+        var userToken = TestTokens.Create();
+        fixture.Endpoint.Respond = request => Task.FromResult(TokenEndpointHandler.Token($"token-{fixture.Endpoint.Requests.Count}", 600));
+
+        var first = await fixture.Provider.GetTokenAsync(userToken, CancellationToken.None);
+        fixture.Provider.Forget(userToken, "token-of-another-call");
+        var kept = await fixture.Provider.GetTokenAsync(userToken, CancellationToken.None);
+        fixture.Provider.Forget(userToken, first.AccessToken);
+        var fresh = await fixture.Provider.GetTokenAsync(userToken, CancellationToken.None);
+
+        kept.ShouldBeSameAs(first);
+        fresh.AccessToken.ShouldBe("token-2");
+        fixture.Endpoint.Requests.Count.ShouldBe(2);
+    }
+
     public void Dispose()
     {
         foreach (var fixture in _fixtures)

@@ -4,7 +4,8 @@ namespace _42.Platform.Storyteller.Mcp.Tools;
 
 // The tools that return secret values or have the API evaluate them (SecretTools, BindingCheckTools). They exist only
 // with Mcp:SecretTools:Enabled, and while the API withholds secrets from the MCP server's actor (NoSecretReveal)
-// SecretToolsFilter hides them from tools/list and StorytellerCallFilter refuses them.
+// ToolListFilter hides them from tools/list and StorytellerCallFilter refuses them. They are reads, so ReadOnlyToolSet
+// keeps them under ReadOnly.
 public static class SecretToolNames
 {
     public const string RevealKeyValue = "reveal_key_value";

@@ -14,7 +14,8 @@ namespace _42.Platform.Storyteller.Mcp.Tools;
 // The one call-tool filter. Before a tool runs it gets the Storyteller token for the person (the API's token exchange)
 // and puts it into the request's StorytellerAccessToken, where the SDK clients of the same scope read it; the inbound
 // MCP token never reaches the API. A secret tool is refused while the API withholds secrets from the MCP server's actor
-// (NoSecretReveal): SecretToolsFilter hides it from tools/list then, but a hidden tool can still be called. After the
+// (NoSecretReveal), and a tool outside ReadOnlyToolSet while the API lets the person's client app only read (ReadOnly):
+// ToolListFilter hides them from tools/list then, but a hidden tool can still be called. After the
 // tool it turns API, sign-in and input errors into isError results, and so a call to the API that did not finish (a
 // timeout, a broken connection).
 //
@@ -66,6 +67,13 @@ public static class StorytellerCallFilter
                     return ToolResults.Error(ApiErrors.ActorRestrictedMessage, new JObject { ["ErrorCode"] = ApiErrors.ActorRestrictedCode });
                 }
 
+                // By the tool the call matched, so a call that matched none is refused too.
+                if (token.IsReadOnly && !ReadOnlyToolSet.Contains(request.MatchedPrimitive))
+                {
+                    logger.LogWarning("Tool {Tool}: refused, the API lets the person's client app only read ({Restriction}).", tool, StorytellerToken.ReadOnly);
+                    return ToolResults.Error(ApiErrors.ActorReadOnlyMessage, new JObject { ["ErrorCode"] = ApiErrors.ActorReadOnlyCode });
+                }
+
                 services.GetRequiredService<StorytellerAccessToken>().Value = token.AccessToken;
 
                 // Only the tool's own calls: a failed token exchange above is a sign-in error, not an unfinished write.
@@ -77,6 +85,16 @@ public static class StorytellerCallFilter
                 {
                     logger.LogWarning("Tool {Tool}: a call to the Storyteller API did not finish ({ExceptionType}).", tool, exception.GetType().Name);
                     return ToolResults.Error(UnfinishedCallMessage);
+                }
+                catch (Sdk.ApiException exception) when (exception.StatusCode == 401 && !Sdk.StepUp.IsStepUpRequired(exception, out _))
+                {
+                    // The API no longer accepts the cached token: the client app was blocked, the actor removed, or the
+                    // exchange turned off. The next call exchanges again, and the exchange names the reason. Not for a
+                    // step-up, which no new exchange lifts (it copies the same sign-in time) and which would only spend
+                    // the API's replay limit per subject token.
+                    services.GetRequiredService<IStorytellerTokenProvider>().Forget(userToken, token.AccessToken);
+                    logger.LogWarning("Tool {Tool}: the Storyteller API answered {Status} {ErrorCode}.", tool, exception.StatusCode, ApiErrors.GetErrorCode(exception));
+                    return ApiErrors.ToResult(exception);
                 }
             }
             catch (Sdk.ApiException exception)

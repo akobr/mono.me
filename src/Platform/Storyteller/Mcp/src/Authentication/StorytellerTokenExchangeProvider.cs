@@ -100,7 +100,7 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
     {
         ArgumentException.ThrowIfNullOrEmpty(userToken);
 
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(userToken)));
+        var key = GetCacheKey(userToken);
 
         if (_cache.TryGetValue(key, out CachedToken? cached) && cached!.RefreshAt > _timeProvider.GetUtcNow())
         {
@@ -113,9 +113,28 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
         return await exchange.Value.WaitAsync(cancellationToken);
     }
 
+    // After the API refused the cached token (a plain 401), so the next call exchanges again and gets the reason.
+    public void Forget(string userToken, string accessToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(userToken);
+        ArgumentException.ThrowIfNullOrEmpty(accessToken);
+
+        var key = GetCacheKey(userToken);
+
+        if (_cache.TryGetValue(key, out CachedToken? cached) && string.Equals(cached!.Token.AccessToken, accessToken, StringComparison.Ordinal))
+        {
+            _cache.Remove(key);
+        }
+    }
+
     public void Dispose()
     {
         _cache.Dispose();
+    }
+
+    private static string GetCacheKey(string userToken)
+    {
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(userToken)));
     }
 
     // The error of an OAuth answer when it is a plain code (RFC 6749 names them in lower case with underscores).
@@ -280,13 +299,20 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
         }
 
         var error = answer is { } refusal ? GetErrorCode(refusal) : null;
+        var description = GetDescription(answer);
 
-        // A sign-in the API refuses for another reason than a missing account: when it refuses every person, the API's
-        // actor usually lacks an aud this server accepts (McpAuthSettings.ValidAudiences, logged at start). The API's
-        // own log names the reason; no token or description is logged here.
+        // A sign-in the API refuses for another reason than a missing account or a blocked client app: when it refuses
+        // every person, the API's actor usually lacks an aud this server accepts (McpAuthSettings.ValidAudiences, logged at
+        // start). The API's own log names the reason; no token or description is logged here.
         if (status is 400 or 401
             && error == StorytellerSignInRefusedException.ErrorCodeValue
-            && !string.Equals(GetDescription(answer), StorytellerSignInRefusedException.NoAccountMessage, StringComparison.Ordinal))
+            && string.Equals(description, StorytellerSignInRefusedException.ClientBlockedMessage, StringComparison.Ordinal))
+        {
+            _logger.LogWarning("The Storyteller API refused the token exchange: {Status} {Error}; the API blocks the client app of this sign-in.", status, error);
+        }
+        else if (status is 400 or 401
+            && error == StorytellerSignInRefusedException.ErrorCodeValue
+            && !string.Equals(description, StorytellerSignInRefusedException.NoAccountMessage, StringComparison.Ordinal))
         {
             _logger.LogWarning(
                 "The Storyteller API refused the token exchange: {Status} {Error}. If it refuses every sign-in, check that the API's Auth:TokenExchange:Actors entry '{ActorId}' lists in SubjectAudiences every audience this server accepts (logged at start).",
@@ -310,7 +336,7 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
             switch (error)
             {
                 case StorytellerSignInRefusedException.ErrorCodeValue:
-                    throw new StorytellerSignInRefusedException(GetDescription(answer));
+                    throw new StorytellerSignInRefusedException(description);
                 case "invalid_client":
                     throw new StorytellerActorException(StorytellerActorException.ActorNotAcceptedMessage, error);
                 case "unsupported_grant_type":

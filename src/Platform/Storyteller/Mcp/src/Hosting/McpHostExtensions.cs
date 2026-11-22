@@ -49,11 +49,9 @@ public static class McpHostExtensions
             {
                 filters.AddCallToolFilter(StorytellerCallFilter.Create);
 
-                // The secret tools follow the API: tools/list hides them while it withholds secrets from the actor.
-                if (secretTools)
-                {
-                    filters.AddListToolsFilter(SecretToolsFilter.Create);
-                }
+                // tools/list follows the API: it hides the secret tools while the API withholds secrets from the actor,
+                // and the tools that change anything while it lets the person's client app only read.
+                filters.AddListToolsFilter(ToolListFilter.Create);
             })
             .WithStorytellerTools(secretTools);
 
