@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.22722
  */
 import { faker } from "@faker-js/faker";
 
@@ -53,6 +53,10 @@ export const getGetTemplatesResponseMock = (): ConfigurationTemplateSummary[] =>
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
+            ViaClient: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
           },
           undefined,
         ]),
@@ -92,6 +96,10 @@ export const getGetTemplateResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -138,6 +146,10 @@ export const getSetTemplateResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -181,6 +193,10 @@ export const getPatchTemplateResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -218,6 +234,10 @@ export const getGetTemplateVersionsResponseMock = (): ConfigurationVersion[] =>
               undefined,
             ]),
             Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            ViaClient: faker.helpers.arrayElement([
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
@@ -268,6 +288,10 @@ export const getGetTemplateVersionResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -305,6 +329,10 @@ export const getRestoreTemplateVersionResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),

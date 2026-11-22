@@ -4,7 +4,7 @@ import { RouterView } from 'vue-router'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { routes } from 'vue-router/auto-routes'
-import type { AccessAuditEntry, AccessAuditResponse } from '@42for.net/2splatform.sdk'
+import type { AccessAuditEntry, AccessAuditResponse, AuditActor } from '@42for.net/2splatform.sdk'
 import { mockHandlers } from '@/mock/all-handlers'
 import { createSeed } from '@/mock/db'
 import { mountScreen, settle, type AppMountOptions } from '../../helpers'
@@ -131,6 +131,31 @@ describe('organization Audit page', () => {
     expect(button('Copy to clipboard', policy)).toBeTruthy()
     // personal data is kept out of PostHog
     expect(document.body.querySelector('table')?.classList).toContain('ph-no-capture')
+  })
+
+  it('names the client app a person used with an actor, and the actor alone when the record has no client', async () => {
+    const client = 'https://claude.ai/oauth/mcp-oauth-client-metadata'
+    const ada: AuditActor = { Kind: 'Account', Id: 'user_01MOCKADA', Name: 'Ada Lovelace', Via: 'mcp' }
+    server.use(
+      http.get('*/api/v1/access/points/:key/audit', () =>
+        HttpResponse.json({
+          Items: [entry('client', { Actor: { ...ada, ViaClient: client } }), entry('actor', { Actor: ada })],
+          Count: 2,
+        }),
+      ),
+    )
+    await mountAudit()
+    await vi.waitFor(() => expect(rows()).toHaveLength(2))
+
+    const actorCell = (target: string) => rowWith(target)!.querySelector('td:nth-child(6)')!
+    expect(actorCell('Member client').textContent?.trim()).toBe(`Ada Lovelace via mcp (client ${client})`)
+    expect(actorCell('Member actor').textContent?.trim()).toBe('Ada Lovelace via mcp')
+    // the name stays on one line, a long client id may wrap
+    const clientText = [...actorCell('Member client').querySelectorAll('span')].find((span) =>
+      span.textContent?.includes('(client'),
+    )
+    expect(clientText?.classList).toContain('wrap-anywhere')
+    expect(clientText?.classList).toContain('whitespace-normal')
   })
 
   it('shows a change of roles as badges, and JSON compactly with its full values on demand', async () => {

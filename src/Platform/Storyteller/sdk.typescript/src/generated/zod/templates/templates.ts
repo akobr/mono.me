@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.22722
  */
 import * as zod from "zod";
 
@@ -32,6 +32,7 @@ export const GetTemplatesResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -67,6 +68,7 @@ export const GetTemplateResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -103,6 +105,7 @@ export const SetTemplateResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -157,6 +160,7 @@ export const PatchTemplateResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -202,6 +206,7 @@ export const GetTemplateVersionsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -242,6 +247,7 @@ export const GetTemplateVersionResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -287,6 +293,7 @@ export const RestoreTemplateVersionResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })

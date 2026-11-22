@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.22722
  */
 import { faker } from "@faker-js/faker";
 
@@ -61,6 +61,10 @@ export const getGetConfigurationSchemaResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -109,6 +113,10 @@ export const getSetConfigurationSchemaResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -163,6 +171,10 @@ export const getGetAnnotationSchemaResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -211,6 +223,10 @@ export const getSetAnnotationSchemaResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -265,6 +281,10 @@ export const getGetDescendantTypeSchemaResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -313,6 +333,10 @@ export const getSetDescendantTypeSchemaResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -381,6 +405,10 @@ export const getGetCombinedConfigurationSchemaResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              ViaClient: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -438,6 +466,10 @@ export const getGetConfigurationSchemasResponseMock =
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              ViaClient: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -474,6 +506,10 @@ export const getRestoreSchemaVersionResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -517,6 +553,10 @@ export const getRestoreAnnotationSchemaVersionResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -557,6 +597,10 @@ export const getRestoreDescendantTypeSchemaVersionResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -594,6 +638,10 @@ export const getGetSchemaVersionsResponseMock = (): ConfigurationVersion[] =>
               undefined,
             ]),
             Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            ViaClient: faker.helpers.arrayElement([
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
@@ -649,6 +697,10 @@ export const getGetSchemaVersionResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -853,6 +905,10 @@ export const getGetAnnotationSchemaVersionsResponseMock =
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              ViaClient: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -905,6 +961,10 @@ export const getGetAnnotationSchemaVersionResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1109,6 +1169,10 @@ export const getGetDescendantTypeSchemaVersionsResponseMock =
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              ViaClient: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -1161,6 +1225,10 @@ export const getGetDescendantTypeSchemaVersionResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),

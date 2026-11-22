@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.22722
  */
 import * as zod from "zod";
 
@@ -98,6 +98,7 @@ export const GetKeyValuePolicyResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -130,6 +131,7 @@ export const GetKeyValuePolicyResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -258,6 +260,7 @@ export const SetKeyValuePolicyResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -290,6 +293,7 @@ export const SetKeyValuePolicyResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -401,6 +405,7 @@ export const VerifyByokResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -433,6 +438,7 @@ export const VerifyByokResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -538,6 +544,7 @@ export const RotateKeyValueKeyResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -570,6 +577,7 @@ export const RotateKeyValueKeyResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -608,6 +616,7 @@ export const GetRecipientsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -653,6 +662,7 @@ export const AddRecipientResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -697,6 +707,7 @@ export const UpdateRecipientResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -771,6 +782,7 @@ export const GetKeyValuesResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -838,6 +850,7 @@ export const GetKeyValueResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -853,6 +866,7 @@ export const GetKeyValueResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -869,6 +883,7 @@ export const GetKeyValueResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -933,6 +948,7 @@ export const SetKeyValueResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -948,6 +964,7 @@ export const SetKeyValueResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -964,6 +981,7 @@ export const SetKeyValueResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -1178,6 +1196,7 @@ export const GetKeyValueVersionsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -1238,6 +1257,7 @@ export const GetKeyValueVersionResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -1253,6 +1273,7 @@ export const GetKeyValueVersionResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -1269,6 +1290,7 @@ export const GetKeyValueVersionResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -1603,6 +1625,7 @@ export const GetKeyValueAuditResponse = zod.object({
             Id: zod.string().optional(),
             Name: zod.string().optional(),
             Via: zod.string().optional(),
+            ViaClient: zod.string().optional(),
           })
           .optional(),
         Channel: zod

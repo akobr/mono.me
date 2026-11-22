@@ -41,7 +41,7 @@ public partial class AnnotationsApiClient
     private const string UnauthorizedMessage = "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable.";
     private const string ServerErrorMessage = "Unexpected error occurred on the service.";
     private const string ConflictMessage = "The annotations changed concurrently three times in a row (Conflict); try again.";
-    private const string ForbiddenWriteMessage = "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scope Annotation.Write (AccessDenied).";
+    private const string ForbiddenWriteMessage = "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scope Annotation.Write (AccessDenied). Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly.";
 
     // The messages of the documented failures of each operation, as the generated methods throw them.
     private static readonly IReadOnlyDictionary<int, string> GetMessages = new Dictionary<int, string>

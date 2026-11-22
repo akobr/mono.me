@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.22722
  */
 import { faker } from "@faker-js/faker";
 
@@ -111,6 +111,10 @@ export const getGetAnnotationsResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              ViaClient: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -139,6 +143,10 @@ export const getGetAnnotationsResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -178,6 +186,10 @@ export const getGetAnnotationsResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -291,6 +303,10 @@ export const getSetAnnotationsResponseMock = (): Annotation[] =>
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
+            ViaClient: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
           },
           undefined,
         ]),
@@ -319,6 +335,10 @@ export const getSetAnnotationsResponseMock = (): Annotation[] =>
               undefined,
             ]),
             Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            ViaClient: faker.helpers.arrayElement([
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
@@ -358,6 +378,10 @@ export const getSetAnnotationsResponseMock = (): Annotation[] =>
               undefined,
             ]),
             Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            ViaClient: faker.helpers.arrayElement([
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
@@ -457,6 +481,10 @@ export const getGetAnnotationResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -485,6 +513,10 @@ export const getGetAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -524,6 +556,10 @@ export const getGetAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -621,6 +657,10 @@ export const getSetAnnotationResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -649,6 +689,10 @@ export const getSetAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -688,6 +732,10 @@ export const getSetAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -785,6 +833,10 @@ export const getPatchAnnotationResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -813,6 +865,10 @@ export const getPatchAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -852,6 +908,10 @@ export const getPatchAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -903,6 +963,10 @@ export const getDeleteAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1012,6 +1076,10 @@ export const getGetDescendantsResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              ViaClient: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -1040,6 +1108,10 @@ export const getGetDescendantsResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -1079,6 +1151,10 @@ export const getGetDescendantsResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -1192,6 +1268,10 @@ export const getSetAnnotationsSimpleResponseMock = (): Annotation[] =>
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
+            ViaClient: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
           },
           undefined,
         ]),
@@ -1220,6 +1300,10 @@ export const getSetAnnotationsSimpleResponseMock = (): Annotation[] =>
               undefined,
             ]),
             Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            ViaClient: faker.helpers.arrayElement([
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
@@ -1259,6 +1343,10 @@ export const getSetAnnotationsSimpleResponseMock = (): Annotation[] =>
               undefined,
             ]),
             Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            ViaClient: faker.helpers.arrayElement([
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
@@ -1370,6 +1458,10 @@ export const getGetResponsibilitiesResponseMock = (
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
+                  ViaClient: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
                 },
                 undefined,
               ]),
@@ -1398,6 +1490,10 @@ export const getGetResponsibilitiesResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -1437,6 +1533,10 @@ export const getGetResponsibilitiesResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -1567,6 +1667,10 @@ export const getGetSubjectsResponseMock = (
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
+                  ViaClient: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
                 },
                 undefined,
               ]),
@@ -1595,6 +1699,10 @@ export const getGetSubjectsResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -1634,6 +1742,10 @@ export const getGetSubjectsResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -1768,6 +1880,10 @@ export const getGetUsagesResponseMock = (
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
+                  ViaClient: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
                 },
                 undefined,
               ]),
@@ -1796,6 +1912,10 @@ export const getGetUsagesResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -1835,6 +1955,10 @@ export const getGetUsagesResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -1973,6 +2097,10 @@ export const getGetContextsResponseMock = (
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
+                  ViaClient: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
                 },
                 undefined,
               ]),
@@ -2001,6 +2129,10 @@ export const getGetContextsResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -2040,6 +2172,10 @@ export const getGetContextsResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -2172,6 +2308,10 @@ export const getGetExecutionsResponseMock = (
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
+                  ViaClient: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
                 },
                 undefined,
               ]),
@@ -2200,6 +2340,10 @@ export const getGetExecutionsResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -2239,6 +2383,10 @@ export const getGetExecutionsResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -2380,6 +2528,10 @@ export const getGetUnitsResponseMock = (
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
+                  ViaClient: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
                 },
                 undefined,
               ]),
@@ -2408,6 +2560,10 @@ export const getGetUnitsResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -2447,6 +2603,10 @@ export const getGetUnitsResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -2583,6 +2743,10 @@ export const getGetUnitsOfExecutionResponseMock = (
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
+                  ViaClient: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
                 },
                 undefined,
               ]),
@@ -2611,6 +2775,10 @@ export const getGetUnitsOfExecutionResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -2650,6 +2818,10 @@ export const getGetUnitsOfExecutionResponseMock = (
                     undefined,
                   ]),
                   Via: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  ViaClient: faker.helpers.arrayElement([
                     faker.string.alpha({ length: { min: 10, max: 20 } }),
                     undefined,
                   ]),
@@ -2785,6 +2957,10 @@ export const getGetDeletedAnnotationsResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              ViaClient: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -2813,6 +2989,10 @@ export const getGetDeletedAnnotationsResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -2852,6 +3032,10 @@ export const getGetDeletedAnnotationsResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -2963,6 +3147,10 @@ export const getGetDeletedAnnotationResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -2991,6 +3179,10 @@ export const getGetDeletedAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -3030,6 +3222,10 @@ export const getGetDeletedAnnotationResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -3142,6 +3338,10 @@ export const getFindDeletedAnnotationsResponseMock = (): Annotation[] =>
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
+            ViaClient: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
           },
           undefined,
         ]),
@@ -3170,6 +3370,10 @@ export const getFindDeletedAnnotationsResponseMock = (): Annotation[] =>
               undefined,
             ]),
             Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            ViaClient: faker.helpers.arrayElement([
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
@@ -3209,6 +3413,10 @@ export const getFindDeletedAnnotationsResponseMock = (): Annotation[] =>
               undefined,
             ]),
             Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            ViaClient: faker.helpers.arrayElement([
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
@@ -3313,6 +3521,10 @@ export const getRestoreAnnotationsResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              ViaClient: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -3341,6 +3553,10 @@ export const getRestoreAnnotationsResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -3380,6 +3596,10 @@ export const getRestoreAnnotationsResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -3481,6 +3701,10 @@ export const getGetAnnotationHistoryResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -3642,6 +3866,10 @@ export const getGetViewsResponseMock = (): View[] =>
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
+            ViaClient: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
           },
           undefined,
         ]),
@@ -3694,6 +3922,10 @@ export const getCreateViewResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -3741,6 +3973,10 @@ export const getUpdateViewResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
