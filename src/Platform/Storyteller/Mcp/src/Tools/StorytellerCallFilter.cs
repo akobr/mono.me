@@ -158,14 +158,15 @@ public static class StorytellerCallFilter
         return await httpContext.GetTokenAsync("access_token");
     }
 
-    // The resilience handler's timeout, a transport failure (a response body that breaks while it is read included), or
-    // a cancellation the caller did not ask for (the deadline of the tool call, HttpClient's own timeout). The caller's
-    // cancellation stays a cancellation.
+    // The resilience handler's timeout, a transport failure, or a cancellation the caller did not ask for (the deadline of
+    // the tool call, HttpClient's own timeout). A response body that breaks while it is read is a transport failure too:
+    // an HttpIOException when the connection ends early, a plain IOException when it is reset. No tool reads a file. The
+    // caller's cancellation stays a cancellation.
     internal static bool IsUnfinishedCall(Exception exception, CancellationToken cancellationToken)
     {
         return exception switch
         {
-            TimeoutRejectedException or HttpRequestException or HttpIOException => true,
+            TimeoutRejectedException or HttpRequestException or IOException => true,
             OperationCanceledException => !cancellationToken.IsCancellationRequested,
             Sdk.ApiException => FindBrokenBody(exception) is not null,
             _ => false,
@@ -173,12 +174,12 @@ public static class StorytellerCallFilter
     }
 
     // The SDK reports a body it could not read as an ApiException with the status of the answer, the one-time credentials
-    // of a new machine in a 200 among them; Newtonsoft can wrap the transport failure in a JsonSerializationException.
-    private static HttpIOException? FindBrokenBody(Exception exception)
+    // of a new machine in a 200 among them; Newtonsoft wraps the transport failure in a JsonException first.
+    private static IOException? FindBrokenBody(Exception exception)
     {
         for (var inner = exception; inner is not null; inner = inner.InnerException)
         {
-            if (inner is HttpIOException broken)
+            if (inner is IOException broken)
             {
                 return broken;
             }
