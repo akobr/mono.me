@@ -715,10 +715,10 @@ Check: `curl -s -i -X POST https://mcp.2s.42for.net/mcp` answers `401` with `WWW
 | Key Vault (keys and operations; HSM keys only when a project allows them) | under 1 USD |
 | Log Analytics, Application Insights (capped) | 0 |
 | Sentry Developer (5k errors a month for both projects; the API sends at most 40 a day per instance) | 0 |
-| Container Apps, the MCP server (step 17a: one replica always on, `mcpMinReplicas = 1`, at the idle rate between calls beyond the monthly free grant of 180,000 vCPU-seconds and 360,000 GiB-seconds; 0 USD with scale to zero; its logs under the workspace's cap; the managed certificate is free) | about 4–5 |
-| **Total** | **about 0–2 USD** |
+| Container Apps, the MCP server (step 17a: one replica always on, `mcpMinReplicas = 1`, at the idle rate between calls beyond the monthly free grant of 180,000 vCPU-seconds and 360,000 GiB-seconds; 0 USD with scale to zero; its logs under the workspace's cap; the managed certificate is free) | about 4–5 USD |
+| **Total** | **about 4–7 USD** (0–2 USD with the MCP server scaled to zero) |
 
-What raises it: Cosmos DB throughput above 1000 RU/s, a second region or zone redundancy, an always-ready instance, HSM keys (about 1 USD per key a month), a NAT gateway (about 35 USD), a Managed HSM (thousands of USD). The budget of step 2 warns at 2.50 USD.
+What raises it: Cosmos DB throughput above 1000 RU/s, a second region or zone redundancy, an always-ready instance, HSM keys (about 1 USD per key a month), a NAT gateway (about 35 USD), a Managed HSM (thousands of USD). The budget of step 2 (5 USD) warns at 2.50 USD, so with the MCP server's replica always on its first alert comes every month; raise `budgetAmount` or scale the server to zero.
 
 ## 19. Open points (decide before or during the work)
 
