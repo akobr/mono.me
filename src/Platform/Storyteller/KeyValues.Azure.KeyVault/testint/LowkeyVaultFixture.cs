@@ -1,14 +1,14 @@
+using _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 using Azure.Security.KeyVault.Keys;
 using Testcontainers.LowkeyVault;
 using Xunit;
 
 namespace _42.Platform.Storyteller.KeyValues.Azure.KeyVault.IntegrationTests;
 
-// Lowkey Vault in Docker, or a running instance named by LOWKEY_VAULT_URL.
+// Lowkey Vault in Docker (the pinned image and readiness check of LowkeyVaultTestContainer), or a running instance named
+// by LOWKEY_VAULT_URL.
 public sealed class LowkeyVaultFixture : IAsyncLifetime
 {
-    public const string Image = "nagyesta/lowkey-vault:7.3.112";
-
     private LowkeyVaultContainer? _container;
 
     public Uri VaultUri { get; private set; } = new("https://localhost:8443/");
@@ -28,11 +28,8 @@ public sealed class LowkeyVaultFixture : IAsyncLifetime
             return;
         }
 
-        _container = new LowkeyVaultBuilder(Image)
-            .WithReuse(true)
-            // Its own label, so its own reused vault (Backend.CosmosDb's KeyValueEndToEndTests reuse another).
-            .WithLabel("net.42for.tests.lowkey-vault", "keyvalues-azure-keyvault-integrationtests")
-            .Build();
+        // Its own label, so its own reused vault (Backend.CosmosDb's KeyValueEndToEndTests reuse another).
+        _container = LowkeyVaultTestContainer.Build("keyvalues-azure-keyvault-integrationtests");
 
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         await _container.StartAsync(cancellation.Token);

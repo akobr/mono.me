@@ -21,8 +21,6 @@ namespace _42.Platform.Storyteller.DbCreator.IntegrationTests;
 // Standard vault of the Startup (AddKeyVaultKeyProtection) on Lowkey Vault, over the same database.
 public class DbCreatorFixture : IAsyncLifetime
 {
-    public const string LowkeyVaultImage = "nagyesta/lowkey-vault:7.3.112";
-
     private readonly SemaphoreSlim _vaultLock = new(1, 1);
     private LowkeyVaultContainer? _vault;
     private ServiceProvider? _vaultServices;
@@ -150,10 +148,7 @@ public class DbCreatorFixture : IAsyncLifetime
 
         // its own label, so its own reused vault: disposing a reused container stops it, which would cut off the other
         // suites that run Lowkey Vault at the same time
-        _vault = new LowkeyVaultBuilder(LowkeyVaultImage)
-            .WithReuse(true)
-            .WithLabel("net.42for.tests.lowkey-vault", "dbcreator-integrationtests")
-            .Build();
+        _vault = LowkeyVaultTestContainer.Build("dbcreator-integrationtests");
 
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cancellation.CancelAfter(TimeSpan.FromMinutes(3));
