@@ -29,6 +29,15 @@ import {
   stamp,
   type MockScope,
 } from './audit'
+import {
+  acceptPatch,
+  applyAnnotationPatch,
+  isPatchMediaType,
+  jsonPatchMediaType,
+  jsonPatchProblem,
+  mergePatchMediaType,
+  patchFormatOf,
+} from './annotation-patch'
 import { annotationsOf, overridesOf, type AnnotationOverrides, type MockDb } from './db'
 import { deleteDocument } from './documents'
 import { errorResponse, requireRole, withDb } from './handlers'
@@ -203,30 +212,49 @@ export function storeAnnotation(db: MockDb, params: ScopeParams, annotation: Ann
   }
 
   const previous = existing.get(key)
+  if (previous) {
+    return updateAnnotation(db, params, previous, annotation)
+  }
+
   const { Created: _created, Modified: _modified, Deletion: _deletion, ...body } = annotation
   const stored = withRelations({
     ...body,
     ProjectName: params.project,
     ViewName: params.view,
-    Created: previous?.Created ?? stamp(db, now),
+    Created: stamp(db, now),
     Modified: stamp(db, now),
   })
-
-  if (previous) {
-    const changes = diffAnnotations(previous, stored)
-    if (!changes) {
-      return previous
-    }
-    appendAudit(db, scope, key, newEntry(db, 'Updated', changes))
-  } else {
-    const deletionId = trash[key]?.Deletion?.DeletionId
-    appendAudit(db, scope, key, newEntry(db, deletionId ? 'Recreated' : 'Created', { DeletionId: deletionId }))
-    if (deletionId) {
-      leaveTrashRecreated(db, params, overrides, key)
-    }
+  const deletionId = trash[key]?.Deletion?.DeletionId
+  appendAudit(db, scope, key, newEntry(db, deletionId ? 'Recreated' : 'Created', { DeletionId: deletionId }))
+  if (deletionId) {
+    leaveTrashRecreated(db, params, overrides, key)
   }
 
   put(overrides, stored)
+  return stored
+}
+
+/**
+ * Updates an existing annotation like UpdateCoreAsync: the relations come from the key, Created stays, Modified is
+ * stamped, and an update without a change writes nothing and returns the stored annotation (no audit entry). Else an
+ * Updated entry records the changed members. Neither creates ancestors nor re-creates a key (a PATCH never does).
+ */
+function updateAnnotation(db: MockDb, params: ScopeParams, previous: Annotation, annotation: Annotation): Annotation {
+  const { Created: _created, Modified: _modified, Deletion: _deletion, ...body } = annotation
+  const stored = withRelations({
+    ...body,
+    ProjectName: params.project,
+    ViewName: params.view,
+    Created: previous.Created ?? stamp(db, new Date()),
+    Modified: stamp(db, new Date()),
+  })
+
+  const changes = diffAnnotations(previous, stored)
+  if (!changes) {
+    return previous
+  }
+  appendAudit(db, scopeOf(params), previous.AnnotationKey, newEntry(db, 'Updated', changes))
+  put(overridesOf(db, params.org, params.project, params.view), stored)
   return stored
 }
 
@@ -267,13 +295,21 @@ const limits: [keyof Annotation, number][] = [
   ['DocumentationLink', 2048],
 ]
 
+/** An absolute http or https URL without white space, as AnnotationRules.IsHttpUrl reads a documentation link. */
+const isHttpUrl = (value: string) => /^https?:\/\/\S+$/i.test(value) && URL.canParse(value)
+
 /** The problems AnnotationRules finds, one sentence each; none for a valid annotation. */
 export function annotationProblems(annotation: Annotation): string[] {
   const record = annotation as unknown as Record<string, unknown>
-  return limits
+  const problems = limits
     .map(([field, max]) => [field, String(record[field] ?? '').length, max] as const)
     .filter(([, length, max]) => length > max)
     .map(([field, length, max]) => `${field} has ${length} characters, at most ${max} are allowed.`)
+  const link = annotation.DocumentationLink
+  if (link && link.length <= 2048 && !isHttpUrl(link)) {
+    problems.push('DocumentationLink must be an absolute http or https URL.')
+  }
+  return problems
 }
 
 function invalidAnnotation(annotation: Annotation, key?: string): Response | undefined {
@@ -771,6 +807,93 @@ export const annotationHandlers: HttpHandler[] = [
       return HttpResponse.json(storeAnnotation(db, params, { ...body, Name: parsed.name }))
     }),
   ),
+
+  // PatchAnnotation, in the API's order (AnnotationsHttp.cs): access, key, conditions, media type, body, the key's
+  // state, the patch, the rules, the write. A patch never creates or re-creates a key, and one that changes nothing
+  // writes nothing. If-Match is not modelled: the mock has no ETags, and the admin UI sends none. The body is read
+  // before the database, so the database part runs without an await and the concurrent patches of the bulk actions
+  // (four at a time) do not overwrite each other.
+  http.patch<ScopeParams & { key: string }>(`${api}/annotations/:key`, async (info) => {
+    const text = await info.request.text()
+    return withDb<ScopeParams & { key: string }>((db, { params, request }) => {
+      const denied = requireRole(db, projectKey(params), 'Contributor')
+      if (denied) {
+        return denied
+      }
+      if (!isValidAnnotationKey(params.key)) {
+        return errorResponse(400, `Invalid annotation key: ${params.key}`, 'InvalidKey')
+      }
+      if (request.headers.has('If-None-Match')) {
+        return errorResponse(
+          400,
+          'A patch never creates an annotation, so If-None-Match does not apply; create it with POST and If-None-Match: *.',
+          'InvalidPrecondition',
+        )
+      }
+      const contentType = request.headers.get('Content-Type')
+      if (!isPatchMediaType(contentType)) {
+        const response = errorResponse(
+          415,
+          `A patch of an annotation is ${mergePatchMediaType} or ${jsonPatchMediaType}.`,
+          'InvalidContentType',
+        )
+        response.headers.set('Accept-Patch', acceptPatch)
+        return response
+      }
+
+      let body: unknown
+      try {
+        body = JSON.parse(text)
+      } catch (error) {
+        return errorResponse(
+          400,
+          `The body is not a patch of an annotation: ${(error as Error).message}`,
+          'PatchInvalid',
+        )
+      }
+      const format = patchFormatOf(contentType, body)
+      if (typeof format !== 'string') {
+        const reason = 'invalid' in format ? format.invalid : 'unsupported media type'
+        return errorResponse(400, `The body is not a patch of an annotation: ${reason}`, 'PatchInvalid')
+      }
+      const malformed = format === 'json-patch' ? jsonPatchProblem(body as unknown[]) : undefined
+      if (malformed) {
+        return errorResponse(400, `The body is not a patch of an annotation: ${malformed}`, 'PatchInvalid')
+      }
+
+      if (trashOf(overridesOf(db, params.org, params.project, params.view))[params.key]) {
+        return errorResponse(
+          404,
+          `The annotation '${params.key}' is deleted.`,
+          'AnnotationDeleted',
+          'A patch does not re-create a deleted annotation: restore it (RestoreAnnotations), or write it whole with POST.',
+        )
+      }
+      const current = annotationsOf(db, params.org, params.project, params.view).get(params.key)
+      if (!current) {
+        return errorResponse(
+          404,
+          `The annotation '${params.key}' does not exist.`,
+          'AnnotationNotFound',
+          'A patch does not create an annotation: write it whole with POST.',
+        )
+      }
+
+      const patched = applyAnnotationPatch(current, format, body)
+      if (!('annotation' in patched)) {
+        return errorResponse(patched.status, patched.message, patched.code)
+      }
+      const problems = annotationProblems(patched.annotation)
+      if (problems.length) {
+        return errorResponse(
+          400,
+          `The annotation '${params.key}' is not valid: ${problems.join(' ')}`,
+          'InvalidAnnotation',
+        )
+      }
+      return HttpResponse.json(updateAnnotation(db, params, current, patched.annotation))
+    })(info)
+  }),
 
   http.delete<ScopeParams & { key: string }>(
     `${api}/annotations/:key`,

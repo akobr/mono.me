@@ -46,7 +46,11 @@ export function requireRole(db: MockDb, key: string, minimal: AccountRole) {
 
 type ResolverInfo<Params extends PathParams> = Parameters<HttpResponseResolver<Params, DefaultBodyType>>[0]
 
-/** Runs a handler against the stored database and saves it afterwards. */
+/**
+ * Runs a handler against the stored database and saves it afterwards. A synchronous handler loads, changes and saves
+ * the database with no await in between, so concurrent requests cannot overwrite each other's writes; a handler that
+ * awaits (its body, for example) after the load can, so a write that runs concurrently reads its body first.
+ */
 export const withDb =
   <Params extends PathParams = PathParams>(
     handler: (db: MockDb, info: ResolverInfo<Params>) => Response | Promise<Response>,
@@ -54,7 +58,8 @@ export const withDb =
   async (info) => {
     const db = loadDb()
     const before = JSON.stringify(db)
-    const response = await handler(db, info)
+    const answer = handler(db, info)
+    const response = answer instanceof Promise ? await answer : answer
     // Only writes persist: a read that finishes late must not overwrite a newer write.
     if (JSON.stringify(db) !== before) {
       saveDb(db)
