@@ -31,7 +31,8 @@ mono.me.second/
 ├── mrepo.json                # Monorepo tooling config (items, types, release rules)
 ├── version.json              # Root versioning (Nerdbank.GitVersioning)
 ├── stylecop.json             # StyleCop rules (usings outside namespace, system-first)
-├── nuget.config              # NuGet sources: NuGet.org + local .artifacts
+├── nuget.config              # NuGet sources: NuGet.org, local .artifacts, vendored .packages
+├── .packages/                # Vendored NuGet packages that no public feed has (custom OpenAPI extension; see its README.md)
 ├── docs/                     # Documentation (VitePress site at docs/42for.net)
 └── src/
     ├── Platform/             # 2S Platform (main product)
