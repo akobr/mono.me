@@ -113,40 +113,6 @@ export function toAnnotationDraft(annotation: Annotation): AnnotationForm {
   return { ...draft, UnitType: unit.UnitType ?? '', UnitDefinition: unit.UnitDefinition ?? '' }
 }
 
-/**
- * The body for SetAnnotation: empty strings and collections become absent. SetAnnotation replaces the whole
- * document and requires the type-specific members (SubjectKey, ResponsibilityName, …), which the form does not edit,
- * so they are taken from the loaded `original`. The relation arrays (ContextNames, …) come along; the server ignores
- * their values. A unit's trigger is edited, and the trimmed draft replaces it.
- */
-export function toAnnotationBody(draft: AnnotationForm, original?: Annotation): Annotation {
-  const blank = (value: string | undefined) => (value && value.trim() ? value.trim() : undefined)
-  const body: Annotation & { UnitType?: string; UnitDefinition?: string } = {
-    ...original,
-    ProjectName: draft.ProjectName,
-    ViewName: draft.ViewName,
-    AnnotationKey: draft.AnnotationKey,
-    Name: draft.Name,
-    AnnotationType: draft.AnnotationType ?? 'Responsibility',
-    IsDisabled: draft.IsDisabled ? true : null,
-    ValidFrom: draft.ValidFrom || null,
-    ExpiresAt: draft.ExpiresAt || null,
-    TimeZone: blank(draft.TimeZone),
-    Title: blank(draft.Title),
-    Description: blank(draft.Description),
-    DocumentationLink: blank(draft.DocumentationLink),
-    Labels: draft.Labels?.length ? draft.Labels : undefined,
-    Values: draft.Values && Object.keys(draft.Values).length ? draft.Values : undefined,
-  }
-
-  if (isUnitAnnotation(draft)) {
-    body.UnitType = draft.UnitType?.trim() ?? ''
-    body.UnitDefinition = draft.UnitDefinition?.trim() ?? ''
-  }
-
-  return body
-}
-
 /** Issues of a document edited as JSON/YAML that the schema cannot express: changed key fields. */
 export function readOnlyIssues(original: Annotation, edited: unknown): { path: string; message: string }[] {
   if (!edited || typeof edited !== 'object' || Array.isArray(edited)) {

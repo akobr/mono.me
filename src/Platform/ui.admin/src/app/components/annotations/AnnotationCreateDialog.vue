@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { setAnnotation, type Annotation } from '@42for.net/2splatform.sdk'
+import { setAnnotation, type Annotation, type AnnotationMergePatch } from '@42for.net/2splatform.sdk'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { useProjectSettingsStore } from '@/stores/project-settings'
@@ -14,14 +14,15 @@ import {
   type AnnotationTypeCode,
 } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 
 /**
  * New annotation (spec section 8): pick a type, fill the parent names it needs (suggested from the catalog,
  * new names allowed) and the name, with a live key preview. SetAnnotation creates a new key with its missing
  * ancestors (CosmosAnnotationService.TryCheckAndCreate*), so the dialog only lists them; the body carries the
  * relation members the runtime type requires, derived from the key. A deleted key or ancestor is looked up first
- * (useDeletedKeyCheck): the user restores it, which keeps its configuration and history, or creates it new.
+ * (useDeletedKeyCheck): the user restores it, which keeps its configuration and history, and only the dialog's title
+ * and zone are patched over it; or creates it new.
  * The time zone starts as the project's default (project settings, 424-12); the API copies it to the new ancestors.
  */
 const open = defineModel<boolean>('open', { default: false })
@@ -144,7 +145,7 @@ async function create() {
     }
 
     // Restore and update: the deleted keys come back alone (their deleted children stay deleted), and a restored
-    // key keeps its content; the dialog's title is written over it.
+    // key keeps its content; only what the dialog sets is patched over it (424-225).
     let restored: Annotation | undefined
     if (choice === 'restore') {
       const outcome = await actions.restoreMany(
@@ -157,21 +158,26 @@ async function create() {
       restored = outcome.restored.find((annotation) => annotation.AnnotationKey === key.value)
     }
 
+    if (restored) {
+      await updateRestored(restored)
+      return
+    }
+
+    // A new key, Create new over a deleted one, or a key whose deleted ancestors were restored: only a whole write
+    // (POST) creates or re-creates a key.
     const created = await setAnnotation(
       org,
       project,
       view,
       key.value,
       withRelations({
-        ...restored,
         ProjectName: project,
         ViewName: view,
         AnnotationKey: key.value,
         Name: key.value.split('.').at(-1)!,
         AnnotationType: meta.value.type,
-        Title: title.value.trim() || restored?.Title || undefined,
-        // a restored annotation keeps its own zone
-        TimeZone: restored?.TimeZone || timeZone.value || undefined,
+        Title: title.value.trim() || undefined,
+        TimeZone: timeZone.value || undefined,
       }),
     )
     catalog.upsert(created)
@@ -179,20 +185,51 @@ async function create() {
     if (missingAncestors.value.length) {
       void catalog.load(context.scope, { force: true })
     }
-    toast.add({
-      title: restored ? `${created.AnnotationKey} restored and updated` : `${created.AnnotationKey} created`,
-      color: 'success',
-      icon: restored ? 'i-lucide-archive-restore' : 'i-lucide-plus',
-    })
-    open.value = false
-    emit('created', created.AnnotationKey)
-    parts.name = ''
-    title.value = ''
+    toast.add({ title: `${created.AnnotationKey} created`, color: 'success', icon: 'i-lucide-plus' })
+    finish(created.AnnotationKey)
   } catch (error) {
     failure.value = errorMessage(error)
   } finally {
     saving.value = false
   }
+}
+
+/**
+ * A merge patch of what the dialog sets over the restored record: the title when it is given and differs, and the
+ * time zone when the record has none (a restored annotation keeps its own zone). An empty patch writes nothing. The key
+ * is restored whether the patch succeeds or not, so the dialog closes on it either way.
+ */
+async function updateRestored(restored: Annotation) {
+  const restoredKey = restored.AnnotationKey
+  const patch: AnnotationMergePatch = {}
+  const newTitle = title.value.trim()
+  if (newTitle && newTitle !== restored.Title) {
+    patch.Title = newTitle
+  }
+  if (!restored.TimeZone && timeZone.value) {
+    patch.TimeZone = timeZone.value
+  }
+
+  try {
+    if (Object.keys(patch).length) {
+      await actions.patch(restoredKey, patch)
+    }
+    toast.add({ title: `${restoredKey} restored and updated`, color: 'success', icon: 'i-lucide-archive-restore' })
+  } catch (error) {
+    toast.add({
+      title: writeFailureTitle(error, `${restoredKey} restored, but not updated`),
+      description: errorMessage(error),
+      color: 'warning',
+    })
+  }
+  finish(restoredKey)
+}
+
+function finish(annotationKey: string) {
+  open.value = false
+  emit('created', annotationKey)
+  parts.name = ''
+  title.value = ''
 }
 </script>
 
