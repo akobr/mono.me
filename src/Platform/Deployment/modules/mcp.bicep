@@ -188,18 +188,18 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
             memory: '0.5Gi'
           }
           env: settingVariables
-          // The health endpoints of Aspire.ServiceDefaults exist only in Development, so the probes check the port.
+          // The health endpoints of Aspire.ServiceDefaults exist only in Development, so the probes check the port. In the
+          // order Azure stores them (Liveness, Readiness, Startup), so a run that changes nothing writes the same template:
+          // no what-if noise and no new revision.
           probes: [
             {
-              // Up to 30 seconds to start listening; a configuration error stops the process before that.
-              type: 'Startup'
+              type: 'Liveness'
               tcpSocket: {
                 port: 8080
               }
-              initialDelaySeconds: 1
-              periodSeconds: 3
+              periodSeconds: 10
               timeoutSeconds: 3
-              failureThreshold: 10
+              failureThreshold: 3
             }
             {
               type: 'Readiness'
@@ -211,13 +211,15 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
               failureThreshold: 3
             }
             {
-              type: 'Liveness'
+              // Up to 30 seconds to start listening; a configuration error stops the process before that.
+              type: 'Startup'
               tcpSocket: {
                 port: 8080
               }
-              periodSeconds: 10
+              initialDelaySeconds: 1
+              periodSeconds: 3
               timeoutSeconds: 3
-              failureThreshold: 3
+              failureThreshold: 10
             }
           ]
         }
