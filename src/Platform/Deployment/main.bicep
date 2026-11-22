@@ -159,7 +159,7 @@ param mcpCustomDomain bool = false
 @description('The scope MCP clients request (Mcp:Authentication:Scope): openid, since dynamically registered clients get no WorkOS permission; the API is the gate.')
 param mcpScope string = 'openid'
 
-@description('The hard gate of the actor mcp (Auth:TokenExchange:Actors:0:AllowedClientIds): with entries, the exchange refuses every other client, and a sign-in that names no client. Empty (the default) accepts any client, which dynamic registration needs; set to mcpTrustedClientIds, it refuses every dynamically registered client (runbook, "Cut off every unlisted client").')
+@description('The hard gate of the actor mcp (Auth:TokenExchange:Actors:0:AllowedClientIds): with entries, the exchange refuses every other client, and a sign-in that names no client. Empty (the default) accepts any client, which dynamic registration needs; set to mcpTrustedClientIds, it refuses every dynamically registered client (runbook, "Cut off every unlisted client"). That needs a trusted client: with none, turn the exchange off (mcpEnabled = false) instead.')
 param mcpAllowedClientIds string[] = []
 
 @description('The MCP clients that act with the actor\'s own policy only (Auth:TokenExchange:Actors:0:TrustedClientIds), compared exactly: the ids the API recorded for clients with a Client ID Metadata Document of web redirects only, never a dynamically registered id (runbook, "Trust a client").')

@@ -37,6 +37,34 @@ public class TokenExchangeActorNoticeTests
         ]);
     }
 
+    // NoSecretReveal is the actor's own restriction without AllowSecrets, so UntrustedClientRestrictions that only repeat it
+    // leave every client with the actor's whole policy: still the exposure the warning is about, and trust has no effect.
+    [Fact]
+    public async Task StartAsync_WithUntrustedClientRestrictionsThatAddNothing_StillWarns()
+    {
+        var logger = await StartAsync(new TokenExchangeOptions
+        {
+            Enabled = true,
+            Actors =
+            [
+                new TokenExchangeActorOptions
+                {
+                    Id = "mcp",
+                    SubjectAudiences = ["https://mcp.example/mcp"],
+                    TrustedClientIds = ["https://claude.ai/oauth/mcp-oauth-client-metadata"],
+                    UntrustedClientRestrictions = [ActorRestrictions.NoSecretReveal],
+                },
+            ],
+        });
+
+        logger.Entries.Select(entry => entry.Level).ShouldBe([LogLevel.Warning, LogLevel.Warning]);
+        logger.Entries.Select(entry => entry.Message).ShouldBe(
+        [
+            string.Format(AnyClientWarning, "mcp", "https://mcp.example/mcp"),
+            "The actor mcp of Auth:TokenExchange:Actors lists 1 TrustedClientIds: TrustedClientIds has no effect without UntrustedClientRestrictions that add to the actor's own restrictions.",
+        ]);
+    }
+
     // The production default: every client reads only and reveals no secret unless it is trusted.
     [Fact]
     public async Task StartAsync_WithUntrustedClientRestrictions_InformsWhatTheUntrustedClientsGet()
@@ -132,7 +160,7 @@ public class TokenExchangeActorNoticeTests
 
         var entry = logger.Entries.ShouldHaveSingleItem();
         entry.Level.ShouldBe(LogLevel.Warning);
-        entry.Message.ShouldBe("The actor mcp of Auth:TokenExchange:Actors lists 1 TrustedClientIds: TrustedClientIds has no effect without UntrustedClientRestrictions.");
+        entry.Message.ShouldBe("The actor mcp of Auth:TokenExchange:Actors lists 1 TrustedClientIds: TrustedClientIds has no effect without UntrustedClientRestrictions that add to the actor's own restrictions.");
     }
 
     // Deny wins, so an id an actor also allows or trusts is a mistake worth a warning, matched as the deny list matches;
