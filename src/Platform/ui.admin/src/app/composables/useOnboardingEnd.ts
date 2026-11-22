@@ -10,12 +10,11 @@ import {
 } from '@42for.net/2splatform.sdk'
 import type { OrganizationForm } from '@/forms/names.schema'
 import { useSessionStore } from '@/stores/session'
+import { projectPath } from '@/utils/memberships'
 import { onboardingTexts as texts } from '@/utils/onboarding'
 
 /** `working`: a request of the end is in flight. `joinFailed`: the account exists, the join did not work. */
 export type OnboardingEndState = 'idle' | 'working' | 'joinFailed'
-
-const projectPath = (organization: string, project: string) => `/${organization}/${project}/default/annotations`
 
 /**
  * The end of the onboarding wizard (424-267, spec 3.6): an own organization, an own organization with the exhibition,

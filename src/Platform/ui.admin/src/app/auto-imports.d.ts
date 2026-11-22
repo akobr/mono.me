@@ -58,9 +58,11 @@ declare global {
   const useDeletionToast: typeof import('./composables/useDeletionToast').useDeletionToast
   const useDetailPanel: typeof import('./composables/useDetailPanel').useDetailPanel
   const useDirtySource: typeof import('./composables/useUnsavedChanges').useDirtySource
+  const useExhibition: typeof import('./composables/useExhibition').useExhibition
   const useFileUpload: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFileUpload').useFileUpload
   const useFormField: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFormField').useFormField
   const useHashScroll: typeof import('./composables/useHashScroll').useHashScroll
+  const useJoinExhibition: typeof import('./composables/useExhibition').useJoinExhibition
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd
   const useNavigationContext: typeof import('./composables/useNavigationContext').useNavigationContext
   const useOnboardingEnd: typeof import('./composables/useOnboardingEnd').useOnboardingEnd
