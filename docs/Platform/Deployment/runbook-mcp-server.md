@@ -17,6 +17,7 @@ Everything is PowerShell 7.4+ on Windows, run from `src/Platform/Deployment` of 
 | 8 | GitHub environment and the first deployment by the workflow | script + workflow | a few minutes |
 | 9 | Verify | an MCP client + checks | — |
 | 10 | Rolling back | — | — |
+| 11 | The cost of the MCP server: when its budget warns | metrics + parameters | — |
 
 Later, for the MCP clients ([424-302](https://linear.app/424fun/issue/424-302/arch-production-turns-on-the-mcp-token-exchange-with-no-client-allow)): [Trust a client](#trust-a-client), [Cut off one client](#cut-off-one-client) and [Cut off every unlisted client](#cut-off-every-unlisted-client). A client that isn't trusted only reads and reveals no secret.
 
@@ -147,6 +148,7 @@ param mcpExchangeAppId = '<$exchange.ClientId>'
 param mcpInitialImage = 'ghcr.io/akobr/2s-platform-mcp:<commit of phase 3>'
 param mcpAppExists = false
 param mcpCustomDomain = false
+param mcpBudgetStartDate = '<the first day of this month, e.g. 2026-12-01>'
 ```
 
 The client lists stay as committed: `mcpUntrustedClientRestrictions = ['ReadOnly', 'NoSecretReveal']` and the three id lists empty, so every client reads, changes nothing and reveals no secret until one is trusted ([Trust a client](#trust-a-client)).
@@ -164,7 +166,8 @@ az deployment sub what-if --name prod-2s-main --location swedencentral `
 - `+ Microsoft.ManagedIdentity/userAssignedIdentities/prod-2s-mcp-mi`
 - `+ Microsoft.App/managedEnvironments/prod-2s-cae`: the workload profile `Consumption`, `appLogsConfiguration.destination` `azure-monitor`, `zoneRedundant` false
 - `+ Microsoft.Insights/diagnosticSettings/log-analytics` on `prod-2s-cae`: `ContainerAppConsoleLogs` and `ContainerAppSystemLogs` to `prod-2s-log`, `Dedicated`
-- `+ Microsoft.App/containerApps/prod-2s-mcp-ca`: the image of phase 3, `minReplicas` 0, `maxReplicas` 3, the identity, the 12 environment variables of the cookbook's step 17a, the three TCP probes, **no** `secrets` and no `customDomains`
+- `+ Microsoft.App/containerApps/prod-2s-mcp-ca`: the image of phase 3, `minReplicas` 0, `maxReplicas` 3, `cooldownPeriod` 300, the identity, the 12 environment variables of the cookbook's step 17a, the three TCP probes, **no** `secrets` and no `customDomains`
+- `+ Microsoft.Consumption/budgets/prod-2s-mcp-budget`: amount 1, `timeGrain` `Monthly`, the start date you set, the filter `MeterCategory` `In` `Azure Container Apps`, the notifications `actual50`, `actual100` and `forecasted100` to your email
 - `+ Microsoft.Authorization/roleAssignments/<guid>`: Container Apps Contributor (`358470bc-…`) for the deployment identity, scoped to `prod-2s-mcp-ca`
 - `~ Microsoft.Web/sites/prod-2s-api-fa/config/appsettings`: `Auth__TokenExchange__Enabled` `false` → `true`, `+ Auth__TokenExchange__AdditionalIssuers__0__Issuer` (`https://palatial-omen-84.authkit.app`) and `__JwksUri` (`…/oauth2/jwks`), `+ Auth__TokenExchange__Actors__0__Id` (`mcp`), `+ …__Authentication__WorkloadIdentity__Issuer` (`https://sts.windows.net/<tenant>/`), `__Subject` (the identity's object id: what-if may show it as an expression, since the identity doesn't exist yet), `__Audience` (`api://<mcpExchangeAppId>`), `+ …__SubjectAudiences__0` (`https://mcp.2s.42for.net/mcp`), `+ …__UntrustedClientRestrictions__0` (`ReadOnly`) and `__1` (`NoSecretReveal`); no `…__AllowedClientIds__*`, `…__TrustedClientIds__*` or `Auth__TokenExchange__DeniedClientIds__*` while their lists are empty; every other setting unchanged.
 
@@ -184,7 +187,7 @@ curl.exe -s -D - -o NUL -X POST "https://$fqdn/mcp"
 az containerapp logs show -g prod-2s-eusec-rg -n prod-2s-mcp-ca --type console --tail 50
 ```
 
-The `POST` answers `401` with `WWW-Authenticate: Bearer resource_metadata="https://mcp.2s.42for.net/.well-known/oauth-protected-resource/mcp"` (the first call after an idle period waits a few seconds for a replica). The log, streamed while a replica runs, shows `The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: https://mcp.2s.42for.net/mcp.`, `Now listening on: http://[::]:8080` and `Hosting environment: Production`. Two warnings of ASP.NET Core's data protection about keys stored in the container are expected: the server protects nothing with them. A configuration error stops the container and names the setting (`az containerapp logs show … --type system` shows the restarts).
+The `POST` answers `401` with `WWW-Authenticate: Bearer resource_metadata="https://mcp.2s.42for.net/.well-known/oauth-protected-resource/mcp"` (the first call after an idle period waits 10 to 30 seconds for a replica). The log, streamed while a replica runs, shows `The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: https://mcp.2s.42for.net/mcp.`, `Now listening on: http://[::]:8080` and `Hosting environment: Production`. Two warnings of ASP.NET Core's data protection about keys stored in the container are expected: the server protects nothing with them. A configuration error stops the container and names the setting (`az containerapp logs show … --type system` shows the restarts).
 
 **Check the API:** it restarted with the new settings.
 
@@ -308,7 +311,8 @@ If the job fails with `AuthorizationFailed` on `Microsoft.App/containerApps/writ
 | No passthrough | send the MCP token to `GET https://api.2s.42for.net/api/v1/access/account` | `401` |
 | Logs | Log Analytics `prod-2s-log`: `ContainerAppConsoleLogs \| where ContainerAppName == "prod-2s-mcp-ca" \| take 50`, and the API's Application Insights | the exchange logged with the actor `mcp` and the client, no token or body in any log |
 | Scale to zero | after 10 minutes without calls: `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` | no replica |
-| Cost | Cost Management after a few days, the resource group filtered by the new resources | 0 USD |
+| The budget | `az rest --url "https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Consumption/budgets/prod-2s-mcp-budget?api-version=2026-06-01" --query "properties.{amount:amount, start:timePeriod.startDate, spent:currentSpend.amount, filter:filter.dimensions}" -o json` (`az rest` fills in the subscription) | amount `1`, your start date, spent `0`, the filter `MeterCategory` `In` `Azure Container Apps` |
+| Cost | after a few days: Cost Management → Cost analysis, scope the subscription, group by **Service name** (the meter category), the server's resources only | `Azure Container Apps` at 0 USD, or no row yet (free usage isn't billed). If its usage shows under another meter category, the budget's filter in `main.bicep` must name that one |
 
 A request through the ingress ends after 240 seconds: a tool call that waits longer for the API is cut off, and the assistant checks a write with the matching read.
 
@@ -376,6 +380,51 @@ param mcpAllowedClientIds = ['<each id of mcpTrustedClientIds>']
 Pull request, what-if (only `prod-2s-api-fa/appsettings`: `+ Auth__TokenExchange__Actors__0__AllowedClientIds__<n>`), then create. From the restart on, the API refuses the exchange of every other client; the API checks this list at the exchange only, so the tokens such a client already has run out within 10 minutes (`TokenLifetimeMinutes`) plus the clock skew (`MachineAuth:Federation:ClockSkewSeconds`, 30 seconds). With no trusted client there is nothing to list: turn the exchange off instead ([10. Rolling back](#10-rolling-back)).
 
 Turning dynamic client registration off in WorkOS production does the same for the whole environment, and also locks out Cursor and every other client without CIMD. Access tokens WorkOS issued before stay valid until they expire.
+
+## 11. The cost of the MCP server
+
+The server costs nothing while it is warm for less than about 200 hours a month: that is the monthly free grant of Container Apps at 0.25 vCPU and 0.5 GiB, per subscription. Every request wakes a replica for about 5.5 minutes, a `401` or a scanner's request too, and each warm hour past the grant costs about 0.027 USD. The [decisions](decisions.md#the-mcp-server) have the whole range, up to about 53 USD a month with three replicas up all month; the spec is [Cost Range and Budget of the MCP Server](specs/2026-11-22%20Cost%20Range%20and%20Budget%20of%20the%20MCP%20Server.md).
+
+**The budget** `prod-2s-mcp-budget` holds the subscription's Container Apps cost, which is 0 inside the grant. It emails you at 50 % and 100 % of `mcpBudgetAmount` (1 by default, in the billing currency) and when the month's forecast reaches it. Cost data of a pay-as-you-go subscription can come up to three days late, and budgets are checked once a day: an email tells about the past few days, not the last hour.
+
+When an email comes:
+
+1. **How warm the server was this month.** The platform metric `Replicas`, read per minute, needs no setting of the app (Azure Monitor keeps platform metrics for 93 days at no cost). A minute without data had no replica, so the count is right whether the metric reports zeros or nothing. One call per day of the month:
+
+   ```powershell
+   $app = az containerapp show -g prod-2s-eusec-rg -n prod-2s-mcp-ca --query id -o tsv
+   $now = (Get-Date).ToUniversalTime()
+   $minutes = 0
+   for ($day = [datetime]::new($now.Year, $now.Month, 1, 0, 0, 0, [DateTimeKind]::Utc); $day -lt $now; $day = $day.AddDays(1)) {
+     $maxima = az monitor metrics list --resource $app --metric Replicas --aggregation Maximum --interval PT1M `
+       --start-time $day.ToString('o') --end-time $day.AddDays(1).ToString('o') `
+       --query 'value[0].timeseries[0].data[].maximum' -o json | ConvertFrom-Json
+     $minutes += ($maxima | Where-Object { $_ } | Measure-Object -Sum).Sum
+   }
+   '{0:N0} replica-minutes this month (the free grant: 12,000 a month, about 400 a day)' -f $minutes
+   ```
+
+2. **Who wakes it.** The requests of the last 24 hours by status class, and in how many of those hours each came:
+
+   ```powershell
+   $series = az monitor metrics list --resource $app --metric Requests --aggregation Total --interval PT1H `
+     --start-time $now.AddDays(-1).ToString('o') --filter "statusCodeCategory eq '*'" `
+     --query 'value[0].timeseries' -o json | ConvertFrom-Json
+   $series | ForEach-Object {
+     [pscustomobject]@{ Status = $_.metadatavalues[0].value; Requests = ($_.data.total | Measure-Object -Sum).Sum; Hours = @($_.data | Where-Object total).Count }
+   }
+   ```
+
+   `4xx` in most hours of the day is scanner traffic (`401` without a token, `404` for other paths); `2xx` is people using the server.
+
+3. **What to change**, in `parameters/prod.bicepparam` through a pull request, then the what-if and the create of phase 4 (the what-if shows the changed value on `prod-2s-mcp-ca` or on the budget):
+   - **Scanners, and more than about 400 replica-minutes a day:** `param mcpCooldownSeconds = 120` (about 2.5 minutes warm per request instead of 5.5) or `60` (a request every 5 minutes then still fits the grant). The price is a cold start of 10 to 30 seconds after every pause of a session that is longer than the cool-down. Check it once after the run: one `curl.exe -s -o NUL -X POST https://mcp.2s.42for.net/mcp`, then `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` every half minute until no replica is left: about the cool-down plus up to half a minute.
+   - **People's use past the grant:** the server doing its work. Raise `mcpBudgetAmount` to what a month may cost.
+   - **A cost although the replica-minutes are inside the grant** (and no other Container App runs in the subscription): Cost Management prices the free usage during the month, and only the invoice subtracts the grant. Set `mcpBudgetAmount = 7`: the grant is worth about 5.40 USD at Sweden Central's prices, so the budget then warns past it.
+   - **Two or three replicas for long** (the per-minute maxima of step 1 at 2 or 3): more than 20 concurrent requests at a time; lower `mcpMaxReplicas`.
+   - **At once:** `az containerapp ingress disable` (phase 10) stops every request, and the server with it.
+
+If scanners stay the cost even with a short cool-down, the next steps change the templates: rule-based routing of the environment, or `minReplicas` 1 (decisions, "The MCP server").
 
 ## Later: the custom AuthKit domain
 
