@@ -25,13 +25,17 @@ export const patchableLabels = (labels: readonly unknown[] | null | undefined): 
  * meanwhile, the patch fails with 412 PatchTestFailed and writes nothing, so a label is never added twice in another
  * spelling (the API dedupes ordinally only) or removed at a moved index. `seen` are the patchable labels the UI read.
  */
-const guard = (seen: readonly string[]): JsonPatchOperation => ({ op: 'test', path: '/Labels', value: [...seen] })
+export const labelGuard = (seen: readonly string[]): JsonPatchOperation => ({
+  op: 'test',
+  path: '/Labels',
+  value: [...seen],
+})
 
 /** The patch that appends `label`, or undefined when the labels have it in any spelling. */
 export function labelAddition(seen: readonly string[], label: string): JsonPatchOperation[] | undefined {
   return seen.some((existing) => sameLabel(existing, label))
     ? undefined
-    : [guard(seen), { op: 'add', path: '/Labels/-', value: label.trim() }]
+    : [labelGuard(seen), { op: 'add', path: '/Labels/-', value: label.trim() }]
 }
 
 /**
@@ -44,7 +48,7 @@ export function labelRemoval(seen: readonly string[], label: string): JsonPatchO
     .filter(({ existing }) => sameLabel(existing, label))
     .toReversed()
     .map(({ index }): JsonPatchOperation => ({ op: 'remove', path: `/Labels/${index}` }))
-  return removals.length ? [guard(seen), ...removals] : undefined
+  return removals.length ? [labelGuard(seen), ...removals] : undefined
 }
 
 /** Trims, drops empty values and duplicates (case-insensitive, first spelling wins). */
