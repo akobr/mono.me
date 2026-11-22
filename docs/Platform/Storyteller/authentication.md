@@ -1015,10 +1015,10 @@ Trust never removes a restriction of the actor itself. A wider match is safe onl
 
 | Level | When | Text |
 | --- | --- | --- |
-| Warning | An actor has neither `AllowedClientIds` nor `UntrustedClientRestrictions` | "The actor {ActorId} of Auth:TokenExchange:Actors has no AllowedClientIds: a token any client got for its SubjectAudiences ({SubjectAudiences}) is accepted for the exchange. List the clients to narrow it, or set UntrustedClientRestrictions (for example ReadOnly and NoSecretReveal) for the clients outside TrustedClientIds." |
-| Information | An actor has no `AllowedClientIds` but `UntrustedClientRestrictions` | "The actor {ActorId} of Auth:TokenExchange:Actors accepts a token of any client for {SubjectAudiences}; the clients outside its {TrustedCount} TrustedClientIds get {UntrustedClientRestrictions}." |
+| Warning | An actor has no `AllowedClientIds`, and no `UntrustedClientRestrictions` that add to its own restrictions (`NoSecretReveal` alone adds nothing without `AllowSecrets`) | "The actor {ActorId} of Auth:TokenExchange:Actors has no AllowedClientIds: a token any client got for its SubjectAudiences ({SubjectAudiences}) is accepted for the exchange. List the clients to narrow it, or set UntrustedClientRestrictions (for example ReadOnly and NoSecretReveal) for the clients outside TrustedClientIds." |
+| Information | An actor has no `AllowedClientIds`, and `UntrustedClientRestrictions` that add to its own restrictions | "The actor {ActorId} of Auth:TokenExchange:Actors accepts a token of any client for {SubjectAudiences}; the clients outside its {TrustedCount} TrustedClientIds get {UntrustedClientRestrictions}." |
 | Warning | An actor with `AllowSecrets` has no `AllowedClientIds`, and its `UntrustedClientRestrictions` lack `NoSecretReveal` | Names the actor and ends "every client may read the person's secrets through it; add NoSecretReveal to UntrustedClientRestrictions." |
-| Warning | An actor has `TrustedClientIds` but no `UntrustedClientRestrictions` | Names the actor and ends "TrustedClientIds has no effect without UntrustedClientRestrictions." |
+| Warning | An actor has `TrustedClientIds`, but no `UntrustedClientRestrictions` that add to its own restrictions | Names the actor and ends "TrustedClientIds has no effect without UntrustedClientRestrictions that add to the actor's own restrictions." |
 | Warning | An id of `DeniedClientIds` is also in an actor's `TrustedClientIds` or `AllowedClientIds` | Names the id and the actor and ends "it is denied." |
 | Information | `DeniedClientIds` has entries | The number of denied clients; the ids are in the settings. |
 

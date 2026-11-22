@@ -76,7 +76,11 @@ internal sealed class TokenExchangeActorNotice : IHostedService
         var untrusted = actor.UntrustedClientRestrictions.Distinct(StringComparer.Ordinal).ToList();
         var trustedCount = Entries(actor.TrustedClientIds).Distinct(StringComparer.Ordinal).Count();
 
-        if (anyClient && untrusted.Count == 0)
+        // Whether a client outside TrustedClientIds gets more than the actor's own restrictions: UntrustedClientRestrictions
+        // that only repeat them (NoSecretReveal without AllowSecrets) narrow nothing.
+        var narrows = actor.GetRestrictions(null).Count > actor.GetRestrictions().Count;
+
+        if (anyClient && !narrows)
         {
             // Today's exposure: every client the person consents to acts with the actor's whole policy.
             _logger.LogWarning(
@@ -103,10 +107,10 @@ internal sealed class TokenExchangeActorNotice : IHostedService
                 actor.Id);
         }
 
-        if (trustedCount > 0 && untrusted.Count == 0)
+        if (trustedCount > 0 && !narrows)
         {
             _logger.LogWarning(
-                "The actor {ActorId} of Auth:TokenExchange:Actors lists {TrustedCount} TrustedClientIds: TrustedClientIds has no effect without UntrustedClientRestrictions.",
+                "The actor {ActorId} of Auth:TokenExchange:Actors lists {TrustedCount} TrustedClientIds: TrustedClientIds has no effect without UntrustedClientRestrictions that add to the actor's own restrictions.",
                 actor.Id,
                 trustedCount);
         }
