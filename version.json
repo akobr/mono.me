@@ -6,7 +6,9 @@
     "^refs/heads/main$" // we release only out of main
   ],
   "cloudBuild": {
-    "setVersionVariables": true,
+    // off: every project wrote GitBuildVersion* to $GITHUB_ENV, and parallel build nodes overwrote each other's lines,
+    // which failed the step after its tests passed (424-310); nothing reads the variables
+    "setVersionVariables": false,
     "buildNumber": {
       "enabled": true,
       "includeCommitId": {
