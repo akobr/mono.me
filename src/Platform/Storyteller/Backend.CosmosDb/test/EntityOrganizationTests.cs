@@ -40,7 +40,7 @@ public class EntityOrganizationTests
     [Fact]
     public void TheEntityTypes_AreFound()
     {
-        StoredTypes().Select(type => type.Name).Should().Contain(["SubjectEntity", "KeyValueEntity", "MachineAccessEntity", "ViewTransferEntity", "AccessPointEntity"]);
+        StoredTypes().Select(type => type.Name).Should().Contain(["SubjectEntity", "KeyValueEntity", "MachineAccessEntity", "ViewTransferEntity", "ViewInboxEntity", "AccessPointEntity"]);
     }
 
     [Theory]
