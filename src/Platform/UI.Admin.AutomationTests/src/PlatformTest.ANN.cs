@@ -60,7 +60,8 @@ public abstract partial class PlatformTest
         return request.Path.EndsWith("/annotations/simple", StringComparison.Ordinal);
     }
 
-    // A write of the annotation: any method but GET of …/annotations/<key> (SetAnnotation is its POST) or below it.
+    // A write of the annotation: any method but GET of …/annotations/<key> (SetAnnotation is its POST, PatchAnnotation
+    // its PATCH, which the admin UI sends for every change of an existing annotation) or below it.
     protected static Func<RecordedRequest, bool> IsWriteOf(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
