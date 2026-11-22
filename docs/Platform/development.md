@@ -205,6 +205,8 @@ DbCreator (`2sInitDb`) seeds [data sets](Storyteller/data-sets.md), folders in t
 | `playground` | `42dotnet` / `main` / `default` | `2sInitDb seed --path src/Platform/Storyteller/Playground/data` |
 | `exhibit` | `fourth-wall` / `toons-and-tyrants` / `default` | `2sInitDb seed exhibit`, see [The exhibition](#the-exhibition) |
 
+In the Aspire host, the command **Seed with options…** of `db-seed` seeds any of these without the command line: pick the sets (or give the playground's folder), the owner and the flags in its dialog, and it runs with the host's Cosmos DB and vault. **Create with options…** of `db-creator` does the same for the base account id and the staging accounts.
+
 From the command line, DbCreator reaches the Windows emulator of its `app.config.json`. For the container of the Aspire host, set `ConnectionStrings__cosmos` to the value the dashboard shows in the environment of `db-creator`, and `baseAccount__id` to your account id:
 
 ```powershell
