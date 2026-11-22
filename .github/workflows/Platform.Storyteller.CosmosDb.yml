@@ -9,7 +9,9 @@ name: Platform.Storyteller.CosmosDb
 # docs/Platform/Storyteller/specs/2026-11-09 Shared Organization Container.md, sections 8 and 10. On a pull request the
 # classic job runs only the Emulator=Classic tests (Backend.CosmosDb has them, the two integration suites none); by
 # hand or called, the whole suites. The vNext job also runs the unit tests of DbCreator (no emulator): no other workflow
-# runs the Storyteller unit tests, and the seed's integration suite builds on them.
+# runs the Storyteller unit tests, and the seed's integration suite builds on them. By hand, vnext_runs runs the vNext
+# job several times at once on the same commit, a check that it is steady (424-310), and classic: false leaves out the
+# classic job.
 on:
   pull_request:
     paths:
@@ -24,7 +26,26 @@ on:
       - version.json
       - .github/workflows/Platform.Storyteller.CosmosDb.yml
   workflow_dispatch:
+    inputs:
+      vnext_runs:
+        description: How many vNext jobs run at once on the commit (a check that the job is steady)
+        type: choice
+        options: ['1', '5', '10']
+        default: '1'
+      classic:
+        description: Run the classic job too
+        type: boolean
+        default: true
   workflow_call:
+    inputs:
+      vnext_runs:
+        description: How many vNext jobs run at once on the commit (1, 5 or 10)
+        type: string
+        default: '1'
+      classic:
+        description: Run the classic job too
+        type: boolean
+        default: true
 
 concurrency:
   group: storyteller-cosmos-${{ github.workflow }}-${{ github.ref }}
@@ -48,9 +69,15 @@ defaults:
 
 jobs:
   vnext:
-    name: vNext emulator
+    # One job on a pull request; by hand 1, 5 or 10 at once on the same commit, each on its own runner. The name stays
+    # "vNext emulator" for one.
+    name: ${{ strategy.job-total > 1 && format('vNext emulator ({0})', matrix.run) || 'vNext emulator' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        run: ${{ fromJSON(inputs.vnext_runs == '10' && '[1,2,3,4,5,6,7,8,9,10]' || inputs.vnext_runs == '5' && '[1,2,3,4,5]' || '[1]') }}
     env:
       STORYTELLER_TESTS_EMULATOR: vnext
     steps:
@@ -84,12 +111,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: storyteller-cosmos-vnext
+          name: storyteller-cosmos-vnext${{ strategy.job-total > 1 && format('-{0}', matrix.run) || '' }}
           path: TestResults
           if-no-files-found: ignore
 
   classic:
     name: Classic emulator
+    # Always on a pull request (whose inputs are empty); by hand or when called, unless classic is false.
+    if: ${{ github.event_name == 'pull_request' || inputs.classic }}
     # The classic emulator image is x64 only.
     runs-on: ubuntu-latest
     timeout-minutes: 90
