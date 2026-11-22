@@ -105,27 +105,26 @@ function reset(annotation: Annotation) {
 
 /**
  * The text modes edit the whole document: each member is set whole (setValues would merge, keeping a removed value
- * name or a deleted line), and a member the text leaves out takes its unset value.
+ * name or a deleted line), a member of the annotation the text leaves out takes its unset value, and any other member
+ * the text no longer has (one typed there before) is dropped.
  */
 function setDocument(document: unknown) {
   // the editor reports anything else as an issue (readOnlyIssues), so it changes nothing
   if (!document || typeof document !== 'object' || Array.isArray(document)) {
     return
   }
+  const text = document as Record<string, unknown>
   const unset = toAnnotationDraft({
     ProjectName: props.annotation.ProjectName,
     ViewName: props.annotation.ViewName,
     AnnotationKey: props.annotation.AnnotationKey,
     Name: props.annotation.Name,
     AnnotationType: props.annotation.AnnotationType,
-  })
-  for (const member of new Set([...Object.keys(unset), ...Object.keys(document)])) {
-    const field = member as keyof AnnotationForm
-    setFieldValue(
-      field,
-      (member in document ? (document as Record<string, unknown>)[member] : unset[field]) as never,
-      false,
-    )
+  }) as Record<string, unknown>
+  for (const member of new Set([...Object.keys(unset), ...Object.keys(text), ...Object.keys(values)])) {
+    // undefined drops the member: VeeValidate's dirty check and the editor's JSON leave undefined members out
+    const value = Object.hasOwn(text, member) ? text[member] : unset[member]
+    setFieldValue(member as keyof AnnotationForm, value as never, false)
   }
   void validate()
 }
@@ -142,8 +141,11 @@ watch(
 
 useUnsavedChanges(() => meta.value.dirty)
 
-const save = handleSubmit(async (draft) => {
-  const patch = toAnnotationPatch(draft as AnnotationForm, toAnnotationDraft(base.value))
+const save = handleSubmit(async () => {
+  // The form's own values, not the schema's output: both sides of the difference must be read alike, and Zod's record
+  // leaves out a value named __proto__, which the diff would then remove. A copy without the form's proxies.
+  const draft = JSON.parse(JSON.stringify(values)) as AnnotationForm
+  const patch = toAnnotationPatch(draft, toAnnotationDraft(base.value))
   if (!patch) {
     // only changes that the save normalizes away (spaces around a title, for example): the latest copy is shown
     reset(props.annotation)

@@ -206,4 +206,34 @@ describe('AnnotationForm: what a save is the difference from', () => {
     expect(await read('sbt.northwind')).not.toHaveProperty('Description')
     screen.host.unmount()
   })
+
+  it('drops a member typed in the JSON mode once its line is deleted again', async () => {
+    const loaded = await seed({ Title: 'Northwind' })
+    const screen = await mountForm(loaded, '/acme/billing/default/annotations/sbt.northwind?format=json')
+    const editor = () => screen.host.findComponent({ name: 'DocumentEditor' })
+
+    editor().vm.$emit('update:modelValue', { ...toAnnotationDraft(loaded), Titel: 'typo' })
+    await settle()
+    expect(screen.host.text()).toContain('Unsaved changes')
+    editor().vm.$emit('update:modelValue', toAnnotationDraft(loaded))
+    await settle()
+
+    expect(screen.host.text()).not.toContain('Unsaved changes')
+    // an undefined member, which the editor's JSON (and YAML) leaves out
+    expect(JSON.stringify(editor().props('modelValue'))).not.toContain('Titel')
+    screen.host.unmount()
+  })
+
+  it('keeps a value named __proto__ when another member is saved', async () => {
+    const loaded = await seed({ Values: JSON.parse('{"__proto__": {"kept": true}, "plan": "basic"}') })
+    const writes = recordWrites()
+    const screen = await mountForm(loaded)
+
+    await titleInput(screen).setValue('Northwind Traders')
+    await save(screen)
+
+    expect(writes.map((write) => write.body)).toEqual([{ Title: 'Northwind Traders' }])
+    expect(Object.keys((await read('sbt.northwind')).Values ?? {}).toSorted()).toEqual(['__proto__', 'plan'])
+    screen.host.unmount()
+  })
 })
