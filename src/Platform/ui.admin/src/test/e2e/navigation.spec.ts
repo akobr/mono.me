@@ -500,7 +500,9 @@ test('the command palette of a reader lists the tabs of Modeling without Export 
     await palette.fill(tab)
     await expect(page.getByRole('option', { name: new RegExp(`^${tab}\\s*Modeling$`) })).toHaveCount(1)
   }
+  // The filter applies about 100 ms after the input: once the option of the last tab has gone, the result is final.
   await palette.fill('Export & Import')
+  await expect(page.getByRole('option', { name: /^Compare views\s*Modeling$/ })).toHaveCount(0)
   await expect(page.getByRole('option', { name: /^Export & Import/ })).toHaveCount(0)
 
   await palette.fill('Templates')

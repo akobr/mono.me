@@ -137,7 +137,8 @@ public sealed class ModelingTabsTests : PlatformTest
     // A Reader opens Modeling on Schemas with the four tabs of a Contributor and without New schema. The execution
     // template is either "No execution template" without Create template or its document, read-only and without Save,
     // Revert or Delete. Export & Import shows "Administrators only" under the four tabs with none selected; Deleted has
-    // Show cascaded but no selection, and a row's menu (a target with deletions) only its details; Compare views opens
+    // Show cascaded, and on a target with deletions no selection and a row's menu with only its details (the mock's
+    // Reader project has none, so there the rows are covered by the admin UI's own tests); Compare views opens
     // selected, with its key picker.
     [Test]
     [TestCase(42)]
@@ -186,7 +187,8 @@ public sealed class ModelingTabsTests : PlatformTest
         await Expect(exportImport.ExportRegion).ToHaveCountAsync(0);
         await Expect(exportImport.ImportRegion).ToHaveCountAsync(0);
 
-        // The selection only serves the bulk Restore and Delete permanently, so a Reader has none.
+        // The selection only serves the bulk Restore and Delete permanently, so a Reader has none. Without deletions
+        // (the mock) the page has no rows, so the row checks need a target with deletions.
         await deleted.OpenAsync();
         await deleted.WaitForListAsync();
         await Expect(deleted.SelectCheckboxes).ToHaveCountAsync(0);
