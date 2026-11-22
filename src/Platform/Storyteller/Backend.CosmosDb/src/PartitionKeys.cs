@@ -8,6 +8,7 @@ public static class PartitionKeys
     public const string TemplatePartitionSuffix = "template";
     public const string KeyValuesPartitionInfix = "kv";
     public const string TransferPartitionSuffix = "transfer";
+    public const string InboxPartitionInfix = "inbox";
 
     public static string GetResponsibility(string projectName, string responsibilityName)
     {
@@ -34,6 +35,12 @@ public static class PartitionKeys
     public static string GetTransfer(string projectName)
     {
         return $"{projectName}.{TransferPartitionSuffix}";
+    }
+
+    // The inbox items of one view: one logical partition, so its list and its count name the full key.
+    public static string GetInbox(string projectName, string viewName)
+    {
+        return $"{projectName}.{InboxPartitionInfix}.{viewName}";
     }
 
     public static string GetKey(IAnnotation annotation)
@@ -90,5 +97,10 @@ public static class PartitionKeys
     public static PartitionKey GetCosmosTransfer(string organization, string projectName)
     {
         return OrganizationKeys.Key(organization, GetTransfer(projectName));
+    }
+
+    public static PartitionKey GetCosmosInbox(string organization, string projectName, string viewName)
+    {
+        return OrganizationKeys.Key(organization, GetInbox(projectName, viewName));
     }
 }

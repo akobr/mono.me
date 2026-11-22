@@ -14,6 +14,7 @@ using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Json;
 using _42.Platform.Storyteller.KeyValues;
+using _42.Platform.Storyteller.Notifying;
 using _42.Platform.Storyteller.Transferring;
 
 using Microsoft.Azure.Functions.Worker;
@@ -138,6 +139,9 @@ var host = new HostBuilder()
         // Export and import of configurations: jobs in Cosmos DB, archives and the queue in AzureWebJobsStorage
         services.AddViewTransfers(context.Configuration);
         services.AddAzureStorageViewTransfers(context.Configuration);
+
+        // The inbox of a view: items in Cosmos DB; the ends of exports and imports are pushed into it
+        services.AddViewInbox(context.Configuration);
 
         // Add authentication by API keys
         services.AddApiKeyMachineAccess();

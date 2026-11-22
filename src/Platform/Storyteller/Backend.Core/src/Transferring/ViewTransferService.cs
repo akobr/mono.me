@@ -1,5 +1,6 @@
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.Notifying;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -33,6 +34,7 @@ public sealed class ViewTransferService : IViewTransferService
     private readonly ViewTransferOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger<ViewTransferService> _logger;
+    private readonly IViewInboxPublisher? _inbox;
 
     public ViewTransferService(
         IViewTransferStore store,
@@ -44,7 +46,8 @@ public sealed class ViewTransferService : IViewTransferService
         IConfigurationService configurations,
         IOptions<ViewTransferOptions> options,
         TimeProvider time,
-        ILogger<ViewTransferService> logger)
+        ILogger<ViewTransferService> logger,
+        IViewInboxPublisher? inbox = null)
     {
         _store = store;
         _storage = storage;
@@ -57,7 +60,11 @@ public sealed class ViewTransferService : IViewTransferService
         _time = time;
         _logger = logger;
 
-        // built from the same services rather than injected, so the constructor and its callers stay as they were
+        // optional and last: a host without the inbox gets null from the container and reports no end, and the callers
+        // that name ten arguments stay as they were
+        _inbox = inbox;
+
+        // built from the same services rather than injected, so the callers of the constructor give no importer
         _importer = new ViewImporter(annotations, schemas, templates, configurations, logger);
     }
 
@@ -209,6 +216,9 @@ public sealed class ViewTransferService : IViewTransferService
         if (record.Status is ViewTransferStatus.Succeeded or ViewTransferStatus.Failed)
         {
             _logger.LogInformation("The {Kind} job {Id} is already {Status}.", message.Kind, message.Id, record.Status);
+
+            // a message delivered again after a crash between the save of the end and its push
+            await NotifyAsync(record);
             return;
         }
 
@@ -240,9 +250,10 @@ public sealed class ViewTransferService : IViewTransferService
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogError(exception, "The {Kind} job {Id} of {Organization}.{Project}.{View} failed.", message.Kind, message.Id, message.Organization, message.Project, message.View);
-            await FailAsync(message, exception is StorytellerException ? exception.Message : $"The {message.Kind.ToString().ToLowerInvariant()} failed: {exception.Message}", cancellationToken);
+            var failed = await FailAsync(message, exception is StorytellerException ? exception.Message : $"The {message.Kind.ToString().ToLowerInvariant()} failed: {exception.Message}", cancellationToken);
 
-            if (message.Kind == ViewTransferKind.Export)
+            // the archive of an export that ended before stays downloadable
+            if (failed && message.Kind == ViewTransferKind.Export)
             {
                 await TryDeleteArchiveAsync(ViewTransferNames.GetArchiveName(message), cancellationToken);
             }
@@ -328,6 +339,10 @@ public sealed class ViewTransferService : IViewTransferService
         {
             _logger.LogWarning("The export {Id} was changed by another worker; its result was not saved.", record.Id);
         }
+        else
+        {
+            await NotifyAsync(saved);
+        }
 
         // a kind left out reads nothing and has no count
         async Task<IReadOnlyList<T>> ReadAsync<T>(ViewArchiveContent content, Func<Task<IReadOnlyList<T>>> read)
@@ -402,8 +417,11 @@ public sealed class ViewTransferService : IViewTransferService
             ExpiresAt = completedAt + _options.Retention,
         };
 
-        if (await SaveImportAsync(current, completed, cancellationToken) is not null)
+        var saved = await SaveImportAsync(current, completed, cancellationToken);
+
+        if (saved is not null)
         {
+            await NotifyAsync(saved);
             await TryDeleteArchiveAsync(name, cancellationToken);
         }
     }
@@ -427,23 +445,68 @@ public sealed class ViewTransferService : IViewTransferService
         {
             var latest = await _store.GetAsync(message.Organization, message.Project, message.View, message.Kind, message.Id, cancellationToken);
 
-            if (latest is null || latest.Status is ViewTransferStatus.Succeeded or ViewTransferStatus.Failed)
+            if (latest is null)
             {
                 return false;
             }
 
+            if (latest.Status is ViewTransferStatus.Succeeded or ViewTransferStatus.Failed)
+            {
+                // The poison queue after the last delivery, or an end whose save succeeded while its answer was lost:
+                // the push of that end may be missing, and a second one changes nothing.
+                await NotifyAsync(latest);
+                return false;
+            }
+
             var now = _time.GetUtcNow();
-            return await _store.TryReplaceAsync(
+            var failed = await _store.TryReplaceAsync(
                 Update(
                     latest,
                     export => export with { Status = ViewTransferStatus.Failed, Error = Truncate(error), CompletedAt = now, ExpiresAt = now + _options.Retention },
                     import => import with { Status = ViewTransferStatus.Failed, Error = Truncate(error), CompletedAt = now, ExpiresAt = now + _options.Retention }),
-                cancellationToken) is not null;
+                cancellationToken);
+
+            if (failed is null)
+            {
+                return false;
+            }
+
+            await NotifyAsync(failed);
+            return true;
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogError(exception, "The failure of the {Kind} job {Id} was not saved.", message.Kind, message.Id);
             return false;
+        }
+    }
+
+    // Pushes the notification of a job that ended into the inbox of its view; every call for one job gives the same
+    // item. It never throws: a broken inbox costs a notification, never the job, and an exception here would make
+    // FailAsync answer false for a job it did fail, which would keep the partial archive of a failed export. The push
+    // does not listen to the invocation's token, because a host that shuts down still completes the invocation and
+    // nothing would push again.
+    private async Task NotifyAsync(ViewTransferRecord record)
+    {
+        if (_inbox is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _inbox.PushAsync(ViewTransferNotifications.Create(record), CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "The end of the {Kind} job {Id} of {Organization}.{Project}.{View} was not pushed to the inbox.",
+                record.Kind,
+                record.Id,
+                record.Organization,
+                record.Project,
+                record.View);
         }
     }
 
