@@ -117,8 +117,9 @@ jobs:
 
   classic:
     name: Classic emulator
-    # Always on a pull request (whose inputs are empty); by hand or when called, unless classic is false.
-    if: ${{ github.event_name == 'pull_request' || inputs.classic }}
+    # By hand or when called, unless classic is false; always on a pull request, the only event without inputs (a run by
+    # hand or a call always has vnext_runs). Not github.event_name: a called workflow sees its caller's event.
+    if: ${{ inputs.classic || !inputs.vnext_runs }}
     # The classic emulator image is x64 only.
     runs-on: ubuntu-latest
     timeout-minutes: 90
