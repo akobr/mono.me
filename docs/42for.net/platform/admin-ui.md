@@ -242,6 +242,8 @@ The **Import** section:
 - **Store schemas and configurations that break each other** writes them with a warning. Without it, they fail, and the rest is imported.
 - **Check** shows the outcome of every file without writing anything; **Import now** in its result then imports the same file with the same options. **Import** imports at once. Leaving the page doesn't stop an import: a toast reports its end, with a link back to the result.
 
+Every export and import that ends is also kept in the [Inbox](#inbox) of the view, for your other tabs and for the other Administrators of the project; the one this tab showed you is there under **Done**.
+
 An import writes the annotations first, ancestors before their descendants, then the schemas, templates and configurations. It checks a schema against the configurations the archive brings, so an archive can change both together. It never deletes what the archive lacks, and it never replays versions: only the current document of each file is imported.
 
 **The result** counts the documents per kind and in total, with the files left out by the kinds and the ignored files. Chips filter the documents by kind, and by **Failed**, **Skipped** and **Warnings**. Every document that was not unchanged is listed with its kind, outcome, version, code, message and warnings, and links to its page when the view has it. On a phone, the table becomes a list. After a reload, the page shows the view's latest import again.
@@ -254,6 +256,27 @@ The CLI does the same with `sform story export` and `sform story import` (see [C
 | Schemas | `Configuration.Read` | `Configuration.Write` and `Schema.Write` |
 | Templates | `Configuration.Read` | `Configuration.Write` and `Template.Write` |
 | Configurations | `Configuration.Read` | `Configuration.Write` |
+
+## Inbox
+
+**Inbox**, the last entry of the view in the sidebar, after **Modeling** (or `G` then `I`, or the command palette), is where the platform leaves things for the people of the project. Today a deployment leaves one thing there: the end of every [export and import](#export-and-import) of the view. The switcher keeps the page when it changes the view or the project, on its **Open** tab.
+
+The page needs the Contributor role or a higher one. A Reader sees the entry with a lock, and the page shows the notice "Contributors only"; in the collapsed sidebar, the tooltip of the entry says the same. The ends of exports and imports are for Administrators and Owners, the roles that may export and import. So the inbox of a Contributor is empty for now, and says "Nothing to do".
+
+The page has two tabs. **Open** lists the items nobody has handled, newest first, with their number on the tab. **Done** lists the dismissed ones, with who dismissed each and when. The address keeps the tab.
+
+An Administrator or Owner finds an item for every export, import and check of the view that ended, whoever started it: you in another tab or on another device, another Administrator, the CLI, or a machine such as a nightly pipeline.
+
+- **What it says.** **Export finished** or **Export failed**; **Import finished**, **Import finished with failures** or **Import failed**; for a check **Check finished**, **Check found problems** or **Check failed**. Below the title are the counts, or the error of a job that failed, then when it ended and who started it. The badge **Administrators only** marks it.
+- **Download**, on an export that finished, downloads its zip again under the same name. "Expires …" next to it says until when.
+- **Show the result**, on an import or a check that ran, opens its result as the Export & Import page shows it, without **Import now**.
+- **How long it stays.** A result stays as long as the server keeps its job, with the zip or the report: 24 hours unless the deployment sets another time, from 1 hour to 7 days. Then the item is gone. A failure stays longer, 30 days by default: it is complete in itself.
+- **Dismiss** moves an item to **Done**. An item has one state for everybody: it is open for everyone who sees it, and done for everyone once one person dismisses it. Under **Done** it keeps its **Download** or **Show the result** until it expires.
+- **What your tab showed you is under Done.** An export or import that this browser tab followed to its end was reported to you already, by its toast, its download or its result on the page. The tab dismisses that item for you, so you find it under **Done**. **Open** holds what nobody was shown: the jobs of other people and of machines, and of a tab that was closed before its job ended.
+
+**The mark.** A dot on the icon of **Inbox** in the sidebar says that the view has open items for your role. It is there on every page whose sidebar lists the view, the pages of the project and the organization included. The sidebar reads it when it opens a view. While the Inbox page is open, it reads the open items again every 20 seconds, and **Refresh** reads them at once; on the other pages a new item can mark the entry later, after a reload at the latest.
+
+Suggested actions, which you accept or dismiss, will arrive in the inbox with a later release; until then nothing there can be accepted.
 
 ## People, machines and settings
 
@@ -356,7 +379,7 @@ New credentials (API keys, certificates with their password, client secrets) are
 | `Ctrl K` / `⌘ K` | Command palette |
 | `/` | Focus the filter |
 | `[` | Collapse or expand the sidebar |
-| `G` then `A`, `C`, `G`, `T`, `S`, `E`, `O` | Annotations, Configurations, Graph, the Templates, Schemas and Export & Import tabs of Modeling, Organizations |
+| `G` then `A`, `C`, `G`, `T`, `S`, `E`, `I`, `O` | Annotations, Configurations, Graph, the Templates, Schemas and Export & Import tabs of Modeling, Inbox, Organizations |
 | `J` / `K`, `Enter`, `Esc` | Next / previous row, open, close the detail |
 | `Ctrl S` / `⌘ S` | Save |
 | `?` | All shortcuts |

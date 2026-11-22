@@ -4,7 +4,7 @@ Every view has an **inbox**: the place where the platform leaves things for the 
 
 The inbox is there for two things. The result of background work gets a place where it stays, for everybody with the role, and not only for the browser tab that started the job. And the platform gets a way to ask people for a decision. The first producer is the [export and import of a view](export-import.md): every job that ends pushes a notification.
 
-This page describes what exists today: the model, the publisher for producers, the service for readers, the Cosmos DB store, and the three [routes](#routes) of the API with their SDK clients. People with the Contributor role on the project read the inbox of a view and accept or dismiss its items; machines cannot. No page of the administration UI reads the inbox yet (see [Not there yet](#not-there-yet)). The design and its decisions are in [the spec](specs/2026-11-22%20Inbox%20of%20a%20View.md).
+This page describes what exists today: the model, the publisher for producers, the service for readers, the Cosmos DB store, the three [routes](#routes) of the API with their SDK clients, and the **Inbox** page of the [administration UI](#administration-ui) with the mark of open items in its menu. People with the Contributor role on the project read the inbox of a view and accept or dismiss its items; machines cannot. In a deployment the items are the ends of exports and imports, for Administrators; no producer suggests an action yet (see [Not there yet](#not-there-yet)). The design and its decisions are in [the spec](specs/2026-11-22%20Inbox%20of%20a%20View.md).
 
 The code is in:
 
@@ -12,7 +12,8 @@ The code is in:
 - `Api.Functions/src/V1/ViewInboxHttp.cs`: the three routes, with the role of the caller from `Security/HttpRequestDataExtensions.cs` (`GetUserRoleInProjectAsync`);
 - `Backend.Core/src/Notifying/`: the publisher (`IViewInboxPublisher`, `ViewInboxPublisher`, `ViewInboxPush`), the service (`IViewInboxService`, `ViewInboxService`, `ViewInboxQuery`, `ViewInboxFilter`), the handlers of actions (`IViewInboxActionHandler`, `ViewInboxActionContext`, `ViewInboxActionResult`), the ids (`ViewInboxIds`), the topics (`ViewInboxTopics`), the options (`ViewInboxOptions`), the contract of the store (`IViewInboxStore`, `ViewInboxRecord`) and the registration (`ViewInboxEntryPoint`);
 - `Backend.Core/src/Transferring/`: the notifications of exports and imports (`ViewTransferNotifications`, pushed by `ViewTransferService`);
-- `Backend.CosmosDb/src/`: the store (`Notifying/CosmosViewInboxStore.cs`), the entity (`Entities/Inbox/ViewInboxEntity.cs`) and the partition (`PartitionKeys.cs`).
+- `Backend.CosmosDb/src/`: the store (`Notifying/CosmosViewInboxStore.cs`), the entity (`Entities/Inbox/ViewInboxEntity.cs`) and the partition (`PartitionKeys.cs`);
+- `src/Platform/ui.admin/src/app/`: the page (`pages/[org]/[project]/[view]/inbox.vue`), its components (`components/inbox/`), its queries (`queries/inbox.ts`), the presentation of an item (`utils/inbox.ts`), the entry and its mark in the menu (`utils/navigation.ts`, `components/shell/AppSidebar.vue`) and the mock API (`mock/inbox.ts`, `mock/inbox-handlers.ts`); see [Code of the page](#code-of-the-page).
 
 ## Items
 
@@ -550,6 +551,224 @@ A worker that lost the job to another worker, a failure that could not be saved 
 
 **Without the inbox.** The publisher is the last, optional constructor parameter of `ViewTransferService` (`IViewInboxPublisher? inbox = null`). A host that does not call `AddViewInbox` gets no publisher, and its jobs report their ends nowhere.
 
+## Administration UI
+
+The **Inbox** page of a view (`ui.admin/src/app/pages/[org]/[project]/[view]/inbox.vue`, at `…/{view}/inbox`) lists the items of the view that the signed-in person sees, and accepts and dismisses them. It calls the three [routes](#routes) through the TypeScript SDK. The paths below are under `src/Platform/ui.admin/src/app/`.
+
+### The menu
+
+- **The entry.** **Inbox** (icon `i-lucide-inbox`) is the sixth and last entry of the view section of the sidebar, after **Modeling** (`utils/navigation.ts`). It is the last one so that the other entries keep their positions. It has `editRole: 'Contributor'` and `lockedHint: 'Contributors only'`: every role sees the entry, a Reader with a lock, and the tooltip of the lock in the collapsed sidebar says "Contributors only".
+- **The switchers.** `inbox` is the last of the `viewSections` of `utils/context-paths.ts`, so a switch of the view or the project keeps the page. The tab is not carried over: the page of the other view opens on **Open**.
+- **The shortcut.** `g i` opens the page of the view the menu shows, for every role (`components/shell/CommandPalette.vue`). The shortcut help lists it as **Inbox** in the group **Go to** (`composables/useShortcutsHelp.ts`).
+- **The command palette** lists the page among **Pages**, as it lists every entry of the menu, a locked one included. It builds the menu without marks, so its entry never has one.
+- **A view named `inbox`.** The name is not reserved. The page is the fourth segment of the path, below the view, so `/acme/billing/inbox/inbox` is the Inbox page of the view `inbox`.
+
+### The mark of open items
+
+The entry has a dot on its icon while the view has open items for the caller.
+
+- **Where it comes from.** `components/shell/AppSidebar.vue` reads the first page of the open items (`useViewInbox(navigation, 'Open')`, so `GET …/inbox?state=Open`) and marks the entry when the answer's `OpenCount` is above zero. `buildNavigation(context, { inbox: true })` then sets `marked` on the Inbox entry, and on no other. `OpenCount` counts what the caller's role sees, so the end of an export or import marks the entry for Administrators and Owners only.
+- **Which view.** The view the menu shows (`useNavigationContext()`): the view of the route, and on the pages of a project, an organization or the account the remembered view, or `default` for a project without one. Outside a project the menu has no Inbox entry and nothing is requested.
+- **A dot, not a number.** `marked` becomes the `chip` of the menu item, which the expanded sidebar, the icon rail and the menu of a phone all show. The text of the link stays `Inbox` and its trailing badge stays the lock. The number is on the **Open** tab of the page.
+- **Who.** The sidebar asks only from Contributor up (`canAsk`), as the API serves the inbox. Below it nothing is requested and nothing is marked, also when the role is lost while an answer with open items is still cached.
+- **When it is read.** The sidebar never polls. It reads the open items of the view it shows once, and those of another view when the view changes. It observes the query the Inbox page reads, so every read of the page (its re-read every 20 seconds, **Refresh**, an accept, a dismiss) and the read of the toaster after a job updates the mark too. Nothing else does: an item that arrives while the person works on another page marks the entry at the next of these reads, or after a reload.
+- **No mark on an error.** The query is silent (`meta: { silent: true }`): a failed read shows no toast and is not reported to Sentry. A read that failed (a `404` of a deployment without the routes, a `403`, a `5xx`) or has not answered yet leaves no mark. A later read that fails takes the mark away, although the answer before it had open items.
+- **In words.** A dot alone says nothing to a screen reader, so the marked link has `aria-describedby` on a hidden element with the text "Open items" (`#navigation-inbox-mark`). The element is rendered once, outside the menus, because the docked sidebar renders its menu a second time in the slideover of a phone. The tooltip "Open items" shows only in the collapsed sidebar: Nuxt UI renders the tooltips of a vertical menu only there, where it takes the place of the tooltip with the label. In the expanded sidebar and in the menu of a phone the mark is the dot and the description.
+
+### The page
+
+- **Header.** The navbar with the title **Inbox**, and **Refresh**: an icon button (`i-lucide-refresh-cw`) with the tooltip and the accessible name "Refresh". It reads the lists again (see [Freshness](#freshness)) and is there from Contributor up.
+- **Tabs.** **Open**, with the number of open items as a badge when it is above zero, and **Done**: the accepted and the dismissed items. The tab is kept in the address: `?tab=done` for **Done**, nothing for **Open**. So a reload and a link open the same tab. The page replaces the address when the tab changes, so the browser's **Back** leaves the page.
+- **The lock.** Below Contributor the page shows "Contributors only" (icon `i-lucide-lock`) with "The inbox of the view, with the results of background jobs and the actions the platform suggests, is available to the project's Contributors." It has no tabs and no **Refresh**, and it requests nothing. A `403` of a list shows the same lock without the tabs: the role was lost while the page was open. **Refresh** stays then, and the lock stays until **Refresh** reads the list again, because the re-read every 20 seconds stops while the list is in error. The session's access map is not read again, so the menu still shows the entry without a lock (and without a mark).
+- **Loading.** "Loading the inbox…" until the shown list has its first answer.
+- **An error.** Any other failure of the shown list shows the shared error state with **Retry**, which reads that list again: its title by the status ("Not found" for the `404` of a deployment without the routes, "The API failed" for a `5xx`, "The API is not reachable", "The API did not answer in time") and the message of the API. While the open items are in error, the **Open** tab has no number.
+- **Empty.**
+
+  | List | Title | Text |
+  | --- | --- | --- |
+  | **Open**, for an Administrator or Owner | Nothing to do | Results of exports and imports and suggested actions of this view arrive here. |
+  | **Open**, below Administrator | Nothing to do | Suggested actions of this view arrive here. |
+  | **Done** | Nothing done yet | Accepted and dismissed items stay here until they expire. |
+
+  The icon of **Open** is `i-lucide-check-check`, not the inbox icon, which is the icon of the page in the menu.
+- **The list.** Newest first, in one bordered list of at most `max-w-5xl`, labelled "Open items" or "Done items". It carries `ph-no-capture`, because the items name people. A phone gets the same list in one column, with the buttons of an item under its text.
+
+### An item
+
+`components/inbox/InboxItemRow.vue` shows one item and only tells the page which button was pressed:
+
+- **The icon** of its kind, or of its level for a notification, with the same in words: as the `title` of the icon and as a text for screen readers before the title (`inboxAppearance` of `utils/inbox.ts`).
+
+  | Item | Icon | In words |
+  | --- | --- | --- |
+  | An action | `i-lucide-sparkles` | Suggested action |
+  | A message | `i-lucide-message-square` | Message |
+  | A notification, `Info` | `i-lucide-info` | Notification |
+  | A notification, `Success` | `i-lucide-circle-check` | Finished |
+  | A notification, `Warning` | `i-lucide-triangle-alert` | Finished with problems |
+  | A notification, `Error` | `i-lucide-circle-x` | Failed |
+
+  An action and a message keep their icon whatever their level. An item without a kind, and a notification with a level the page does not know, show as a plain notification.
+- **The title and the text**, as the producer wrote them. They break inside a word when they must: the error of a job is one long line.
+- **Administrators only**, a badge, when the minimal role of the item is `Administrator` or `Owner`.
+- **When and who.** "25 minutes ago by System": the relative time of `CreatedAt` and the actor of `CreatedBy` (`AuditActorLink`, so an account is a link to the members for Administrators, a machine a link to its page, and the platform the plain text **System**), followed by "via mcp" when an actor acted for the person.
+- **Who closed it**, of an item under **Done**: "Dismissed by Grace Hopper, 4 hours ago" or "Accepted by …", from the stamp `Closed`.
+
+The buttons of an item follow from its kind, topic, level, job and state (`inboxOffers`):
+
+| Item | While open | Under Done |
+| --- | --- | --- |
+| An action | **Accept**, **Dismiss** | none |
+| A message | **Dismiss** | none |
+| The notification of an export that succeeded: the topic `ViewExport`, a `Job` of the kind `ViewExport` with an id, a level other than `Error` | **Download**, **Dismiss** | **Download** |
+| The notification of an import that ran: the topic `ViewImport`, a `Job` of the kind `ViewImport` with an id, a level other than `Error` (a check too) | **Show the result**, **Dismiss** | **Show the result** |
+| Any other notification: the level `Error`, no job, or another topic | **Dismiss** | none |
+
+- The topic and the kind of the job must agree: an action that names an export offers no **Download**.
+- An item of the level `Error` offers nothing that needs its job: the job failed and left nothing to read.
+- **Download** has "Expires …" before it, the relative time of the item's `ExpiresAt`, which is the job's. **Show the result** has no such line, although the report expires with its job too.
+- An item without an `Id` offers neither **Accept** nor **Dismiss**: no route can address it.
+
+### Accept and dismiss on the page
+
+- **Accept** asks first: "Accept this action?" with "`<title>`: the work starts now and runs in the background. Its result arrives in this inbox." and the buttons **Cancel** and **Accept**. **Dismiss** asks nothing.
+- Both are plain calls of the SDK (`acceptViewInboxItem`, `dismissViewInboxItem`), not mutations. While one is on its way, **Accept** and **Dismiss** of that item are disabled; the other items stay usable.
+- **After every answer**, a refusal included, the page reads both lists again: the item is under **Done**, somebody else closed it, or it is still open.
+
+| Answer | Toast | |
+| --- | --- | --- |
+| Accept, `200` | "Action accepted" with "Its work runs in the background; the result arrives in this inbox." | success |
+| Dismiss, `200` | none | |
+| `409` `InboxItemClosed` | "The item was already handled" with the message of the API | warning |
+| `404` | "The item is gone" with "It has expired, or your role no longer sees it." | warning |
+| `501` | "This action is not available in this deployment" | warning |
+| Anything else | Accept: "The action could not start". Dismiss: "The item was not dismissed". Both with the message of the API. | error |
+
+"Anything else" is `409` `InboxItemNotAction`, a handler's own refusal such as `TransferLimit`, `409` `Conflict`, a `403`, a `5xx` and a request that never got an answer. A request that ran out of time has the title "The API did not answer in time; the change may have been saved". The answers are told apart in the order of the table: the code `InboxItemClosed`, then the status `404`, then `501`.
+
+Against a deployed API every **Accept** answers `501` today (see [Not there yet](#not-there-yet)).
+
+### Download and Show the result
+
+- **Download** fetches the archive of the item's job with the route of the job (`GET …/exports/{Job.Id}/archive`, through `downloadArchive` of `stores/transfers.ts`, with the 10 minutes of a transfer) and saves it under the job's `FileName`, or as `export-<view>.zip` without one. The item stays as it is: a download closes nothing.
+  - A `404` says "The archive has expired" with "An export keeps its archive for a limited time. Export the view again." Any other failure says "The archive was not downloaded" with the message of the API.
+  - While an archive is being fetched, its **Download** shows the spinner and takes no second click. The other items download meanwhile. The fetch goes on when the person switches the view, and its button is still busy when they come back.
+- **Show the result** opens a wide slideover (`max-w-5xl`, `components/inbox/InboxImportResult.vue`) with the title of the item. It reads the job with `GET …/imports/{Job.Id}` and shows its report with `components/transfer/ImportResult.vue` under the heading "Report", as the Export & Import page shows it under "Latest import".
+  - It offers no **Import now**: the file of a check stays in the tab that uploaded it.
+  - A `404` closes the slideover and says "The report has expired" with "The report of an import is kept for a limited time." Any other failure shows in the slideover, with **Retry**.
+  - A switch to another view closes it: the links of the report would lead to the documents of the other view.
+
+### Freshness
+
+- **Every 20 seconds** (`inboxPollMs`) the page reads the open items again while it is open, whatever the tab. The number of the **Open** tab and the mark of the menu come from that answer. The re-read stops while the list is in error, and starts again after a **Retry** or a **Refresh** that succeeds.
+- **The Done list** is a second query, asked only while its tab is shown: when the tab opens, on **Refresh** and after every accept and dismiss. A **Refresh**, an accept or a dismiss while **Open** is shown makes it stale, so it is read when its tab opens next.
+- **An answer is fresh for 15 seconds** (`inboxStaleMs`). The page opens with the answer of the menu when that is newer, and reads the open items again otherwise. A tab that opens within that time shows the answer it has.
+- **Load more** shows while the list has a `ContinuationToken`, and appends the next page of 50, read with the same `state`. A failure says "The next page did not load".
+- **The next pages continue behind the first page they were asked for.** A re-read that answers the same first page keeps what was loaded. A first page that changed (a new item, a closed item, another number of open items, also by the re-read every 20 seconds), the other tab and another view start the list again from the first page, and a next page that arrives for an older one is dropped.
+- Window focus reads nothing, as everywhere in the administration UI.
+
+### Results the tab already showed
+
+A tab that followed a job to its end has shown it: the toast, the automatic download of an export, or the result on the Export & Import page. The notification of that job would report it a second time and mark the menu for the person who just saw it. So `components/transfer/TransferToaster.vue`, when it hears the end of a job, dismisses the job's item (`dismissJobItem` of `queries/inbox.ts`):
+
+1. It reads the first page of the open items of the job's view and looks for the notification whose `Job.Id` is the job's.
+2. When the item is not there yet, it waits two seconds (`jobItemRetryMs`) and looks once more. The back end pushes the item right after it saves the end of the job.
+3. It dismisses the item. The item is then under **Done**, dismissed by that person, with its **Download** or **Show the result**.
+4. It reads the lists of the view again, once, after the dismissal: reading them first would mark the menu for a moment.
+
+- **Only an end the server has.** The item is dismissed when the end the tab showed is the end of the job: a job that succeeded and was shown as done, or a job that failed on the server. When the tab gave up after 15 minutes, could not read the job (three failed reads, or a `404`), or could not download the archive of an export that succeeded, it reported a failure the server does not have. The item of the job then stays open and tells what the tab could not, with the **Download** of an export that succeeded; the tab only reads the lists again.
+- **Every job of the tab**, also an import that the Export & Import page shows and the toaster therefore does not report.
+- **Only the notification.** An open action that names the same job is not touched. Only the 50 newest open items are looked at, where a job that just ended is.
+- **Failures are ignored**: a deployment without the routes, a lost role, an item somebody closed first. The job is reported as before, and its item only stays open.
+
+What stays open, and marked, is what nobody was shown: the job of a tab that was closed before the end, of another device, of another Administrator, of a machine.
+
+### Code of the page
+
+| File | What it does |
+| --- | --- |
+| `pages/[org]/[project]/[view]/inbox.vue` | The page: the tabs and the kept tab, the lock, the states, the list with **Load more**, the calls of accept, dismiss and download with their toasts, the slideover |
+| `components/inbox/InboxItemRow.vue` | One item: the icon, the title and the text, when and who, the badge, who closed it, and the buttons of what it offers; it emits `accept`, `dismiss`, `download` and `result` |
+| `components/inbox/InboxImportResult.vue` | The slideover with the report of an import |
+| `queries/inbox.ts` | `useViewInbox(scope, filter, { enabled, poll })`: the first page of a list over the generated query, always with an explicit `state`, so the sidebar and the page share one query, and silent; `invalidateInbox(client, scope)`: both lists of a view; `dismissJobItem(client, scope, jobId)`; the constants `inboxPollMs`, `inboxStaleMs` and `jobItemRetryMs` |
+| `utils/inbox.ts` | Pure functions: `inboxAppearance`, `inboxOffers`, `isAdministratorsOnly`, `inboxClosedLabel`, `inboxAcceptConfirmation` and `inboxEmptyState`. Every member of an item is optional in the SDK, so each answers for an item without it. |
+| `utils/navigation.ts` | The entry, `NavigationEntry.marked`, `NavigationMarks` and `buildNavigation(context, marks?)` |
+| `utils/context-paths.ts` | `inbox` among the `viewSections` |
+| `components/shell/AppSidebar.vue` | The query of the mark, the dot, the tooltip and the description |
+| `components/shell/CommandPalette.vue`, `composables/useShortcutsHelp.ts` | `g i` |
+| `components/transfer/TransferToaster.vue` | Dismisses the item of a job it reported |
+| `stores/transfers.ts` | `downloadArchive(scope, id, fileName)`: the archive of an export by the id of its job, also of a job the tab does not follow; `download(job)` calls it |
+| `components/transfer/ImportResult.vue` | The property `title`, "Latest import" by default |
+| `mock/inbox.ts`, `mock/inbox-handlers.ts` | The [mock API](#mock-api) |
+
+### Mock API
+
+`npm run dev:mock` and the tests serve the three routes from `mock/inbox-handlers.ts`, registered in `mock/all-handlers.ts`. `mock/inbox.ts` holds the rules, as a TypeScript port of `ViewInboxIds`, `ViewInboxPublisher`, `ViewInboxService` and `ViewTransferNotifications`:
+
+- **The routes** check as the API does: the Contributor role on the project first (`403` `AccessDenied`, with the shared message of the mock, for example `The Contributor role on acme.shipping is required.`), then the `state` and the continuation token of the list (`400` `InvalidQuery` with the messages of the API). A `state` or a token that is given twice is read as one value with a comma, as the API reads its query, and refused.
+- **Visibility.** The role decides which items there are: an item above it is not found (`404`), before its kind and its state are looked at, as an unknown id, an id of another shape and an expired item are.
+- **The list** has 50 items a page, newest first, the token of the API and `OpenCount`. Accept and dismiss answer the conflicts of the API with their codes and messages, and stamp the item with the mock user.
+- **Where the items are.** In the mock database, `MockDb.inbox`, keyed `org/project/view`, in the order they were written. The member is optional and filled on first use, so the storage key of the database stays, and a reset of the data resets the inboxes too.
+- **The seed.** A view that the mock seeds with data starts with five items, with times relative to its first use:
+
+  | Title | Kind | State | For | By |
+  | --- | --- | --- | --- | --- |
+  | Generate a schema for 4 similar configurations | Action `GenerateSchema`, topic `SchemaSuggestion` | Open, 25 minutes old | Contributors | System |
+  | Export failed | Notification, `ViewExport`, `Error`: a throttled read of Cosmos DB, cut at 500 characters | Open, 3 hours old | Administrators | another Administrator |
+  | Schema suggestions are on for this view | Message, topic `SchemaSuggestion` | Open, 2 days old | Contributors | System |
+  | Import finished | Notification, `ViewImport`, `Success`, without a `Job` | Dismissed by another Administrator | Administrators | the mock user |
+  | Generate a schema for 7 similar configurations | Action `GenerateSchema` | Accepted by the mock user | Contributors | System |
+
+  - **Which views.** In the legacy datasets the scopes of `scopeSeed` (`mock/db.ts`): `acme/billing/default`, `acme/billing/staging`, `acme/shipping/default`, `northwind/portal/default` and `exhibition/exhibition/default`. In the showcase every view of every project. Any other view starts empty: a view registered later, and the view of a new project of the onboarding.
+  - **Another Administrator** is the first other account that is Administrator or Owner of the project, then of its organization, and Grace Hopper when nobody is.
+  - **The seeded import** names no job, because the mock never had one, so it has no **Show the result**.
+  - **An id** of a seeded item is the 21 digits of its time and a fixed suffix (`5eed` and its number), so the ids of two views seeded in the same millisecond are equal. The tests find the items by their titles.
+- **Jobs.** `mock/transfer-handlers.ts` pushes the notification of an export or import when the job ends, on its second read, with the titles, texts, role, key and lifetimes of the [table above](#notifications-of-exports-and-imports).
+
+The simplifications:
+
+- **Accept is the one rule where the mock leaves the API.** The API has no handler and answers `501`. The mock runs the action `GenerateSchema` at once: the item is `Accepted`, stamped with the mock user, and a notification arrives ("Schema generation finished" with "A schema with 6 properties was generated from the similar configurations of this view.", the topic `SchemaSuggestion`, `Success`, for the role of the accepted item, by System, without a `Job`). Nothing is generated: it stands for what 424-8 adds, so the flow can be seen and tested. Any other action code answers the `501` of the API.
+- **The id of a keyed push is not a SHA-256.** It has the format of the API, and the same key and time give the same id, but its 32 hexadecimal digits come from a small synchronous hash. So the mock's id of a job's notification is not the id the API gives that key.
+- **Expiry.** The mock database has no `ttl`. An expired item stays stored and is neither listed, counted nor found, and a keyed push that meets one creates it again.
+- **The lifetime of a result** is the mock job's `ExpiresAt`: a day after the job was started, not after it ended.
+- **The archive of a mock export** lives in the memory of the page. The **Download** of its item works until the tab reloads and answers `404` afterwards, while the item is still listed. The last ten finished imports are kept in `sessionStorage`, so **Show the result** survives a reload.
+- **No reopening and no lost replace.** The mock's one handler never throws and nothing writes at the same time, so an accepted item is never put back to open, and `409` `Conflict` is never answered.
+- **Machines.** The mock user is always a person, so the `403` of a machine is not mocked.
+- **No hook** of `window.storytellerMock` pushes an item. A unit test pushes with `pushInboxItem`; an end-to-end test gets its items from the seed and from the jobs it runs.
+
+### Tests of the page
+
+- **Vitest**, `test/unit/inbox/`:
+  - `inbox-utils.test.ts`: what an item offers per kind, state, level, topic and job; how it looks; the texts of the confirmation and of the empty states;
+  - `inbox-row.test.ts`: the row: the texts, the icon in words, the badge, an actor, who closed it, the buttons and what they emit, a busy item, a download on its way;
+  - `inbox-page.test.ts`: the page over the mock API: the two lists and the kept tab, a Contributor, the empty states, the lock of a Reader and of a `403`, the error state of a `404` and a `500`, **Refresh**, accept with its confirmation and each answer (also a handler's own `409` and the `501`), dismiss and its answers, no second accept or dismiss of an item on its way, the download, a second download next to a slow one, the expired archive, the report of an import and its failures, **Load more** with its restart and a dropped late page, a switch to another view, and the re-read every 20 seconds, which stops on an error;
+  - `inbox-menu.test.ts`: the mark: the dot and its description, the tooltip in the icon rail, no other marked entry, no mark without open items, on a failed read and below Contributor, the view of the menu outside a view, no polling; and the menu next to the page: one shared request, the answer of the menu while it is fresh, the mark following the page;
+  - `inbox-toaster.test.ts`: the toaster dismissing the item of an export and an import it reported, also of a job that failed on the server; the items it leaves open (other jobs, an archive it could not download); the one re-read after the dismissal; a failing inbox that changes nothing of the report; and `dismissJobItem`: the second look after two seconds, giving up, only the notification of the job, a refused dismissal.
+- **Vitest**, `test/unit/mock/`:
+  - `inbox.test.ts`: the ids, the tokens, the visibility, the `state`, the push with its rules, the notifications of jobs with the cases of `ViewTransferNotificationsTests`, and the seed;
+  - `inbox-handlers.test.ts`: the three routes through calls of the SDK: the seed per role, the refusals below Contributor, the list and its pages, dismiss, accept with the mock action and the `501` of any other, `404` instead of a conflict for an Administrator's item, and the ends of exports and imports.
+- **Vitest**, changed: `utils/navigation.test.ts` (the six entries, the Inbox entry and its lock, the mark, `g i`), `utils/shell.test.ts` (`inbox` as a section that the switchers keep, without its tab, and a view named `inbox`), `transfers/transfer-page.test.ts` (the `title` of `ImportResult`, and the toaster invalidating the inbox once, after the kinds an import wrote) and `transfers/transfers.test.ts` (`downloadArchive`).
+- **Playwright** (`test/e2e/inbox.spec.ts`), on desktop and mobile, against the mock API:
+  - the page from the menu and with `g i`, the marked entry with its description, and the three seeded open items in their order;
+  - the page in the command palette;
+  - the suggested action accepted after its confirmation: the result arrives, and the action is under **Done**, with `?tab=done` in the address;
+  - an item dismissed and found under **Done**, also after a reload;
+  - a Contributor (`acme/shipping`) without the items of Administrators;
+  - the lock of a Reader (`northwind/portal`) in the menu and on the page, without a request to the inbox;
+  - an export started on Export & Import, found under **Done** and downloaded again under the same name; the test reaches the page through the menu, because a reload would drop the archive of the mock;
+  - an import started there, and its report from the item under **Done**, without **Import now** and inside the screen.
+- **Playwright** (`test/e2e/navigation.spec.ts`): the six entries of the view section for every role, with the lock on **Modeling** and **Inbox** for a Reader.
+- **axe** (`test/e2e/accessibility.spec.ts`): the page of an Owner with its three open items, in both themes. The menus of the other screens of `acme/billing` carry the mark.
+- **Visual baselines** (`test/e2e/visual.spec.ts`): the screen `inbox` as it opens, in both themes, on desktop and mobile. The baselines show only the open list: the **Done** tab, the empty states, the lock and the slideover are not captured. The desktop baselines of the other screens with a view section have the entry and its mark.
+- **UI automation suite** (`src/Platform/UI.Admin.AutomationTests`): `AppRoutes.Inbox`, and the six entries in the menus of an Administrator and a Contributor (`NavigationMenuTests`, cases 24 and 27). The page has no Testiny case yet.
+
+```bash
+cd src/Platform/ui.admin/src
+npx vitest run test/unit/inbox test/unit/mock/inbox.test.ts test/unit/mock/inbox-handlers.test.ts
+npm run test:e2e -- test/e2e/inbox.spec.ts
+npm run test:visual:docker
+```
+
 ## Storage
 
 An item is a document of the container `organizations`, in the logical partition (organization, `{project}.inbox.{view}`): `PartitionKeys.GetInbox(project, view)` and `GetCosmosInbox(organization, project, view)`. One view's inbox is one logical partition, so the list and the count name the full key and need no predicate on the organization.
@@ -648,6 +867,8 @@ The range is checked when the setting is first read, and the publisher reads it 
 
 ## Tests
 
+The tests of the back end, the API and the store are below. The tests of the administration UI (Vitest, Playwright, axe, the visual baselines) and of its mock API are in [Tests of the page](#tests-of-the-page).
+
 | Project | Class | Covers |
 | --- | --- | --- |
 | `Backend.Core/test/Notifying/` | `ViewInboxIdsTests` | The shape of an id, the order, a time with another offset, the culture of the thread, `ForKey`, `IsValid` |
@@ -694,5 +915,7 @@ STORYTELLER_TESTS_USE_CONTAINER=true STORYTELLER_TESTS_EMULATOR=classic dotnet t
 
 ## Not there yet
 
-- **The page of the administration UI** and its mock API come with phase 3 of 424-31. Until then nothing of the platform calls the routes: the SDKs have the clients, and the administration UI still learns the end of a job by polling it.
-- **The first suggested action**, its handler and what an action carries for its handler come with 424-8. Until then no item is an action, and the acceptance of one answers `501`.
+- **The first suggested action**, its handler and what an action carries for its handler come with 424-8. Until then no producer pushes an action and no handler is registered:
+  - The items of a deployment are the ends of exports and imports. They are for Administrators, so the inbox of a Contributor is empty.
+  - Against a real API every **Accept** answers `501` today, and the page then says "This action is not available in this deployment". No item of a deployment is an action, so its page shows no **Accept**.
+  - The suggested action that the [mock API](#mock-api) of the administration UI seeds and runs stands for what 424-8 adds. It is not a feature of a deployment.
