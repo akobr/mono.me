@@ -14,10 +14,8 @@ const preferences = usePreferencesStore()
 const { combined } = useConfiguration(() => props.annotationKey)
 const format = ref<DocumentFormat>(preferences.state.editorFormat)
 
-// The schemas are on the Schemas tab of Modeling, which is locked below Contributor (424-38): a Reader gets their
-// names without links.
-const canEdit = useCan('edit')
-const base = computed(() => (canEdit.value && context.scope ? modelingPath(context.scope, 'schemas') : undefined))
+// The schemas are on the Schemas tab of Modeling (424-38), which every member opens, a Reader read-only (424-272).
+const base = computed(() => (context.scope ? modelingPath(context.scope, 'schemas') : undefined))
 
 const layers = computed(() =>
   (combined.data.value?.AppliedSchemas ?? []).map((schema) => {

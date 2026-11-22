@@ -402,4 +402,34 @@ describe('the Export & Import page', () => {
     await vi.waitFor(() => expect(view.inner().findComponent(ImportResult).exists()).toBe(true), { timeout: 10_000 })
     expect(document.body.textContent).toContain('Checked: nothing was written')
   })
+
+  // A Reader reaches the page through Modeling too (424-272), and gets the same lock as a Contributor.
+  it('shows a Reader the lock of Administrators under the four other tabs, none selected, and requests nothing', async () => {
+    const tabs = () => [...document.body.querySelectorAll('[role="tab"]')]
+    const transfers: string[] = []
+    server.events.on('request:start', ({ request }) => {
+      const path = new URL(request.url).pathname
+      if (path.includes('/exports') || path.includes('/imports')) {
+        transfers.push(`${request.method} ${path}`)
+      }
+    })
+    const view = await mountScreen(
+      ExportImportPage,
+      {},
+      { path: '/acme/billing/default/modeling/export-import', accessMap: { 'acme.billing': 'Reader' } },
+    )
+    await settle()
+
+    expect(document.body.textContent).toContain('Administrators only')
+    expect(document.body.textContent).toContain(
+      "The export and the import of the view are available to the project's Administrators.",
+    )
+    expect(document.body.textContent).not.toContain('Contributors only')
+    expect(tabs().map((tab) => tab.textContent?.trim())).toEqual(['Schemas', 'Templates', 'Deleted', 'Compare views'])
+    expect(tabs().filter((tab) => tab.getAttribute('aria-selected') === 'true')).toEqual([])
+    for (const section of [ExportPanel, ImportPanel, ImportResult]) {
+      expect(view.inner().findComponent(section).exists()).toBe(false)
+    }
+    expect(transfers).toEqual([])
+  })
 })

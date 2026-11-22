@@ -13,7 +13,8 @@ import { hasOtherView, modelingPath, modelingTab, movedToModeling } from '@/util
 import { mountScreen, settle } from '../../helpers'
 
 // The Modeling page of a view (424-38): Schemas, Templates, Export & Import, Deleted and Compare views as tabs, each a
-// page of its own below modeling/, locked below Contributor. Export & Import is a tab from Administrator up (424-66).
+// page of its own below modeling/, open to every member and read-only below Contributor (424-272). Export & Import is a
+// tab from Administrator up (424-66).
 
 // the navbar needs the dashboard shell; the stand-in shows its title and what the page puts on its right
 vi.mock('@/components/shell/AppNavbar.vue', async () => {
@@ -121,6 +122,7 @@ describe('ModelingHeader', () => {
   })
 
   it.each([
+    ['Reader', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
     ['Contributor', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
     ['ContributorWithSecrets', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
     ['Administrator', ['Schemas', 'Templates', 'Export & Import', 'Deleted', 'Compare views']],
@@ -132,12 +134,20 @@ describe('ModelingHeader', () => {
     expect(selected()?.textContent?.trim()).toBe('Schemas')
   })
 
-  it('selects no tab on the locked Export & Import page of a Contributor', async () => {
-    await mountHeader('/acme/billing/default/modeling/export-import', 'billing', 'Contributor')
+  it.each(['Reader', 'Contributor'] as const)(
+    'selects no tab on the locked Export & Import page of a %s',
+    async (role) => {
+      await mountHeader('/acme/billing/default/modeling/export-import', 'billing', role)
 
-    expect(tabs()).toHaveLength(4)
-    expect(selected()).toBeUndefined()
-  })
+      expect(tabs().map((candidate) => candidate.textContent?.trim())).toEqual([
+        'Schemas',
+        'Templates',
+        'Deleted',
+        'Compare views',
+      ])
+      expect(selected()).toBeUndefined()
+    },
+  )
 
   it('rebuilds the tabs when the role drops below Administrator on the Export & Import page', async () => {
     const tabList = () => document.body.querySelector('[role="tablist"]')
@@ -365,28 +375,12 @@ describe('ModelingHeader', () => {
 })
 
 describe('the Modeling page', () => {
-  it('shows a Reader one lock and no tabs', async () => {
+  // A Reader browses the tabs read-only (424-272): no lock of the whole page, the tab pages hide their writes.
+  it.each(['Reader', 'Contributor'] as const)('is only the outlet of the tab pages for a %s', async (role) => {
     const view = await mountScreen(
       ModelingPage,
       {},
-      { path: '/acme/billing/default/modeling/schemas', accessMap: { 'acme.billing': 'Reader' } },
-    )
-    await settle()
-
-    expect(document.body.querySelector('[data-navbar]')?.getAttribute('data-navbar')).toBe('Modeling')
-    expect(view.host.text()).toContain('Contributors only')
-    expect(view.host.text()).toContain("available to the project's Contributors")
-    expect(view.host.text()).toContain('the export and the import to its Administrators')
-    expect(document.body.querySelectorAll('[role="tab"]')).toHaveLength(0)
-    // no tab page is mounted, so none of their queries runs
-    expect(view.inner().findComponent(RouterView).exists()).toBe(false)
-  })
-
-  it('is only the outlet of the tab pages for a Contributor', async () => {
-    const view = await mountScreen(
-      ModelingPage,
-      {},
-      { path: '/acme/billing/default/modeling', accessMap: { 'acme.billing': 'Contributor' } },
+      { path: '/acme/billing/default/modeling', accessMap: { 'acme.billing': role } },
     )
     view.router.addRoute({
       path: '/acme/billing/default/modeling/schemas',
@@ -396,6 +390,7 @@ describe('the Modeling page', () => {
     await settle()
 
     expect(view.host.text()).not.toContain('Contributors only')
+    expect(view.inner().findComponent(RouterView).exists()).toBe(true)
     // the tab page itself, without an element around it, so its panels stay children of the dashboard group
     expect((view.inner().element as HTMLElement).dataset.tab).toBe('schemas')
   })

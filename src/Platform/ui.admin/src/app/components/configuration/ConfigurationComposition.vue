@@ -31,7 +31,6 @@ const route = useRoute()
 const context = useContextStore()
 const catalog = useCatalogStore()
 const queryClient = useQueryClient()
-const canEdit = useCan('edit')
 
 const composition = useConfigurationComposition(() => props.annotationKey)
 const missing = computed(() => composition.isError.value && isNotFound(composition.error.value))
@@ -117,9 +116,8 @@ const statusText = computed(() => {
 })
 
 const base = computed(() => `/${context.org}/${context.project}/${context.view}`)
-const templates = computed(() =>
-  canEdit.value && context.scope ? modelingPath(context.scope, 'templates') : undefined,
-)
+// A template opens on the Templates tab of Modeling, which every member opens, a Reader read-only (424-272).
+const templates = computed(() => (context.scope ? modelingPath(context.scope, 'templates') : undefined))
 
 /** An ancestor's configuration opens its Edit tab while it is in the catalog; the composition includes deleted ones. */
 function sourceLink(step: CompositionStepView) {

@@ -12,7 +12,8 @@ import { errorMessage, writeFailureTitle } from '@/utils/errors'
 
 // The deleted annotations of the view (spec 4.5): the roots of deletions, newest first, or every deleted annotation
 // with "Show cascaded". Contributors restore them (with or without descendants), Administrators delete them
-// permanently. The rest is purged automatically (PurgeAt).
+// permanently. The rest is purged automatically (PurgeAt). A Reader browses them and their details read-only, without
+// the selection, which only serves the bulk actions (424-272).
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
@@ -221,14 +222,13 @@ const selectedRows = computed(() => rows.value.filter((row) => selected.value.ha
         </div>
       </UDashboardToolbar>
       <div
-        v-if="selected.size > 0"
+        v-if="canEdit && selected.size > 0"
         class="flex flex-wrap items-center gap-2 border-b border-default bg-elevated/50 px-4 py-2 text-sm"
         role="toolbar"
         aria-label="Bulk actions"
       >
         <span class="font-medium">{{ formatter.format(selected.size) }} selected</span>
         <UButton
-          v-if="canEdit"
           label="Restore"
           icon="i-lucide-archive-restore"
           size="xs"
@@ -277,7 +277,7 @@ const selectedRows = computed(() => rows.value.filter((row) => selected.value.ha
         <table class="w-full text-sm">
           <thead class="bg-elevated/50 text-xs text-muted">
             <tr>
-              <th class="w-8 px-3 py-2">
+              <th v-if="canEdit" class="w-8 px-3 py-2">
                 <UCheckbox
                   :model-value="allSelected"
                   aria-label="Select all"
@@ -296,7 +296,7 @@ const selectedRows = computed(() => rows.value.filter((row) => selected.value.ha
           </thead>
           <tbody class="divide-y divide-default">
             <tr v-for="annotation in rows" :key="annotation.AnnotationKey">
-              <td class="px-3 py-2">
+              <td v-if="canEdit" class="px-3 py-2">
                 <UCheckbox
                   :model-value="selected.has(annotation.AnnotationKey)"
                   :aria-label="`Select ${annotation.AnnotationKey}`"

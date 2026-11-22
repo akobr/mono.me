@@ -19,8 +19,6 @@ const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const canAdmin = useCan('manageAccess')
-// Compare views is a tab of Modeling, which is locked below Contributor (424-38).
-const canCompare = useCan('edit')
 
 const views = useGetViews(
   () => context.org ?? '',
@@ -30,7 +28,8 @@ const views = useGetViews(
 )
 
 // Compare opens Compare views of the default view (this page has no view of its own) with the view of the row as ?to=.
-// The default view's own row has nothing to compare with, and without another view it is the only row (424-64).
+// The default view's own row has nothing to compare with, and without another view it is the only row (424-64). Every
+// member compares: Compare views is a tab of Modeling, which a Reader browses read-only (424-272).
 const compareHint = computed(() =>
   hasOtherView(views.data.value, defaultViewName)
     ? 'The other views are compared with this one'
@@ -119,7 +118,7 @@ function edit(view: View) {
           <span class="min-w-0 flex-1 truncate text-sm text-muted">{{ view.Description }}</span>
           <RelativeTime v-if="view.Created" :value="view.Created.At" class="text-xs text-dimmed" />
           <span class="flex gap-1">
-            <UTooltip v-if="canCompare" :text="compareHint" :disabled="!isDefaultView(view.Name)">
+            <UTooltip :text="compareHint" :disabled="!isDefaultView(view.Name)">
               <UButton
                 :to="`/${context.org}/${context.project}/${defaultViewName}/modeling/compare?to=${view.Name}`"
                 :disabled="isDefaultView(view.Name)"

@@ -17,7 +17,8 @@ import type { VersionSource } from '@/components/versions/version-source'
 /**
  * The schema editor (spec section 14): the document on the left, validated against the JSON Schema meta-schema,
  * and the live form preview on the right (tabs on phones). Saving replaces the whole document (PUT); a 409 lists
- * the configurations the change would break, with Save anyway.
+ * the configurations the change would break, with Save anyway. Below Contributor it is read-only, with a badge that
+ * says so, and a schema that does not exist is a notice instead of the starter document (424-272).
  */
 const props = defineProps<{ target: SchemaTarget }>()
 
@@ -207,6 +208,13 @@ defineShortcuts({
     <template v-else>
       <LoadingState v-if="schema.isPending.value" />
       <ErrorState v-else-if="schema.isError.value && !missing" :error="schema.error.value" @retry="schema.refetch()" />
+      <!-- Below Contributor nothing creates it, so the starter document is not shown (424-272). -->
+      <EmptyState
+        v-else-if="missing && !canEdit"
+        icon="i-lucide-braces"
+        title="No schema"
+        description="This schema does not exist in this view, so it validates nothing."
+      />
       <template v-else>
         <div class="flex-1 space-y-3 p-4">
           <UAlert
@@ -263,7 +271,11 @@ defineShortcuts({
               @update:format="(value) => (format = value)"
               @update:valid="(valid) => (textValid = valid)"
               @save="canEdit && canSave && save()"
-            />
+            >
+              <template v-if="!canEdit" #actions>
+                <UBadge label="Read-only" icon="i-lucide-lock" color="neutral" variant="subtle" size="sm" />
+              </template>
+            </DocumentEditor>
             <SchemaFormPreview v-show="wide || pane === 'preview'" :schema="draft" />
           </div>
         </div>

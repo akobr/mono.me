@@ -14,8 +14,6 @@ export interface NavigationEntry {
   minRole?: AccountRoleName
   /** Shown with a lock icon below this role (read-only for the caller). */
   editRole?: AccountRoleName
-  /** The tooltip of the lock, when the page is not read-only but closed for the caller. */
-  lockedHint?: string
   /** The tabs of the page, each with its own path; the command palette lists them after the entry (424-38). */
   tabs?: { label: string; icon: string; to: string }[]
 }
@@ -105,15 +103,14 @@ export function buildNavigation(
         { label: 'Configurations', icon: 'i-lucide-settings-2', to: `${base}/configurations`, editRole: 'Contributor' },
         { label: 'Values store', icon: 'i-lucide-vault', to: `${base}/key-values`, editRole: 'Contributor' },
         { label: 'Graph', icon: 'i-lucide-waypoints', to: `${base}/graph` },
-        // Templates, Schemas, Export & Import, Deleted and Compare views are its tabs (424-38). The whole page is
-        // locked for a Reader, who still sees the entry, with the lock. Export & Import is a tab of Administrators and
-        // Owners only (424-66), so the command palette lists it for them only.
+        // Templates, Schemas, Export & Import, Deleted and Compare views are its tabs (424-38). A Reader browses them
+        // read-only (424-272), so the entry has the read-only lock, as Annotations has. Export & Import is a tab of
+        // Administrators and Owners only (424-66), so the command palette lists it for them only.
         {
           label: 'Modeling',
           icon: 'i-lucide-puzzle',
           to: modelingPath({ org, project, view }),
           editRole: 'Contributor',
-          lockedHint: 'Contributors only',
           tabs: modelingTabsFor(context.projectRole).map((tab) => ({
             label: tab.label,
             icon: tab.icon,
