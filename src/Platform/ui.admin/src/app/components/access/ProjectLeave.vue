@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { AccountRoleName } from '@42for.net/2splatform.sdk'
 import { useLeaveProject } from '@/composables/useLeaveProject'
+import { hasUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { roleLabel } from '@/utils/roles'
 
 /**
@@ -20,19 +21,42 @@ const props = defineProps<{
 const { leaving, leave } = useLeaveProject()
 const confirming = ref(false)
 
-const description = computed(
-  () =>
-    `You lose your ${roleLabel(props.role)} role on ${props.projectKey}. ${
-      props.exhibition
-        ? 'You can join the exhibition again from Organizations.'
-        : 'To come back, you need a new invitation.'
-    }`,
-)
+/**
+ * What the confirmation was opened for. It stays as it was while the leave ends, when the role is gone already, and when
+ * the context switcher moves on while the dialog is open: the leave is for the project of the click.
+ */
+const opened = ref<{ projectKey: string; role: AccountRoleName; exhibition: boolean; unsaved: boolean }>()
+
+function open() {
+  opened.value = {
+    projectKey: props.projectKey,
+    role: props.role,
+    exhibition: !!props.exhibition,
+    // the draft of the project settings, or a dialog with input: a leave ends the page and them
+    unsaved: hasUnsavedChanges(),
+  }
+  confirming.value = true
+}
+
+const title = computed(() => `Leave ${opened.value?.projectKey ?? props.projectKey}?`)
+const description = computed(() => {
+  const target = opened.value
+  if (!target) {
+    return undefined
+  }
+  return [
+    `You lose your ${roleLabel(target.role)} role on ${target.projectKey}.`,
+    target.exhibition
+      ? 'You can join the exhibition again from Organizations.'
+      : 'To come back, you need a new invitation.',
+    ...(target.unsaved ? ['Your unsaved changes on this page are lost.'] : []),
+  ].join(' ')
+})
 
 async function confirm() {
-  // for the project of the click: the dialog may stay open while the context switcher moves on
-  const projectKey = props.projectKey
-  await leave(projectKey)
+  if (opened.value) {
+    await leave(opened.value.projectKey)
+  }
   confirming.value = false
 }
 </script>
@@ -52,12 +76,12 @@ async function confirm() {
       color="error"
       variant="outline"
       :disabled="lastOwner"
-      @click="confirming = true"
+      @click="open"
     />
 
     <ConfirmDialog
       v-model:open="confirming"
-      :title="`Leave ${projectKey}?`"
+      :title="title"
       :description="description"
       confirm-label="Leave project"
       :loading="leaving"

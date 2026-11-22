@@ -1,7 +1,9 @@
+/* eslint-disable vue/one-component-per-file -- a page that asks for the exhibition, and a host that shows it again */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createApp } from 'vue'
+import { createApp, defineComponent, h, ref } from 'vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
+import { useExhibition } from '@/composables/useExhibition'
 import { mockHandlers } from '@/mock/all-handlers'
 import { loadDb, mockUser, resetDb, saveDb, type MockScenario } from '@/mock/db'
 import OrganizationsPage from '@/pages/orgs/index.vue'
@@ -117,6 +119,55 @@ describe('the exhibition on Organizations', () => {
 
     await eventually(() => expect(offer()).toBeTruthy())
     expect(body()).toContain('No organizations yet')
+  })
+})
+
+describe('the answer about the exhibition', () => {
+  /** A page that asks for the exhibition, shown and gone again with `shown`. */
+  async function mountAsker(scenario: MockScenario) {
+    start(scenario)
+    const shown = ref(true)
+    const Asker = defineComponent({
+      setup: () => {
+        const { offered } = useExhibition()
+        return () => h('p', offered.value ? 'offered' : 'not offered')
+      },
+    })
+    const Host = defineComponent({ setup: () => () => (shown.value ? h(Asker) : null) })
+    const view = await mountScreen(Host, {}, { path: '/orgs', account: loadDb().account })
+    mounted.push(view)
+    await settle(6)
+    return shown
+  }
+
+  const asked = () => requests.filter((request) => request === 'GET /access/exhibition').length
+
+  it('keeps a 404 (none), so the next page does not ask again', async () => {
+    const shown = await mountAsker('showcase')
+    await eventually(() => expect(asked()).toBe(1))
+
+    shown.value = false
+    await settle()
+    shown.value = true
+    await settle(6)
+
+    expect(asked()).toBe(1)
+    expect(body()).toContain('not offered')
+  })
+
+  it('asks again after another failure', async () => {
+    server.use(http.get('*/api/v1/access/exhibition', () => HttpResponse.json({ Message: 'Down' }, { status: 503 })))
+    const shown = await mountAsker('default')
+    await eventually(() => expect(asked()).toBe(1))
+    server.resetHandlers()
+
+    shown.value = false
+    await settle()
+    shown.value = true
+
+    await eventually(() => expect(asked()).toBe(2))
+    await eventually(() => expect(body()).toContain('offered'))
+    expect(body()).not.toContain('not offered')
   })
 })
 

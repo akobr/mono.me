@@ -1,7 +1,8 @@
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { isNavigationFailure, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { getAccount, hasErrorCode, removeMember, type Account } from '@42for.net/2splatform.sdk'
+import { leaveWithoutPrompt } from '@/composables/useUnsavedChanges'
 import { invalidateProject } from '@/queries/invalidation'
 import { useSessionStore } from '@/stores/session'
 import { errorMessage } from '@/utils/errors'
@@ -32,6 +33,7 @@ export function useLeaveProject() {
       return false
     }
 
+    // In flight until the page is gone: the confirmation keeps its loading state, and a second click does nothing.
     leaving.value = true
     try {
       try {
@@ -52,19 +54,29 @@ export function useLeaveProject() {
       // removal left. The page must not keep the membership either way.
       const fresh: Account = await getAccount().catch(() => withoutMembership(account, projectKey))
       session.setAccount(fresh)
-      await invalidateProject(queryClient, projectKey)
+      // Organizations reads the session's access map; the cached projects and access point refresh behind it.
+      void invalidateProject(queryClient, projectKey)
+
+      toast.add({ title: leaveTexts.left(projectKey), color: 'success', icon: 'i-lucide-log-out' })
+      await toOrganizations()
+      return true
     } finally {
       leaving.value = false
     }
+  }
 
-    toast.add({ title: leaveTexts.left(projectKey), color: 'success', icon: 'i-lucide-log-out' })
+  /** Ends the page of the project: a guard that stops the navigation, or a page that did not load, ends in a full load. */
+  async function toOrganizations(): Promise<void> {
+    let failed: boolean
     try {
-      await router.replace('/orgs')
+      failed = isNavigationFailure(await router.replace('/orgs'))
     } catch {
-      // A navigation that failed (a page that did not load): a full load of Organizations ends the page as well.
+      failed = true
+    }
+    if (failed) {
+      leaveWithoutPrompt()
       window.location.replace(router.resolve('/orgs').href)
     }
-    return true
   }
 
   return { leaving, leave }

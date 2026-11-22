@@ -448,7 +448,8 @@ export const accessManagementHandlers: HttpHandler[] = [
         return errorResponse(404, 'The member does not exist.', 'MemberNotFound')
       }
       if (!leaving && current === 'Owner' && roleOf(db, params.key) !== 'Owner') {
-        return errorResponse(403, 'Only Owners can remove an Owner.', 'ElevatedRole')
+        // the API's AccessDeniedException, with its code (not the ElevatedRole of a role change)
+        return errorResponse(403, `Only an owner can remove an owner of '${params.key}'.`, 'AccessDenied')
       }
       if (current === 'Owner' && ownerCount(db, params.key) <= 1) {
         return errorResponse(409, 'The last Owner cannot be removed.', 'LastOwner')
