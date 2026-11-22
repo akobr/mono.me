@@ -235,7 +235,7 @@ The **Import** section:
 - **Store schemas and configurations that break each other** writes them with a warning. Without it, they fail, and the rest is imported.
 - **Check** shows the outcome of every file without writing anything; **Import now** in its result then imports the same file with the same options. **Import** imports at once. Leaving the page doesn't stop an import: a toast reports its end, with a link back to the result.
 
-Every export and import that ends is also kept in the [Inbox](#inbox) of the view, for your other tabs and for the other Administrators of the project; the one this tab showed you is there under **Done**.
+An export or an import that ends also leaves an item in the [Inbox](#inbox) of the view, for your other tabs and for the other Administrators of the project; the one this tab showed you is there under **Done**.
 
 An import writes the annotations first, ancestors before their descendants, then the schemas, templates and configurations. It checks a schema against the configurations the archive brings, so an archive can change both together. It never deletes what the archive lacks, and it never replays versions: only the current document of each file is imported.
 
@@ -258,7 +258,7 @@ The page needs the Contributor role or a higher one. A Reader sees the entry wit
 
 The page has two tabs. **Open** lists the items nobody has handled, newest first, with their number on the tab. **Done** lists the dismissed ones, with who dismissed each and when. The address keeps the tab.
 
-An Administrator or Owner finds an item for every export, import and check of the view that ended, whoever started it: you in another tab or on another device, another Administrator, the CLI, or a machine such as a nightly pipeline.
+An Administrator or Owner finds an item for the exports, imports and checks of the view that ended, whoever started them: you in another tab or on another device, another Administrator, the CLI, or a machine such as a nightly pipeline. The inbox is not a history of the jobs: an item is left when a job ends, on a best effort, and it expires.
 
 - **What it says.** **Export finished** or **Export failed**; **Import finished**, **Import finished with failures** or **Import failed**; for a check **Check finished**, **Check found problems** or **Check failed**. Below the title are the counts, or the error of a job that failed, then when it ended and who started it. The badge **Administrators only** marks it.
 - **Download**, on an export that finished, downloads its zip again under the same name. "Expires …" next to it says until when.
