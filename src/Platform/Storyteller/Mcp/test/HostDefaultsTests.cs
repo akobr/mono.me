@@ -1,4 +1,6 @@
+using _42.Platform.Storyteller.Mcp.Authentication;
 using _42.Platform.Storyteller.Mcp.Hosting;
+using _42.Platform.Storyteller.Mcp.Tools;
 using _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -36,6 +38,18 @@ public sealed class HostDefaultsTests : IDisposable
         options.TotalRequestTimeout.Timeout.ShouldBe(McpHostExtensions.ApiCallTimeout);
         options.CircuitBreaker.SamplingDuration.ShouldBeGreaterThanOrEqualTo(2 * McpHostExtensions.ApiCallTimeout);
         http.Timeout.ShouldBe(Timeout.InfiniteTimeSpan);
+    }
+
+    // In production the Container Apps ingress drops a request after 240 seconds without a byte, the start of a replica
+    // included (the startup probe allows about 31 seconds), and the API's front end answers 502 after 230 seconds. A tool
+    // call ends before either, with room for the start of a replica.
+    [Fact]
+    public void ToolCallDeadline_EndsBeforeTheIngressAndTheApisFrontEnd()
+    {
+        McpHostExtensions.ApiCallTimeout.ShouldBe(StorytellerCallFilter.ToolCallTimeout);
+        StorytellerCallFilter.ToolCallTimeout.ShouldBeLessThan(TimeSpan.FromSeconds(230));
+        StorytellerCallFilter.ToolCallTimeout.ShouldBeLessThanOrEqualTo(TimeSpan.FromSeconds(240) - TimeSpan.FromSeconds(40));
+        StorytellerTokenExchangeProvider.ExchangeTimeout.ShouldBeLessThan(StorytellerCallFilter.ToolCallTimeout);
     }
 
     public void Dispose()

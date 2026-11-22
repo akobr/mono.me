@@ -1,3 +1,7 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+
 using _42.Platform.Storyteller.Mcp.Tools;
 using _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
@@ -17,6 +21,7 @@ public sealed class UnfinishedCallTests : IDisposable
         { "connection", new HttpRequestException($"Connection reset ({Marker}).") },
         { "attempt timeout", new TimeoutRejectedException($"Timed out ({Marker}).") },
         { "HttpClient timeout", new TaskCanceledException($"Timed out ({Marker}).", new TimeoutException()) },
+        { "broken response body", new HttpIOException(HttpRequestError.ResponseEnded, $"The response ended early ({Marker}).") },
     };
 
     [Theory]
@@ -37,6 +42,26 @@ public sealed class UnfinishedCallTests : IDisposable
         var logged = _host.Logs.Entries.Where(entry => entry.Contains($" {StorytellerCallFilter.LoggerCategory}: ", StringComparison.Ordinal)).ToList();
         logged.ShouldContain(entry => entry.Contains($"Tool create_machine: a call to the Storyteller API did not finish ({failure.GetType().Name}).", StringComparison.Ordinal), because);
         logged.ShouldNotContain(entry => entry.Contains(Marker, StringComparison.Ordinal), because);
+    }
+
+    // The one-time credentials of a new machine arrive in the body: a body that breaks while it is read is a call that
+    // may have completed, not a generic error.
+    [Fact]
+    public async Task CreateMachine_WhoseAnswerBreaksWhileItIsRead_SaysItMayHaveCompleted()
+    {
+        _host.Api.Respond = _ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StreamContent(new BrokenBodyStream()) { Headers = { ContentType = new MediaTypeHeaderValue("application/json") } },
+        };
+        await using var client = await _host.ConnectAsync();
+
+        var result = await client.CallAsync("create_machine", new { organization = "house", project = "main", scopes = new[] { "AnnotationRead" } });
+
+        result.IsError.ShouldBe(true);
+        result.Text().ShouldBe(StorytellerCallFilter.UnfinishedCallMessage);
+        _host.Api.Requests.Count.ShouldBe(1);
+        _host.Logs.Entries.ShouldContain(entry => entry.Contains($"Tool create_machine: a call to the Storyteller API did not finish ({nameof(HttpIOException)}).", StringComparison.Ordinal));
+        _host.Logs.Entries.ShouldNotContain(entry => entry.Contains(Marker, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -71,5 +96,49 @@ public sealed class UnfinishedCallTests : IDisposable
     public void Dispose()
     {
         _host.Dispose();
+    }
+
+    // The start of an answer, then the connection ends, as SocketsHttpHandler reports it.
+    private sealed class BrokenBodyStream : Stream
+    {
+        private readonly byte[] _start = Encoding.UTF8.GetBytes("""{"Machine":{"Id":"m-""");
+        private bool _started;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_started)
+            {
+                throw new HttpIOException(HttpRequestError.ResponseEnded, $"The response ended early ({Marker}).");
+            }
+
+            _started = true;
+            var length = Math.Min(count, _start.Length);
+            Array.Copy(_start, 0, buffer, offset, length);
+            return length;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }
