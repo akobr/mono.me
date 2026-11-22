@@ -491,7 +491,7 @@ stateDiagram-v2
 - **The push never fails the job.** A failure of the inbox is logged as a warning; the job keeps its state and an export its archive. The push does not listen to the token of the invocation.
 - A job that could not be queued fails inside the start request and pushes its failure too. A job in progress has no item, and a host without the inbox (`AddViewInbox`) pushes nothing.
 
-The levels, the exact texts and the places where an end is pushed are in [inbox.md](inbox.md#notifications-of-exports-and-imports). People read the item with the [routes of the inbox](inbox.md#routes). No page reads the inbox yet ([inbox.md](inbox.md#not-there-yet)); the clients still learn the end of a job by polling it.
+The levels, the exact texts and the places where an end is pushed are in [inbox.md](inbox.md#notifications-of-exports-and-imports). People read the item with the [routes of the inbox](inbox.md#routes), and in the administration UI on the [Inbox page](inbox.md#administration-ui) of the view, where the item of an export has **Download** and the item of an import **Show the result**. A client still learns the end of its own job by polling it: `sform`, and the tab of the administration UI that started the job, which then dismisses the job's item (see [Store, toaster and caches](#store-toaster-and-caches)).
 
 `ViewExport` reports:
 
@@ -755,6 +755,7 @@ The **Export & Import** page of a view, a tab of **Modeling** (`ui.admin/src/app
 - **Who.** The export and the import need the Administrator role, as in the [API](#access): `useCan('transfer')`, with `transfer: 'Administrator'` in `capabilityRoles` (`composables/useRole.ts`). Below it, the page keeps `ModelingHeader`, with the four other tabs and none of them selected, and its body is the lock "Administrators only" (icon `i-lucide-lock`) with "The export and the import of the view are available to the project's Administrators." It mounts no section and no result, so it requests nothing. The Modeling lock of a Reader names both rules: "The schemas, the templates, the deleted annotations and the comparison of views are available to the project's Contributors, the export and the import to its Administrators." The Contributor lock of the other tabs is a choice of the admin UI only; the API reads them with `Reader` ([access.md](access.md#roles)).
 - **Layout.** The **Export** and **Import** sections sit side by side from the `lg` breakpoint and are stacked below it. Below them, full width, the section **Latest import** shows the result of the view's latest import (`latestImport`) once it has succeeded. While a newer import or check runs, and after one fails, the section is hidden; the Import section shows the progress or the error.
 - While the page is open, it marks that import as shown (`showInPage`), so `TransferToaster` does not report its end. The mark is set synchronously, as soon as the import becomes the latest one: an import restored after a reload that ended meanwhile is tracked and finished in one step, and gets no toast either. Behind the lock the page shows no import and marks none, so the toaster still reports it.
+- **Inbox.** The page shows the jobs of its own tab. The end of every export and import of the view, also of another tab, another Administrator or a machine, is an item of the view's [Inbox page](inbox.md#administration-ui), the last entry of the view section, with **Download** for an export that succeeded and **Show the result** for an import that ran. A job that this tab followed to its end is there under **Done** (see [Store, toaster and caches](#store-toaster-and-caches)).
 
 ### The Export section
 
@@ -785,6 +786,7 @@ The **Export & Import** page of a view, a tab of **Modeling** (`ui.admin/src/app
 
 `components/transfer/ImportResult.vue`:
 
+- **Heading:** the property `title`, "Latest import" by default, which also names the section. The [Inbox page](inbox.md#download-and-show-the-result) shows the report of any import of the view with it, under "Report" and without **Import now**.
 - **Banner:** "Checked: nothing was written" after a dry run, or "Imported", with the file name and the counts. It is a warning when a file failed.
 - **Summary:** a table with one row per entry of `Summaries` and a **Total** row. The columns are Created, Updated, Unchanged, Skipped, Failed and Warnings, and on the total also Excluded files and Ignored files. After a dry run, the headers and the badges say To create, To update, To skip and Fails. Phones get a list of lines instead.
 - **Filters:** chips by kind (Annotations, Schemas, Templates, Configurations) and by outcome (Failed, Skipped, Warnings), each with its count. Only the chips that match documents are shown. Chips of one group combine with *or*, and the two groups with *and*. **Clear the filter** removes them.
@@ -813,6 +815,7 @@ The **Export & Import** page of a view, a tab of **Modeling** (`ui.admin/src/app
 - `startExport(scope, { format, include })` and `startImport(scope, file, { include, existing, force, dryRun })` call `startViewExport` and `startViewImport` of the TypeScript SDK. Options that are left out are not sent, so the API's defaults apply. An empty include means all four kinds.
 - It reads a job every second, then every 2 and 3 seconds, for at most 15 minutes. A `404` ends the job as expired, and so do three failed reads in a row, with their error. A `403`, for a user who lost the Administrator role while the job runs, is such a failed read, so the job ends after three with the server's message.
 - A succeeded export is fetched with the bearer token and saved under its `FileName` (`utils/download.ts`).
+- `downloadArchive(scope, id, fileName)` fetches the archive of an export by the id of its job and saves it under the file name, or as `export-<view>.zip` without one. `download(job)` of a followed job calls it, and so does the [Inbox page](inbox.md#download-and-show-the-result) for a job the tab does not follow: of another tab, another person or a machine. Such a job is neither tracked nor reported, and the `404` of an expired job goes to the caller.
 - `latestExport(scope)` and `latestImport(scope)` give the newest job of a view; `showInPage(id)` marks the one a page shows.
 - **After a reload:**
   - Running exports are kept in `sessionStorage` (`2s-admin:pending-exports`) and followed again. One started more than 15 minutes earlier is dropped.
@@ -822,6 +825,15 @@ The **Export & Import** page of a view, a tab of **Modeling** (`ui.admin/src/app
 
 - an export: "Exported 12 annotations and 2 templates", the counts of the included kinds, with the file name; or "The export failed";
 - an import that no page shows: "Imported `<file>`" or "Checked `<file>`" with the counts, in the warning color when a file failed; or "The import failed". Both have **Show the result**, which opens the page of the import's view.
+
+**The inbox.** The back end leaves the end of every job in the [inbox](inbox.md) of its view, for the other tabs and the other Administrators. The tab that followed the job has just shown that end, so the toaster settles the inbox of the job's view at every end it hears, before it decides about the toast, also for an import that a page shows:
+
+- **It dismisses the job's item** (`dismissJobItem` of `queries/inbox.ts`) when the end it showed is the end of the job on the server: the job is done and its status is `Succeeded`, or it failed and its status is `Failed`. It reads the open items of the view, looks for the notification whose `Job.Id` is the job's, looks once more after two seconds when the item is not there yet, and dismisses it. The item is then under **Done** of the Inbox page, dismissed by that person, with its **Download** or **Show the result**. The inbox does not report the job a second time, and the mark of the menu does not light up for the person who saw it.
+- **It leaves the item open** when the tab reported a failure the server does not have: it gave up after 15 minutes, it could not read the job (three failed reads, or a `404`), or it could not download the archive of an export that succeeded. The item then tells what the tab could not.
+- **It invalidates the inbox of the view** in both cases, once (`invalidateInbox`: both lists, and with them the number of the **Open** tab and the mark of the menu). With a dismissal it does so afterwards, when the item is closed: reading the lists first would light the mark for a moment.
+- **It says nothing about the inbox.** A failure there (a deployment without the routes, a lost role, an item somebody closed first) is ignored: the job is reported as before, and its item stays open.
+
+The details are in [inbox.md](inbox.md#results-the-tab-already-showed).
 
 **Caches.** After a real import that wrote documents, the toaster calls `invalidateImport` (`queries/invalidation.ts`). It refreshes the queries of the kinds the import wrote, as the summaries per kind and the items tell:
 
@@ -843,6 +855,9 @@ A dry run refreshes nothing.
   - Every route needs the Administrator role on the project, as in the API. Below it, the route answers `403` `AccessDenied` with the shared message of the mock, for example `The Administrator role on acme.shipping is required.` The seed has no Administrator project, so in the e2e tests the Owner of `acme.billing` stands in for an Administrator. The scopes and the job limit are not checked.
   - The options are read like the API's: an unknown kind or mode answers `400` (`InvalidQuery` for the query).
   - The last ten finished imports are kept in `sessionStorage` (`2s-admin:mock-finished-imports`), so the page shows a result again after a reload, as the API keeps its jobs.
+- **Notification.** When a job ends, on its second read, the mock pushes its notification into the inbox of the view (`exportNotification` and `importNotification` of `mock/inbox.ts`, a port of `ViewTransferNotifications`), with the titles, the texts, the key and the lifetime of the API: for Administrators, by the mock user who started the job, one item per job, and a result that expires with its job. The mock inbox serves it (see [inbox.md](inbox.md#mock-api)).
+  - The item is in the mock database, but an export lives in the memory of the page. So the **Download** of its item works until the tab reloads and answers `404` afterwards, while the item is still listed. The report of one of the last ten imports is still read after a reload.
+  - A mock job never fails, so no mock job leaves "Export failed" or "Import failed"; the seed of the mock inbox has one failed export.
 - **Export.**
   - The folder format writes one folder per included kind, version files next to their current file with the time of their version, and `export.json` version 2.
   - The git format writes the same folders with the current documents and `.git/HEAD`, without `export.json`. It writes no repository.
@@ -864,9 +879,10 @@ A dry run refreshes nothing.
 - **Vitest** (`test/unit/transfers/`):
   - the archive names;
   - the mock's exports and imports, and its roles: the five routes refuse the Contributor of `acme.shipping` and the Reader of `northwind.portal`, also for jobs started while the mock user was the Administrator there, and serve an Owner and an Administrator (`mock-transfers.test.ts`);
-  - the store's options, polling and restore after a reload (`transfers.test.ts`);
+  - the store's options, polling and restore after a reload, and `downloadArchive`: the archive of an export the store does not follow, by the id of its job and under the given name or `export-<view>.zip`, without tracking or reporting the job, and the `404` of an expired export passed on (`transfers.test.ts`);
   - the names, links and invalidation of a result (`transfer-utils.test.ts`);
-  - the sections, the result and the toaster, and the page after a reload: a resumed export in the Export section, and an import that ended during the reload shown without a toast (`transfer-page.test.ts`);
+  - the sections, the result and the toaster, and the page after a reload: a resumed export in the Export section, and an import that ended during the reload shown without a toast (`transfer-page.test.ts`). The result is headed "Latest import" or by the `title` it is given. The toaster test of an import that no page shows now expects the queries of the kinds it wrote and the inbox of the view, invalidated exactly once, and waits for it, because the inbox follows the dismissal;
+  - the toaster and the inbox (`test/unit/inbox/inbox-toaster.test.ts`): the item of an export and of an import it reported is dismissed, also of a job that failed on the server; the items of other jobs and of an export whose archive it could not download stay open; the inbox of the job's view is read again once, and of no other view; a failing inbox changes nothing of the toast and the download; the mark of the menu stays off for a job the tab reported; and `dismissJobItem` looks a second time after two seconds, gives up without an error, and dismisses only the notification of the job;
   - the role on the page: the fallback of the Import section for a Contributor, and the lock of a Contributor under four tabs, without sections and without marking the import, which mounts the sections once the role becomes Administrator (`transfer-page.test.ts`);
   - the Modeling entry with the tabs of each role, Export & Import from Administrator up, and the shortcut (`test/unit/utils/navigation.test.ts`);
   - the tabs of `ModelingHeader` per role, and no selected tab on the lock of a Contributor (`test/unit/modeling/modeling.test.ts`).
@@ -879,6 +895,7 @@ A dry run refreshes nothing.
   - the lock of a Contributor (`acme/shipping`): "Administrators only" under the four other tabs, none of them selected, without sections, and **Schemas** still opens;
   - a file that is not a zip (desktop only).
 - **Playwright** (`test/e2e/navigation.spec.ts`): the four tabs of a Contributor, and the command palette, which lists Export & Import for the Owner and not for the Contributor.
+- **Playwright** (`test/e2e/inbox.spec.ts`): an export started on the page is not among the open items of the Inbox page: it is under **Done**, dismissed by the user, with **Download** under the same file name. An import started there has **Show the result** on its item under **Done** (see [inbox.md](inbox.md#tests-of-the-page)).
 - **axe** (`accessibility.spec.ts`), in both themes, runs on the page for an Owner (`acme/billing`), on the locked Modeling page of a Reader, on the lock of a Contributor, and on the result of a check.
 - **Visual baselines** (`visual.spec.ts`) capture the page as it opens, in both themes, on desktop and mobile.
 
