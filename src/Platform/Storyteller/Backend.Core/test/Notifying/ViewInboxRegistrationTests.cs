@@ -6,6 +6,7 @@ using _42.Platform.Storyteller.Transferring;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using static _42.Platform.Storyteller.Backend.Core.UnitTests.Notifying.ViewInboxTestData;
 using static _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring.TransferTestData;
 
@@ -101,6 +102,32 @@ public class ViewInboxRegistrationTests
         await transfers.ProcessAsync(_queue.Messages.ShouldHaveSingleItem(), TestContext.Current.CancellationToken);
 
         _items.Writes.ShouldHaveSingleItem().Record.Item.Title.ShouldBe("Export finished");
+    }
+
+    [Fact]
+    public async Task ARetentionOutsideItsRange_FailsThePushThatNeedsIt_AndNotTheTransfers()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ViewInbox:RetentionDays"] = "0" })
+            .Build();
+        var services = HostServices()
+            .AddViewTransfers(configuration)
+            .AddViewInbox(configuration);
+
+        await using var provider = services.BuildServiceProvider(Validated);
+
+        // the setting is read by the push, not by the construction of the publisher that the jobs take
+        var transfers = provider.GetRequiredService<IViewTransferService>();
+        await transfers.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Folder, null, Actor, TestContext.Current.CancellationToken);
+        await transfers.ProcessAsync(_queue.Messages.ShouldHaveSingleItem(), TestContext.Current.CancellationToken);
+
+        // a result names its own expiry and needs no retention
+        _items.Writes.ShouldHaveSingleItem().Record.Item.Title.ShouldBe("Export finished");
+
+        var publisher = provider.GetRequiredService<IViewInboxPublisher>();
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => publisher.PushAsync(Push(), TestContext.Current.CancellationToken));
+        exception.Message.ShouldContain("ViewInbox:RetentionDays must be between 1 and 365.");
+        _items.Writes.Count.ShouldBe(1);
     }
 
     // What a host registers besides the two entry points, as fakes: the stores, the queue, the archives, the services
