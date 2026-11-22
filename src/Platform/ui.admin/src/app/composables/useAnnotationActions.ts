@@ -2,21 +2,25 @@ import { ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
   deleteAnnotation,
+  getAnnotation,
+  hasErrorCode,
   isNotFound,
+  patchAnnotationVersioned,
   purgeAnnotation,
   restoreAnnotations,
-  setAnnotation,
   setAnnotationsSimple,
   type Annotation,
   type AnnotationDeletionResult,
   type AnnotationKeyFailure,
+  type AnnotationPatchBody,
+  type JsonPatchOperation,
 } from '@42for.net/2splatform.sdk'
 import { forgetAnnotation, invalidateAnnotation, invalidateDeleted } from '@/queries/invalidation'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { getAllAncestors, getAnnotationTypeInfo } from '@/utils/annotation-key'
 import { sameView } from '@/utils/context-paths'
-import { normalizeLabels } from '@/utils/labels'
+import { labelAddition, labelRemoval, patchableLabels } from '@/utils/labels'
 
 const writeConcurrency = 4
 const deleteConcurrency = 4
@@ -40,6 +44,9 @@ export async function runLimited<T>(
   })
   await Promise.all(lanes)
 }
+
+/** The attempts of a label action whose test fails because the labels changed meanwhile (412 PatchTestFailed). */
+const labelAttempts = 3
 
 export function chunk<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = []
@@ -79,8 +86,10 @@ export const undoKeys = (deletions: readonly AnnotationDeletionResult[]) =>
     .map((deletion) => deletion.Deletion!.RootKey!)
 
 /**
- * Saving, deleting, restoring and the bulk actions of the annotation screens (spec section 8). Every change updates
- * the catalog entry locally and invalidates the matching detail queries, so nothing reloads the whole catalog.
+ * Saving, deleting, restoring and the bulk actions of the annotation screens (spec section 8). Every change of an
+ * existing annotation is a PATCH of only that change (424-225), so a concurrent change of another member is kept.
+ * Every change updates the catalog entry locally and invalidates the matching detail queries, so nothing reloads the
+ * whole catalog.
  */
 export function useAnnotationActions() {
   const catalog = useCatalogStore()
@@ -95,36 +104,43 @@ export function useAnnotationActions() {
     return context.scope
   }
 
-  async function save(annotation: Annotation): Promise<Annotation> {
+  /**
+   * PatchAnnotation (424-225): a merge patch (an object) or a JSON Patch (an array) of only what changes, merged on
+   * the server against the stored state, so a concurrent change of another member is kept. A patch never creates or
+   * re-creates a key (404 AnnotationNotFound or AnnotationDeleted). The catalog takes the stored result.
+   */
+  async function patch(key: string, body: AnnotationPatchBody): Promise<Annotation> {
     const target = scope()
-    const saved = await setAnnotation(target.org, target.project, target.view, annotation.AnnotationKey, annotation)
+    const { value: saved } = await patchAnnotationVersioned(target.org, target.project, target.view, key, body)
     catalog.upsert(saved)
     await invalidateAnnotation(queryClient, target, saved.AnnotationKey)
     return saved
   }
 
   /**
-   * SetAnnotation per key, four at a time. The bulk endpoint (SetAnnotations) only creates and silently skips every
-   * existing key, so edits go one by one, and the catalog takes what the server returned.
+   * One write per annotation, four at a time: `write` patches it and returns the stored result, or undefined when it
+   * had nothing to write. The bulk endpoint (SetAnnotations) only creates, so edits go one by one. A key deleted (or
+   * purged) meanwhile is not re-created: it fails, and it leaves the catalog, as a delete would have taken it.
    */
-  async function saveMany(annotations: Annotation[]): Promise<void> {
+  async function patchMany(
+    annotations: Annotation[],
+    write: (annotation: Annotation) => Promise<Annotation | undefined>,
+  ): Promise<void> {
     const target = scope()
     const failed: string[] = []
+    let gone = false
     progress.value = { done: 0, total: annotations.length }
     try {
       await runLimited(annotations, writeConcurrency, async (annotation) => {
         try {
-          const saved = await setAnnotation(
-            target.org,
-            target.project,
-            target.view,
-            annotation.AnnotationKey,
-            annotation,
-          )
-          catalog.upsert(saved)
-          await invalidateAnnotation(queryClient, target, saved.AnnotationKey)
-        } catch {
+          await write(annotation)
+        } catch (error) {
           failed.push(annotation.AnnotationKey)
+          if (hasErrorCode(error, 'AnnotationDeleted') || hasErrorCode(error, 'AnnotationNotFound')) {
+            catalog.remove(annotation.AnnotationKey)
+            forgetAnnotation(queryClient, target, annotation.AnnotationKey)
+            gone = true
+          }
         } finally {
           progress.value = { done: progress.value!.done + 1, total: annotations.length }
         }
@@ -132,10 +148,46 @@ export function useAnnotationActions() {
     } finally {
       progress.value = undefined
     }
+    if (gone) {
+      void invalidateDeleted(queryClient, target)
+    }
     if (failed.length) {
       throw new Error(
         `${failed.length} of ${annotations.length} annotations were not saved: ${failed.slice(0, 5).join(', ')}`,
       )
+    }
+  }
+
+  /**
+   * A label action as a JSON Patch guarded by a test of the labels it was built from (labelAddition, labelRemoval):
+   * first from the catalog's copy; when the labels changed meanwhile (412 PatchTestFailed), the annotation is read
+   * again and the patch rebuilt from its labels, up to three attempts. A copy that needs no change is done, and a fresh
+   * one goes into the catalog.
+   */
+  async function patchLabels(
+    annotation: Annotation,
+    build: (labels: string[]) => JsonPatchOperation[] | undefined,
+  ): Promise<Annotation | undefined> {
+    const target = scope()
+    let current = annotation
+    for (let attempt = 1; ; attempt++) {
+      const operations = build(patchableLabels(current.Labels))
+      if (!operations) {
+        if (current !== annotation) {
+          catalog.upsert(current)
+        }
+        return undefined
+      }
+      try {
+        return await patch(annotation.AnnotationKey, operations)
+      } catch (error) {
+        if (!hasErrorCode(error, 'PatchTestFailed') || attempt >= labelAttempts) {
+          throw error
+        }
+      }
+      current = await getAnnotation(target.org, target.project, target.view, annotation.AnnotationKey, {
+        includeInactive: true,
+      })
     }
   }
 
@@ -296,30 +348,36 @@ export function useAnnotationActions() {
   const selected = (keys: string[]) =>
     keys.map((key) => catalog.byKey.get(key)).filter((annotation): annotation is Annotation => !!annotation)
 
+  /**
+   * A label action over the selected keys. The keys whose catalog copy needs no change are not written (a key that has
+   * the label in any spelling, for an add; one without it, for a remove): the UI keeps labels unique case-insensitively,
+   * the API dedupes ordinally only.
+   */
+  const labelAction = (keys: string[], build: (labels: string[]) => JsonPatchOperation[] | undefined) =>
+    patchMany(
+      selected(keys).filter((annotation) => build(patchableLabels(annotation.Labels))),
+      (annotation) => patchLabels(annotation, build),
+    )
+
   return {
     progress,
-    save,
-    saveMany,
+    patch,
+    patchMany,
     removeMany,
     remove: (key: string) => removeMany([key]),
     restoreMany,
     createMany,
     purgeMany,
+    /** A merge patch of IsDisabled alone (null enables: the API treats null and false alike, and the form writes null). */
     setDisabled: (keys: string[], disabled: boolean) =>
-      saveMany(selected(keys).map((annotation) => ({ ...annotation, IsDisabled: disabled ? true : null }))),
+      patchMany(selected(keys), (annotation) =>
+        patch(annotation.AnnotationKey, { IsDisabled: disabled ? true : null }),
+      ),
+    /** Appends the trimmed label (add /Labels/-) where no spelling of it is, guarded by the labels read. */
     addLabel: (keys: string[], label: string) =>
-      saveMany(
-        selected(keys).map((annotation) => ({
-          ...annotation,
-          Labels: normalizeLabels([...(annotation.Labels ?? []), label]),
-        })),
-      ),
+      label.trim() ? labelAction(keys, (labels) => labelAddition(labels, label)) : Promise.resolve(),
+    /** Removes every spelling of the label (remove /Labels/<index>), guarded by the labels read. */
     removeLabel: (keys: string[], label: string) =>
-      saveMany(
-        selected(keys).map((annotation) => ({
-          ...annotation,
-          Labels: (annotation.Labels ?? []).filter((existing) => existing.toLowerCase() !== label.toLowerCase()),
-        })),
-      ),
+      label.trim() ? labelAction(keys, (labels) => labelRemoval(labels, label)) : Promise.resolve(),
   }
 }

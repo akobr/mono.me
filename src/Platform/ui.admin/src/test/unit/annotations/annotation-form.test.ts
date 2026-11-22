@@ -4,10 +4,10 @@ import {
   annotationFormSchema,
   isValidTimeZone,
   readOnlyIssues,
-  toAnnotationBody,
   toAnnotationDraft,
   type AnnotationForm as AnnotationDraft,
 } from '@/forms/annotation.schema'
+import { toAnnotationPatch } from '@/forms/annotation-patch'
 import { chunk, runLimited } from '@/composables/useAnnotationActions'
 import AnnotationForm from '@/components/annotations/AnnotationForm.vue'
 import { parseDocument, toJson, toYaml } from '@/utils/json-yaml'
@@ -82,34 +82,16 @@ describe('annotation form schema', () => {
     expect(isValidTimeZone('Nowhere/City')).toBe(false)
   })
 
-  it('builds the body without derived or empty fields', () => {
-    const body = toAnnotationBody({
-      ...toAnnotationDraft(annotation),
-      Title: '  ',
-      Labels: [],
-      Values: {},
-      IsDisabled: false,
-    })
+  it('patches only the members the user changed, an emptied one as null', () => {
+    const patch = toAnnotationPatch(
+      { ...toAnnotationDraft(annotation), Title: '  ', Labels: [], Values: {}, IsDisabled: false },
+      toAnnotationDraft(annotation),
+    )
 
-    expect(body).toEqual({
-      ProjectName: 'billing',
-      ViewName: 'default',
-      AnnotationKey: 'exe.northwind.invoicing.prod',
-      Name: 'prod',
-      AnnotationType: 'Execution',
-      IsDisabled: null,
-      ValidFrom: null,
-      ExpiresAt: null,
-      TimeZone: undefined,
-      Title: undefined,
-      Description: undefined,
-      DocumentationLink: undefined,
-      Labels: undefined,
-      Values: undefined,
-    })
+    expect(patch).toEqual({ Title: null, Labels: null, Values: { retries: null } })
   })
 
-  it('keeps the type-specific members of the loaded annotation in the body', () => {
+  it('never patches the type-specific members of the loaded annotation', () => {
     const loaded = {
       ...annotation,
       SubjectKey: 'sbt.northwind',
@@ -122,12 +104,9 @@ describe('annotation form schema', () => {
       Title: 'Old',
     } as Annotation
 
-    const body = toAnnotationBody({ ...toAnnotationDraft(loaded), Title: 'New' }, loaded) as unknown as Record<string, unknown>
-
-    expect(body.Title).toBe('New')
-    expect(body.SubjectKey).toBe('sbt.northwind')
-    expect(body.UsageKey).toBe('usg.northwind.invoicing')
-    expect(body.ContextName).toBe('prod')
+    expect(toAnnotationPatch({ ...toAnnotationDraft(loaded), Title: 'New' }, toAnnotationDraft(loaded))).toEqual({
+      Title: 'New',
+    })
   })
 
   it('carries the trigger only on a unit draft', () => {
@@ -145,15 +124,13 @@ describe('annotation form schema', () => {
     expect(issues({ ...toAnnotationDraft(annotation), UnitType: '', UnitDefinition: '' })).toEqual([])
   })
 
-  it('writes the edited trigger over the loaded unit', () => {
-    const body = toAnnotationBody(
-      { ...toAnnotationDraft(unit), UnitType: ' volume ', UnitDefinition: ' incoming/*.csv ' },
-      unit,
-    ) as Annotation & { UnitType?: string; UnitDefinition?: string; ResponsibilityKey?: string }
-
-    expect(body.UnitType).toBe('volume')
-    expect(body.UnitDefinition).toBe('incoming/*.csv')
-    expect(body.ResponsibilityKey).toBe('rst.invoicing')
+  it('patches the edited trigger of a unit, trimmed', () => {
+    expect(
+      toAnnotationPatch(
+        { ...toAnnotationDraft(unit), UnitType: ' volume ', UnitDefinition: ' incoming/*.csv ' },
+        toAnnotationDraft(unit),
+      ),
+    ).toEqual({ UnitType: 'volume', UnitDefinition: 'incoming/*.csv' })
   })
 
   it('reads an edited trigger from JSON and YAML', () => {
@@ -164,12 +141,11 @@ describe('annotation form schema', () => {
       if (!parsed.ok) {
         continue
       }
-      const body = toAnnotationBody(annotationFormSchema.parse(parsed.value) as AnnotationDraft, unit) as Annotation & {
-        UnitType?: string
-        UnitDefinition?: string
-      }
-      expect(body.UnitType).toBe('queue')
-      expect(body.UnitDefinition).toBe('orders.>')
+      const patch = toAnnotationPatch(
+        annotationFormSchema.parse(parsed.value) as AnnotationDraft,
+        toAnnotationDraft(unit),
+      )
+      expect(patch).toEqual({ UnitType: 'queue', UnitDefinition: 'orders.>' })
     }
   })
 

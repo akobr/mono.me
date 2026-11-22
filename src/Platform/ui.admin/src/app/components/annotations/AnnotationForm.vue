@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useForm } from 'vee-validate'
 import { hasErrorCode, type Annotation } from '@42for.net/2splatform.sdk'
@@ -8,10 +8,10 @@ import {
   annotationLimits,
   invalidAnnotationFields,
   readOnlyIssues,
-  toAnnotationBody,
   toAnnotationDraft,
   type AnnotationForm,
 } from '@/forms/annotation.schema'
+import { toAnnotationPatch } from '@/forms/annotation-patch'
 import { toTypedSchema } from '@/forms/typed-schema'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
@@ -29,7 +29,8 @@ import {
 
 /**
  * The Annotation tab (spec section 11.1): Form | JSON | YAML over one VeeValidate form with one Zod schema.
- * Text modes edit the whole annotation; key fields must stay unchanged.
+ * Text modes edit the whole annotation; key fields must stay unchanged. Saving sends only the members the user
+ * changed since the form was last reset (a PATCH, 424-225), so what someone else changed meanwhile is kept.
  */
 const props = defineProps<{ annotation: Annotation; fresh: boolean }>()
 
@@ -42,11 +43,21 @@ const actions = useAnnotationActions()
 const canEdit = useCan('edit')
 const toast = useToast()
 
-const { values, errors, meta, defineField, setValues, setFieldError, resetForm, handleSubmit, isSubmitting } =
-  useForm<AnnotationForm>({
-    validationSchema: toTypedSchema(annotationFormSchema),
-    initialValues: toAnnotationDraft(props.annotation),
-  })
+const {
+  values,
+  errors,
+  meta,
+  defineField,
+  setFieldValue,
+  setFieldError,
+  resetForm,
+  handleSubmit,
+  isSubmitting,
+  validate,
+} = useForm<AnnotationForm>({
+  validationSchema: toTypedSchema(annotationFormSchema),
+  initialValues: toAnnotationDraft(props.annotation),
+})
 
 const [title, titleAttrs] = defineField('Title')
 const [description] = defineField('Description')
@@ -82,12 +93,49 @@ const mode = computed<EditorMode>({
   },
 })
 
+// The annotation the form was last reset to: a save sends the difference from it, never other members of a newer copy.
+const base = shallowRef<Annotation>(props.annotation)
+
+// force: without it, VeeValidate merges the new values into the old ones, so a value name the new copy no longer has
+// would stay in the form (and come back with the next save).
+function reset(annotation: Annotation) {
+  base.value = annotation
+  resetForm({ values: toAnnotationDraft(annotation) }, { force: true })
+}
+
+/**
+ * The text modes edit the whole document: each member is set whole (setValues would merge, keeping a removed value
+ * name or a deleted line), and a member the text leaves out takes its unset value.
+ */
+function setDocument(document: unknown) {
+  // the editor reports anything else as an issue (readOnlyIssues), so it changes nothing
+  if (!document || typeof document !== 'object' || Array.isArray(document)) {
+    return
+  }
+  const unset = toAnnotationDraft({
+    ProjectName: props.annotation.ProjectName,
+    ViewName: props.annotation.ViewName,
+    AnnotationKey: props.annotation.AnnotationKey,
+    Name: props.annotation.Name,
+    AnnotationType: props.annotation.AnnotationType,
+  })
+  for (const member of new Set([...Object.keys(unset), ...Object.keys(document)])) {
+    const field = member as keyof AnnotationForm
+    setFieldValue(
+      field,
+      (member in document ? (document as Record<string, unknown>)[member] : unset[field]) as never,
+      false,
+    )
+  }
+  void validate()
+}
+
 // New data (another key, a refetch) replaces the form unless the user has unsaved edits.
 watch(
   () => props.annotation,
   (annotation, previous) => {
     if (!meta.value.dirty || annotation.AnnotationKey !== previous?.AnnotationKey) {
-      resetForm({ values: toAnnotationDraft(annotation) })
+      reset(annotation)
     }
   },
 )
@@ -95,9 +143,15 @@ watch(
 useUnsavedChanges(() => meta.value.dirty)
 
 const save = handleSubmit(async (draft) => {
+  const patch = toAnnotationPatch(draft as AnnotationForm, toAnnotationDraft(base.value))
+  if (!patch) {
+    // only changes that the save normalizes away (spaces around a title, for example): the latest copy is shown
+    reset(props.annotation)
+    toast.add({ title: 'Nothing to save', color: 'neutral', icon: 'i-lucide-check' })
+    return
+  }
   try {
-    const saved = await actions.save(toAnnotationBody(draft as AnnotationForm, props.annotation))
-    resetForm({ values: toAnnotationDraft(saved) })
+    reset(await actions.patch(props.annotation.AnnotationKey, patch))
     toast.add({ title: 'Annotation saved', color: 'success', icon: 'i-lucide-check' })
   } catch (error) {
     // 400 InvalidAnnotation names the field and its limit: the message goes to that field.
@@ -115,7 +169,7 @@ const descriptionLength = computed(() => description.value?.length ?? 0)
 const showDescriptionCount = computed(() => descriptionLength.value > annotationLimits.Description * 0.9)
 const countFormat = new Intl.NumberFormat('en-US')
 
-const revert = () => resetForm({ values: toAnnotationDraft(props.annotation) })
+const revert = () => reset(props.annotation)
 
 const modes: EditorMode[] = ['form', 'json', 'yaml']
 defineShortcuts({
@@ -421,7 +475,7 @@ const descendantCount = (total: number) => (authoritativeCatalog.value ? String(
         :validate="(value) => readOnlyIssues(annotation, value)"
         hide-toggle
         aria-label="Annotation document"
-        @update:model-value="(value) => setValues(value as AnnotationForm)"
+        @update:model-value="setDocument"
         @update:valid="(valid) => (textValid = valid)"
         @save="canEdit && meta.dirty && !isSubmitting && save()"
       />
