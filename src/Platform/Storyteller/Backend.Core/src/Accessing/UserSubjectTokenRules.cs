@@ -11,6 +11,10 @@ public static class UserSubjectTokenRules
 
     public const string AuthTimeClaimType = "auth_time";
 
+    // The longest client id a subject token may name (IsRecordableClientId): it goes into the Storyteller user token, the
+    // audit actor, the logs and the manifest keys of resolved reads.
+    public const int MaxClientIdLength = 256;
+
     private static readonly long MaxUnixSeconds = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
 
     // A refusal for a request no token can pass, or null.
@@ -45,6 +49,16 @@ public static class UserSubjectTokenRules
     public static string? GetClientId(IReadOnlyList<Claim> claims)
     {
         return FirstValue(claims, "azp") ?? FirstValue(claims, "appid") ?? FirstValue(claims, "client_id");
+    }
+
+    // True for no client, and for 1 to MaxClientIdLength printable ASCII characters ('!' to '~'): no space at either end,
+    // no control or format character (a bidirectional override, a zero-width space) and no look-alike letter, so a
+    // recorded id never looks like another. Every provider's ids fit: Entra ID GUIDs, AuthKit client_01... ids, the
+    // HTTPS URLs of Client ID Metadata Documents and Keycloak client names.
+    public static bool IsRecordableClientId(string? clientId)
+    {
+        return clientId is null
+            || (clientId.Length is > 0 and <= MaxClientIdLength && clientId.All(character => character is >= '!' and <= '~'));
     }
 
     // Any client when allowedClientIds lists none.

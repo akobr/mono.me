@@ -14,7 +14,8 @@ namespace _42.Platform.Storyteller;
 // owns Federation:Issuer, so the bearer pipeline never tries the user provider with them. A machine result has the
 // claims MachineAuthenticationMiddleware builds for API keys, plus the kind, organization and project the per-call checks
 // compare with the stored machine. A user result has the account (sub) and its scopes (scp), and its Delegation names the
-// actor that acts for the person, with the restrictions of the token and those the actor's settings add.
+// actor that acts for the person, with the restrictions of the token and those the actor's settings add, and the client
+// app the person used with it.
 public class StorytellerTokenValidator : IUserTokenIssuerValidator
 {
     // Two claims with one name would let this reader and the token handler see different values.
@@ -207,6 +208,27 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
         return true;
     }
 
+    // The client the subject token was issued to: null when the claim is absent (a subject token that named no client, or
+    // a token issued before the claim). A present claim must be a string that UserSubjectTokenRules.IsRecordableClientId
+    // accepts, as the exchange checked it, or the token is refused.
+    private static bool TryGetSubjectClientId(JsonElement payload, out string? clientId)
+    {
+        clientId = null;
+
+        if (!payload.TryGetProperty(StorytellerTokenClaims.SubjectClientId, out var value))
+        {
+            return true;
+        }
+
+        if (value.ValueKind != JsonValueKind.String || value.GetString() is not { } text || !UserSubjectTokenRules.IsRecordableClientId(text))
+        {
+            return false;
+        }
+
+        clientId = text;
+        return true;
+    }
+
     private static bool TryReadPayload(JsonWebToken token, out JsonElement payload)
     {
         payload = default;
@@ -276,7 +298,8 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
     // removing the actor ends its tokens at once), and known restrictions only. The restrictions enforced are the token's
     // plus those of the actor's settings of now, so adding a restriction or turning AllowSecrets off applies to its tokens
     // at once too, and none is ever dropped here. The scopes become scp claims, which the API reads, and so does auth_time;
-    // the actor and the restrictions go into the Delegation, never into claims.
+    // the actor, the restrictions and the client of the subject token (subject_client_id) go into the Delegation, never
+    // into claims.
     private BearerValidationResult? ValidateUser(JsonElement payload)
     {
         var accountId = GetString(payload, JwtRegisteredClaimNames.Sub);
@@ -319,6 +342,11 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
             return RefuseUser("its restrictions are not a list of known restrictions");
         }
 
+        if (!TryGetSubjectClientId(payload, out var clientId))
+        {
+            return RefuseUser($"its {StorytellerTokenClaims.SubjectClientId} is not a client id");
+        }
+
         // The token's restrictions and those the actor has now: tightening an actor reaches its tokens at once, loosening it
         // waits for new ones.
         var enforced = restrictions.Union(actor.GetRestrictions(), StringComparer.Ordinal).ToArray();
@@ -347,7 +375,7 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
             claims,
             IsMachine: false,
             MachineId: null,
-            Delegation: new BearerDelegation(actorId, enforced));
+            Delegation: new BearerDelegation(actorId, enforced, clientId));
     }
 
     private BearerValidationResult? RefuseUser(string reason)

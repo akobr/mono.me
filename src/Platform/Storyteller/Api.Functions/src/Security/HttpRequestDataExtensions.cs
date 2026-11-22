@@ -114,8 +114,9 @@ public static class HttpRequestDataExtensions
 
     // Who makes the request, for every audit stamp: the machine, or the account (its sub) with a display name from
     // the token, and Via the actor that acts for it (a Storyteller user token, whose name the bearer middleware read from
-    // the account). The profile resolver is not called, so recording the actor adds no latency. Debug builds (DEV_AUTH)
-    // also serve requests without an identity; those are System.
+    // the account) with ViaClient the client app the person used with the actor. The profile resolver is not called, so
+    // recording the actor adds no latency. Debug builds (DEV_AUTH) also serve requests without an identity; those are
+    // System.
     public static AuditActor GetAuditActor(this HttpRequestData @this)
     {
         if (@this.TryGetApplicationIdentity(out var appId))
@@ -135,11 +136,16 @@ public static class HttpRequestDataExtensions
         var account = AuditActor.Account(
             @this.GetIdentityUniqueId(),
             string.IsNullOrEmpty(name) ? (string.IsNullOrEmpty(userName) ? null : userName) : name);
-        return @this.TryGetDelegatedActor(out var actorId) ? account with { Via = actorId } : account;
+        if (!@this.TryGetDelegatedActor(out var actorId))
+        {
+            return account;
+        }
+
+        return account with { Via = actorId, ViaClient = @this.TryGetDelegatedClient(out var clientId) ? clientId : null };
     }
 
-    // Who changes access in this request, for the access audit: the audit actor (with Via) and the invocation id, the
-    // correlation id of the key/value audit too.
+    // Who changes access in this request, for the access audit: the audit actor (with Via and ViaClient) and the invocation
+    // id, the correlation id of the key/value audit too.
     public static AccessCaller GetAccessCaller(this HttpRequestData @this)
     {
         return new AccessCaller(@this.GetAuditActor()) { CorrelationId = @this.FunctionContext.InvocationId };
@@ -487,6 +493,22 @@ public static class HttpRequestDataExtensions
         }
 
         actorId = null;
+        return false;
+    }
+
+    // The client app the person used with the actor (the subject_client_id of a Storyteller user token); false for a direct
+    // call, and for a token whose subject token named no client.
+    public static bool TryGetDelegatedClient(this HttpRequestData @this, [MaybeNullWhen(false)] out string clientId)
+    {
+        if (@this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.DelegatedClient, out var value)
+            && value is string delegatedClient
+            && !string.IsNullOrEmpty(delegatedClient))
+        {
+            clientId = delegatedClient;
+            return true;
+        }
+
+        clientId = null;
         return false;
     }
 

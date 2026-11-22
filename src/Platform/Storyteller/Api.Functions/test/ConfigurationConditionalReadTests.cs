@@ -790,6 +790,21 @@ public class ConfigurationConditionalReadTests
         DependencyManifests.CallerOf(throughTheActor).ShouldBe("Account.mcp:tid:oid:User");
     }
 
+    // The client app goes after the actor as base64url, so a ':' of its URL never splits the key, one client's manifest
+    // never answers another's read, and every client's binding reads are audited.
+    [Fact]
+    public void DependencyManifests_TellTheClientAppsOfAnActorApart()
+    {
+        var direct = new SecretRights(new KeyValueCaller(AuditActor.Account("tid:oid"), true, true), IsReadWithheldByMtls: false, IsWriteWithheldByMtls: false);
+        SecretRights Through(string client) => direct with { Caller = direct.Caller with { Actor = direct.Caller.Actor with { Via = "mcp", ViaClient = client } } };
+
+        DependencyManifests.CallerOf(Through("https://claude.ai/oauth/mcp-oauth-client-metadata"))
+            .ShouldBe("Account.mcp@aHR0cHM6Ly9jbGF1ZGUuYWkvb2F1dGgvbWNwLW9hdXRoLWNsaWVudC1tZXRhZGF0YQ:tid:oid:User");
+        DependencyManifests.CallerOf(Through("client_01JDQ8Z7Y4")).ShouldBe("Account.mcp@Y2xpZW50XzAxSkRROFo3WTQ:tid:oid:User");
+        DependencyManifests.CallerOf(Through("a")).ShouldNotBe(DependencyManifests.CallerOf(Through("b")));
+        DependencyManifests.CallerOf(Through("a")).ShouldNotBe(DependencyManifests.CallerOf(direct with { Caller = direct.Caller with { Actor = direct.Caller.Actor with { Via = "mcp" } } }));
+    }
+
     [Fact]
     public void DependencyManifests_KeepNoManifestLargerThanTheCache()
     {

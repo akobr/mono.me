@@ -36,7 +36,8 @@ public class AccessAuditOrganizationRecordTests(Startup startup)
 
     private static readonly MachineScope[] Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead];
 
-    private static readonly AccessCaller ViaMcp = new(AuditActor.Account("aud-admin", "Ada") with { Via = "mcp" }) { CorrelationId = "corr-1" };
+    // Through the MCP server with a client app: the records keep both.
+    private static readonly AccessCaller ViaMcp = new(AuditActor.Account("aud-admin", "Ada") with { Via = "mcp", ViaClient = "client_01JDQ8Z7Y4K3M2N1P0R9S8T7V6" }) { CorrelationId = "corr-1" };
 
     private static readonly AccessCaller Admin = AccessCaller.Account("aud-admin", "Ada");
 

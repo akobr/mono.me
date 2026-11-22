@@ -66,6 +66,27 @@ public sealed class StorytellerUserTokenTests
             ignoreOrder: true);
     }
 
+    // The client of the subject token goes into a claim of its own; client_id and act still name the actor.
+    [Fact]
+    public async Task UserToken_NamesTheClientOfTheSubjectToken()
+    {
+        var issued = await _issuer.IssueUserAsync(Request() with { SubjectClientId = "https://claude.ai/oauth/mcp-oauth-client-metadata" });
+
+        var token = new JsonWebToken(issued.AccessToken);
+        token.GetPayloadValue<string>("subject_client_id").ShouldBe("https://claude.ai/oauth/mcp-oauth-client-metadata");
+        token.GetPayloadValue<string>("client_id").ShouldBe("mcp");
+        Payload(token).GetProperty("act").EnumerateObject().Select(member => (member.Name, member.Value.GetString())).ShouldBe([("sub", "mcp")]);
+    }
+
+    [Fact]
+    public async Task UserToken_OfASubjectTokenWithoutAClient_HasNoSubjectClientId()
+    {
+        var issued = await _issuer.IssueUserAsync(Request() with { SubjectClientId = null });
+
+        Payload(new JsonWebToken(issued.AccessToken)).TryGetProperty("subject_client_id", out _).ShouldBeFalse();
+        StorytellerTokenClaims.SubjectClientId.ShouldBe("subject_client_id");
+    }
+
     [Fact]
     public async Task UserToken_WithoutRestrictions_HasAnEmptyArray_AndWithoutAuthTime_NoSuchClaim()
     {

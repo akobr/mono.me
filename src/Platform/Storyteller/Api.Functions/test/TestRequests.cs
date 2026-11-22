@@ -19,6 +19,9 @@ internal static class TestRequests
 
     public const string ActorId = "mcp";
 
+    // The id of a client app as a Client ID Metadata Document gives it: a URL, so it holds a ':'.
+    public const string ClientId = "https://claude.ai/oauth/mcp-oauth-client-metadata";
+
     // The judgements of the bearer middleware (Auth:StepUp): every user request of these helpers has a recent sign-in, as
     // a fresh token gives, unless a test replaces it (WithSignIn).
     public static readonly SignInRecency RecentSignIn = new(IsRecent: true, StepUpOptions.DefaultMaxAge);
@@ -32,11 +35,18 @@ internal static class TestRequests
 
     // A user acting through an actor, as the bearer middleware leaves a Storyteller user token: the claims of User (the
     // name from the account), and the actor ActorId and its restrictions as items; NoSecretReveal unless others are given.
-    public static TestHttpRequestData DelegatedUser(IReadOnlyList<string>? restrictions = null, string method = "GET", string? body = null)
+    // With a client, the client app of the subject token too (DelegatedClient), as a token with subject_client_id leaves it.
+    public static TestHttpRequestData DelegatedUser(IReadOnlyList<string>? restrictions = null, string method = "GET", string? body = null, string? client = null)
     {
         var request = User(method, body);
         request.FunctionContext.Items[FunctionContextItemKeys.DelegatedActor] = ActorId;
         request.FunctionContext.Items[FunctionContextItemKeys.DelegatedRestrictions] = restrictions ?? [ActorRestrictions.NoSecretReveal];
+
+        if (client is not null)
+        {
+            request.FunctionContext.Items[FunctionContextItemKeys.DelegatedClient] = client;
+        }
+
         return request;
     }
 

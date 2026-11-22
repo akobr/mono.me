@@ -4,6 +4,8 @@ using System.Security.Claims;
 
 using _42.Platform.Storyteller.Accessing;
 
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
@@ -140,12 +142,33 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         }
 
         StoreIdentity(context, result, delegation);
-        await next(context);
+
+        if (delegation is null)
+        {
+            await next(context);
+            return;
+        }
+
+        await InvokeDelegatedAsync(context, httpReqData, result, delegation, next);
     }
 
     protected virtual void AssignResponse(FunctionContext context, HttpResponseData response)
     {
         context.GetInvocationResult().Value = response;
+    }
+
+    // The status code of the response the function left: its HttpResponseData, or the code of its IActionResult, which the
+    // ASP.NET Core integration writes after the middlewares (200 when the result names none, as ASP.NET Core answers it);
+    // null when it left no response.
+    private static int? GetStatusCode(FunctionContext context)
+    {
+        return context.GetInvocationResult().Value switch
+        {
+            HttpResponseData response => (int)response.StatusCode,
+            IStatusCodeActionResult { StatusCode: { } statusCode } => statusCode,
+            IActionResult => (int)HttpStatusCode.OK,
+            _ => null,
+        };
     }
 
     private static bool TryGetBearerToken(HttpRequestData request, out string rawToken)
@@ -268,9 +291,10 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
     }
 
     // The delegation comes from the result of the Storyteller token validator only, never from claims: the user acts
-    // through that actor, so the audit actor gets Via and the actor's restrictions apply. Every user also gets the
-    // judgement of their sign-in (Auth:StepUp), from the claims that are stored: a provider token's auth_time, or the one a
-    // Storyteller user token copied from its subject token.
+    // through that actor, so the audit actor gets Via (and ViaClient, the client app of the delegation, when it names one)
+    // and the actor's restrictions apply. Every user also gets the judgement of their sign-in (Auth:StepUp), from the
+    // claims that are stored: a provider token's auth_time, or the one a Storyteller user token copied from its subject
+    // token.
     private static void StoreIdentity(FunctionContext context, BearerValidationResult result, BearerDelegation? delegation)
     {
         var claims = result.Claims as List<Claim> ?? result.Claims.ToList();
@@ -280,6 +304,11 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         {
             context.Items[FunctionContextItemKeys.DelegatedActor] = delegation.ActorId;
             context.Items[FunctionContextItemKeys.DelegatedRestrictions] = delegation.Restrictions;
+
+            if (delegation.ClientId is { } clientId)
+            {
+                context.Items[FunctionContextItemKeys.DelegatedClient] = clientId;
+            }
         }
 
         if (!result.IsMachine)
@@ -316,6 +345,34 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         var provider = services.GetService<IOptions<UserAuthenticationOptions>>()?.Value.Provider ?? new UserAuthenticationOptions().Provider;
         var time = services.GetService<TimeProvider>() ?? TimeProvider.System;
         return SignInRecency.Evaluate(claims, options, provider, time.GetUtcNow(), HttpRequestDataExtensions.IsDevelopmentAuthentication);
+    }
+
+    // A request through an actor: the logs of the handlers carry the actor and the client (DelegationLogScope), and one
+    // line names the request, its account, actor and client, and its answer, so every request of a client app is in the
+    // logs, reads too. A request that throws has no line here: ExceptionHandlingMiddleware logs it with the same scope.
+    private async Task InvokeDelegatedAsync(
+        FunctionContext context,
+        HttpRequestData request,
+        BearerValidationResult result,
+        BearerDelegation delegation,
+        FunctionExecutionDelegate next)
+    {
+        using (DelegationLogScope.Begin(_logger, context))
+        {
+            await next(context);
+
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "A request {FunctionName} {Method} of the account {AccountId} via {ActorId} (client {ClientId}) answered {StatusCode}",
+                    context.FunctionDefinition.Name,
+                    request.Method,
+                    result.Claims.FirstOrDefault(claim => claim.Type == SubjectClaimType)?.Value,
+                    delegation.ActorId,
+                    delegation.ClientId ?? DelegationLogScope.NoClient,
+                    GetStatusCode(context));
+            }
+        }
     }
 
     private void RespondUnauthorized(FunctionContext context, HttpRequestData request)

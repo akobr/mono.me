@@ -17,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 using Newtonsoft.Json.Linq;
 
@@ -34,6 +35,14 @@ public class ExceptionHandlingMiddlewareTests
         { new InvalidInputException("The name is reserved.", ErrorCodes.InvalidName), HttpStatusCode.BadRequest, ErrorCodes.InvalidName },
         { new MachineAccessNotSupportedException("A Certificate machine has no key to reset."), HttpStatusCode.BadRequest, ErrorCodes.MachineAccessNotSupported },
         { new JsonPatchException("JSON Patch operation 0 failed.", JsonPatchFailureKind.TestFailed, 0), HttpStatusCode.PreconditionFailed, ErrorCodes.PatchTestFailed },
+    };
+
+    // A refusal (403), a rejected token (401) and an error (500), each with the level it is logged at.
+    public static TheoryData<Exception, LogLevel> ExceptionsOfARequest => new()
+    {
+        { new AccessDeniedException("No Contributor access to 'acme.web'."), LogLevel.Warning },
+        { new SecurityTokenException("The token is not valid."), LogLevel.Warning },
+        { new InvalidOperationException("boom"), LogLevel.Error },
     };
 
     [Theory]
@@ -63,6 +72,52 @@ public class ExceptionHandlingMiddlewareTests
         response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
         using var body = ReadBody(response);
         HasValue(body, nameof(Models.ErrorResponse.Error)).ShouldBeTrue();
+    }
+
+    // The scope of the bearer middleware has ended when an exception reaches this middleware, which sits outside it: the
+    // refusal or the error of a request through an actor still names the actor and the client app.
+    [Theory]
+    [MemberData(nameof(ExceptionsOfARequest))]
+    public async Task Invoke_ExceptionOfARequestThroughAnActor_IsLoggedWithTheActorAndTheClient(Exception exception, LogLevel level)
+    {
+        var logger = new CapturingLogger<ExceptionHandlingMiddleware>();
+        var (context, _) = CreateContext();
+        context.Items[FunctionContextItemKeys.DelegatedActor] = TestRequests.ActorId;
+        context.Items[FunctionContextItemKeys.DelegatedClient] = TestRequests.ClientId;
+
+        await new ExceptionHandlingMiddleware(logger).Invoke(context, _ => throw exception);
+
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(level);
+        entry.ScopeValues().ShouldBe(new Dictionary<string, object?>
+        {
+            [FunctionContextItemKeys.DelegatedActor] = TestRequests.ActorId,
+            [FunctionContextItemKeys.DelegatedClient] = TestRequests.ClientId,
+        });
+    }
+
+    [Fact]
+    public async Task Invoke_RefusalThroughAnActorWithoutAClient_IsLoggedWithNoClient()
+    {
+        var logger = new CapturingLogger<ExceptionHandlingMiddleware>();
+        var (context, _) = CreateContext();
+        context.Items[FunctionContextItemKeys.DelegatedActor] = TestRequests.ActorId;
+
+        await new ExceptionHandlingMiddleware(logger).Invoke(context, _ => throw new AccessDeniedException("No Contributor access to 'acme.web'."));
+
+        logger.Entries.ShouldHaveSingleItem().ScopeValues()[FunctionContextItemKeys.DelegatedClient].ShouldBe("(none)");
+    }
+
+    // A direct call, a machine or a timer: no scope.
+    [Fact]
+    public async Task Invoke_RefusalWithoutAnActor_IsLoggedWithoutTheScope()
+    {
+        var logger = new CapturingLogger<ExceptionHandlingMiddleware>();
+        var (context, _) = CreateContext();
+
+        await new ExceptionHandlingMiddleware(logger).Invoke(context, _ => throw new AccessDeniedException("No Contributor access to 'acme.web'."));
+
+        logger.Entries.ShouldHaveSingleItem().Scopes.ShouldBeEmpty();
     }
 
     // A queue or timer invocation has no response to write: it fails, so the runtime delivers the message again.

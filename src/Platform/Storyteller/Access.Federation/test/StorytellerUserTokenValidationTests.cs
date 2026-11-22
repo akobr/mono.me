@@ -59,6 +59,23 @@ public sealed class StorytellerUserTokenValidationTests
         { "[[\"NoSecretReveal\"]]" },
     };
 
+    // The subject_client_id values that are no client id the exchange would record: not a string, empty, too long, or
+    // with a character outside printable ASCII.
+    public static TheoryData<string> SubjectClientIdsThatAreNotClientIds => new()
+    {
+        { "42" },
+        { "null" },
+        { "true" },
+        { "[\"vscode\"]" },
+        { "{\"id\":\"vscode\"}" },
+        { "\"\"" },
+        { $"\"{new string('a', 257)}\"" },
+        { "\"vs code\"" },
+        { "\" vscode\"" },
+        { "\"vsc\\u043Ede\"" },
+        { "\"vscode\\u202E\"" },
+    };
+
     public static TheoryData<string> OtherTokenUses => new()
     {
         { "\"machine\"" },
@@ -91,6 +108,54 @@ public sealed class StorytellerUserTokenValidationTests
         var delegation = result.Delegation.ShouldNotBeNull();
         delegation.ActorId.ShouldBe(ActorId);
         delegation.Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);
+        delegation.ClientId.ShouldBeNull();
+    }
+
+    // The client of the subject token reaches the delegation, never the claims.
+    [Theory]
+    [InlineData("client_01JDQ8Z7Y4K3M2N1P0R9S8T7V6")]
+    [InlineData("https://claude.ai/oauth/mcp-oauth-client-metadata")]
+    public async Task IssuedUserToken_WithASubjectClient_NamesItInTheDelegation(string clientId)
+    {
+        var issued = await _issuer.IssueUserAsync(UserRequest() with { SubjectClientId = clientId });
+
+        var result = await _validator.ValidateAsync(issued.AccessToken);
+
+        result.ShouldNotBeNull().Delegation.ShouldNotBeNull().ClientId.ShouldBe(clientId);
+        result.Claims.ShouldNotContain(claim => claim.Value == clientId);
+        result.Claims.Select(claim => claim.Type).ShouldBe(["sub", "scp", "scp"]);
+    }
+
+    [Fact]
+    public async Task UserToken_WithASubjectClientIdOf256Characters_IsAccepted()
+    {
+        var payload = UserPayload();
+        payload["subject_client_id"] = new string('a', 256);
+
+        var result = await _validator.ValidateAsync(await SignAsync(payload));
+
+        result.ShouldNotBeNull().Delegation.ShouldNotBeNull().ClientId.ShouldBe(new string('a', 256));
+    }
+
+    // A token from before the claim, or of a subject token that named no client, gives no client.
+    [Fact]
+    public async Task UserToken_WithoutASubjectClientId_HasADelegationWithoutAClient()
+    {
+        var result = await _validator.ValidateAsync(await SignAsync(UserPayload()));
+
+        result.ShouldNotBeNull().Delegation.ShouldNotBeNull().ClientId.ShouldBeNull();
+    }
+
+    // Only the exchange writes the claim, and it checks the value: anything else is refused, not cut or cleaned.
+    [Theory]
+    [MemberData(nameof(SubjectClientIdsThatAreNotClientIds))]
+    public async Task UserToken_WithASubjectClientIdThatIsNotAClientId_IsRefused(string subjectClientId)
+    {
+        var payload = UserPayload();
+        Set(payload, "subject_client_id", subjectClientId);
+
+        (await _validator.ValidateAsync(await SignAsync(payload))).ShouldBeNull();
+        _logger.Entries.ShouldContain(entry => entry.Level == LogLevel.Information && entry.Message.Contains("its subject_client_id is not a client id"));
     }
 
     // The person's sign-in time the exchange copied reaches the API as an auth_time claim, for its step-up (424-264).

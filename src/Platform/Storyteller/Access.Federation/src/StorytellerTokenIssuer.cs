@@ -70,7 +70,8 @@ public class StorytellerTokenIssuer
     }
 
     // A user token: sub the account, token_use "user", act { sub: the actor }, client_id the actor, the scope and the
-    // restrictions. It lives MaxLifetime, never past NotAfter (the subject token's exp), in whole seconds.
+    // restrictions, and subject_client_id when the subject token named a client. It lives MaxLifetime, never past
+    // NotAfter (the subject token's exp), in whole seconds.
     // TokenSigningKeyUnavailableException when no signing key is stored and none may be created; ArgumentException
     // when NotAfter leaves less than a second.
     public async Task<StorytellerToken> IssueUserAsync(StorytellerUserTokenRequest request)
@@ -107,6 +108,11 @@ public class StorytellerTokenIssuer
         if (request.AuthTime is { } authTime)
         {
             claims[StorytellerTokenClaims.AuthTime] = authTime.ToUnixTimeSeconds();
+        }
+
+        if (request.SubjectClientId is { } subjectClientId)
+        {
+            claims[StorytellerTokenClaims.SubjectClientId] = subjectClientId;
         }
 
         var token = _handler.CreateToken(new SecurityTokenDescriptor

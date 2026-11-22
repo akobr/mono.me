@@ -34,8 +34,9 @@ public class AccessAuditCoreRecordTests(Startup startup)
     // One organization per run of the class, so a reused emulator never mixes runs; every test has a project of its own.
     private static readonly string Organization = $"aud-core-{Guid.NewGuid().ToString("N")[..8]}";
 
-    // The owner acting through the MCP server, as GetAccessCaller builds it from a Storyteller user token.
-    private static readonly AccessCaller ViaMcp = new(AuditActor.Account(OwnerId, "Ada") with { Via = "mcp" }) { CorrelationId = "corr-1" };
+    // The owner acting through the MCP server with a client app, as GetAccessCaller builds it from a Storyteller user token
+    // whose subject token named the client; the records keep both.
+    private static readonly AccessCaller ViaMcp = new(AuditActor.Account(OwnerId, "Ada") with { Via = "mcp", ViaClient = "https://claude.ai/oauth/mcp-oauth-client-metadata" }) { CorrelationId = "corr-1" };
 
     private static readonly AccessCaller Owner = AccessCaller.Account(OwnerId, "Owner");
 
@@ -358,7 +359,7 @@ public class AccessAuditCoreRecordTests(Startup startup)
     public async Task KeyValuePolicy_ThroughThePolicyService_RecordsTheKeyValueCaller()
     {
         var pointKey = await CreateProjectAsync();
-        var actor = AuditActor.Account("kv-admin", "Admin") with { Via = "mcp" };
+        var actor = AuditActor.Account("kv-admin", "Admin") with { Via = "mcp", ViaClient = "client_01JDQ8Z7Y4K3M2N1P0R9S8T7V6" };
         var caller = KeyValueCaller.WithSecrets(actor) with { CorrelationId = "corr-kv" };
 
         var added = await AddedAsync(pointKey, () => Context.Services.GetRequiredService<IKeyValuePolicyService>()

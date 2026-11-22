@@ -178,10 +178,43 @@ public class HttpRequestDataExtensionsTests
         actor.Kind.ShouldBe(AuditActorKind.Account);
     }
 
+    // The client app the person used with the actor goes with Via.
+    [Fact]
+    public void GetAuditActor_UserThroughAnActorWithAClient_IsTheAccountViaTheActorAndTheClient()
+    {
+        var request = TestRequests.DelegatedUser(client: TestRequests.ClientId);
+
+        request.TryGetDelegatedClient(out var clientId).ShouldBeTrue();
+        clientId.ShouldBe(TestRequests.ClientId);
+        request.GetAuditActor().ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada") with { Via = TestRequests.ActorId, ViaClient = TestRequests.ClientId });
+    }
+
+    // A token whose subject token named no client (or one issued before the claim): Via alone.
+    [Fact]
+    public void GetAuditActor_UserThroughAnActorWithoutAClient_HasNoViaClient()
+    {
+        var request = TestRequests.DelegatedUser();
+
+        request.TryGetDelegatedClient(out var clientId).ShouldBeFalse();
+        clientId.ShouldBeNull();
+        request.GetAuditActor().ViaClient.ShouldBeNull();
+    }
+
+    // Only the delegation gives a client: an item without an actor is not one, and a direct call has none.
+    [Fact]
+    public void GetAuditActor_ClientWithoutAnActor_HasNoViaClient()
+    {
+        var request = TestRequests.User();
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedClient] = TestRequests.ClientId;
+
+        request.GetAuditActor().ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada"));
+    }
+
     [Fact]
     public void GetAuditActor_DirectUser_HasNoVia()
     {
         TestRequests.User().GetAuditActor().ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada"));
+        TestRequests.User().TryGetDelegatedClient(out _).ShouldBeFalse();
     }
 
     // The caller of an access change: the audit actor, and the invocation id as the correlation id of its record.
@@ -201,6 +234,15 @@ public class HttpRequestDataExtensionsTests
     }
 
     [Fact]
+    public void GetAccessCaller_UserThroughAnActorWithAClient_CarriesTheClient()
+    {
+        var caller = TestRequests.DelegatedUser(client: TestRequests.ClientId).GetAccessCaller();
+
+        caller.Actor.ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada") with { Via = TestRequests.ActorId, ViaClient = TestRequests.ClientId });
+        caller.CorrelationId.ShouldBe("invocation");
+    }
+
+    [Fact]
     public void GetAccessCaller_Machine_IsTheMachine()
     {
         TestRequests.Machine().GetAccessCaller().ShouldBe(new AccessCaller(AuditActor.Machine(TestRequests.MachineId)) { CorrelationId = "invocation" });
@@ -214,6 +256,15 @@ public class HttpRequestDataExtensionsTests
 
         rights.Caller.Actor.ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada") with { Via = TestRequests.ActorId });
         rights.Caller.Channel.ShouldBe(KeyValueChannel.User);
+    }
+
+    // The key/value audit and its binding reads record the client too.
+    [Fact]
+    public async Task GetSecretRights_UserThroughAnActorWithAClient_CallerCarriesTheClient()
+    {
+        var rights = await TestRequests.DelegatedUser(client: TestRequests.ClientId).GetSecretRightsAsync(new RoleAccess(AccountRole.ContributorWithSecrets), new FixedKeyValuePolicies(), "acme", "web");
+
+        rights.Caller.Actor.ViaClient.ShouldBe(TestRequests.ClientId);
     }
 
     // The token of a user acting through an actor carries User.Impersonation (scp), so the user checks pass in every build.

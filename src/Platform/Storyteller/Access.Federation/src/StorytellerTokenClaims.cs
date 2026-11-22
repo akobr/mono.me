@@ -28,4 +28,9 @@ public static class StorytellerTokenClaims
 
     // When the person signed in, in Unix seconds, when the subject token said so.
     public const string AuthTime = "auth_time";
+
+    // The client the subject token was issued to (its azp, appid or client_id), when it named one. Not client_id, which
+    // names the actor that requested the token (RFC 8693 section 4.3, RFC 9068), and not a nested act, which is only
+    // informational (RFC 8693 section 4.1).
+    public const string SubjectClientId = "subject_client_id";
 }

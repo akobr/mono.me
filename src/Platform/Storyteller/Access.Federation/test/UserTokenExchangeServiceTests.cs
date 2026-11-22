@@ -98,6 +98,7 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         token.GetPayloadValue<string>("token_use").ShouldBe("user");
         token.GetPayloadValue<string>("scope").ShouldBe(UserScopes.Impersonation);
         token.GetPayloadValue<string>("client_id").ShouldBe(ActorId);
+        token.GetPayloadValue<string>("subject_client_id").ShouldBe(ClientId);
         token.GetPayloadValue<long>("auth_time").ShouldBe(_time.GetUtcNow().ToUnixTimeSeconds() - 300);
         token.TryGetPayloadValue<string>("actort", out _).ShouldBeFalse();
         token.TryGetPayloadValue<string>("organization", out _).ShouldBeFalse();
@@ -158,6 +159,105 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         var delegation = validated.Delegation.ShouldNotBeNull();
         delegation.ActorId.ShouldBe(ActorId);
         delegation.Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);
+        delegation.ClientId.ShouldBe(ClientId);
+    }
+
+    // A subject token that names no client gives a token without subject_client_id, and the logs say so.
+    [Fact]
+    public async Task SubjectTokenWithoutAClient_IsExchanged_WithoutASubjectClientId()
+    {
+        _subjects.Result = Subject(clientId: null);
+
+        var result = await _exchange.ExchangeAsync(Request());
+
+        result.Succeeded.ShouldBeTrue();
+        Payload(new JsonWebToken(result.AccessToken)).TryGetProperty("subject_client_id", out _).ShouldBeFalse();
+        _logger.Entries.ShouldContain(entry => entry.Message == $"The actor {ActorId} exchanged a user token of the account {AccountId} (client (none)) for 600 seconds");
+    }
+
+    // A CIMD client's URL, and an id at the limit ("256"), are recorded as they are.
+    [Theory]
+    [InlineData("https://claude.ai/oauth/mcp-oauth-client-metadata")]
+    [InlineData("256")]
+    public async Task SubjectTokenWithARecordableClientId_IsExchanged_WithIt(string client)
+    {
+        var clientId = client == "256" ? new string('c', 256) : client;
+        _subjects.Result = Subject(clientId: clientId);
+
+        var result = await _exchange.ExchangeAsync(Request());
+
+        result.Succeeded.ShouldBeTrue();
+        new JsonWebToken(result.AccessToken).GetPayloadValue<string>("subject_client_id").ShouldBe(clientId);
+    }
+
+    // The client id goes into the token, the audit and the logs: one that is too long, or has a character outside
+    // printable ASCII, is refused as a subject that is not accepted, before the account is read, and is not logged ("257"
+    // stands for 257 characters).
+    [Theory]
+    [InlineData("257")]
+    [InlineData("")]
+    [InlineData(" client_01")]
+    [InlineData("client 01")]
+    [InlineData("client_01\n")]
+    [InlineData("client_‮01")]
+    [InlineData("client_​01")]
+    [InlineData("clіent_01")]
+    public async Task SubjectTokenWithAClientIdThatCannotBeRecorded_IsInvalidGrant_AndTheValueIsNotLogged(string client)
+    {
+        var clientId = client == "257" ? new string('c', 257) : client;
+        _subjects.Result = Subject(clientId: clientId);
+
+        ShouldBeRefused(await _exchange.ExchangeAsync(Request()), OAuthTokenExchange.Errors.InvalidGrant, UserTokenExchangeResult.SubjectNotAcceptedDescription);
+
+        _access.Verify(service => service.GetAccountAsync(It.IsAny<string>()), Times.Never);
+        _signingKeys.Creates.ShouldBe(0);
+        var entry = _logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(Microsoft.Extensions.Logging.LogLevel.Information);
+        entry.Message.ShouldBe($"A user token exchange by the actor {ActorId} is refused: the subject token's client id is not 1 to 256 printable ASCII characters");
+    }
+
+    // Every log line after the subject token is accepted names its client.
+    [Fact]
+    public async Task Logs_AfterTheSubjectToken_NameTheClient()
+    {
+        _exchangeOptions.Actors[0].Scopes = [UserScopes.Impersonation];
+        _subjects.Result = Subject(expiresAt: _time.GetUtcNow().AddSeconds(1));
+        await _exchange.ExchangeAsync(Request());
+
+        _subjects.Result = Subject(accountId: "user_unregistered");
+        await _exchange.ExchangeAsync(Request());
+
+        _subjects.Result = Subject();
+        await _exchange.ExchangeAsync(Request() with { Scope = "User.Impersonation Annotation.Read" });
+        await _exchange.ExchangeAsync(Request() with { Scope = "Annotation.Read" });
+
+        _exchangeOptions.MaxExchangesPerSubjectTokenPerMinute = 2;
+        await _exchange.ExchangeAsync(Request());
+
+        _logger.Entries.Select(entry => entry.Message).ShouldBe(
+        [
+            $"A user token exchange by the actor {ActorId} is refused: the subject token of the client {ClientId} expires within 5 seconds",
+            $"A user token exchange by the actor {ActorId} (client {ClientId}) is refused: no account user_unregistered exists",
+            $"A user token exchange by the actor {ActorId} (client {ClientId}) drops the requested scopes Annotation.Read: they are not in the actor's Scopes",
+            $"The actor {ActorId} exchanged a user token of the account {AccountId} (client {ClientId}) for 600 seconds",
+            $"A user token exchange by the actor {ActorId} (client {ClientId}) drops the requested scopes Annotation.Read: they are not in the actor's Scopes",
+            $"A user token exchange by the actor {ActorId} (client {ClientId}) is refused: the granted scope would not contain User.Impersonation",
+            $"A user token exchange by the actor {ActorId} (client {ClientId}) is refused: the subject token was exchanged 2 times within a minute",
+        ]);
+    }
+
+    // A long client id is shortened in the logs, so it cannot flood them.
+    [Fact]
+    public async Task Logs_ShortenALongClientId()
+    {
+        var clientId = new string('c', 256);
+        var shortened = $"(client {new string('c', 64)}…)";
+        _subjects.Result = Subject(clientId: clientId);
+
+        (await _exchange.ExchangeAsync(Request())).Succeeded.ShouldBeTrue();
+
+        _logger.Entries.ShouldContain(entry => entry.Message.Contains(shortened));
+        _logger.Entries.ShouldNotContain(entry => entry.Message.Contains(clientId));
     }
 
     [Fact]
@@ -470,7 +570,7 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
 
         var entry = entries.ShouldHaveSingleItem();
         entry.Level.ShouldBe(Microsoft.Extensions.Logging.LogLevel.Information);
-        entry.Message.ShouldBe($"A user token exchange by the actor {ActorId} drops the requested scopes {dropped}: they are not in the actor's Scopes");
+        entry.Message.ShouldBe($"A user token exchange by the actor {ActorId} (client {ClientId}) drops the requested scopes {dropped}: they are not in the actor's Scopes");
     }
 
     [Theory]
@@ -603,12 +703,13 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         string accountId = AccountId,
         DateTimeOffset? expiresAt = null,
         string? tokenId = "jti-1",
-        IReadOnlyList<Claim>? claims = null)
+        IReadOnlyList<Claim>? claims = null,
+        string? clientId = ClientId)
     {
         var now = _time.GetUtcNow();
         return UserSubjectTokenResult.Accepted(
             accountId,
-            ClientId,
+            clientId,
             expiresAt ?? now.AddHours(1),
             DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds() - 300),
             tokenId,
