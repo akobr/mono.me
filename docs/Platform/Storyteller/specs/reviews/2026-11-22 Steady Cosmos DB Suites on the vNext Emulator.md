@@ -80,7 +80,14 @@ Locally (Docker Desktop, 8 CPUs, 11.7 GB; `STORYTELLER_TESTS_USE_CONTAINER=true`
 
 After the run each of the three emulator containers still had `postgresql-16.15-1.azl3`, with "Nothing to do. Package updates completed" in its update log.
 
-In CI, the check of the acceptance criteria is the run by hand [44970544370](https://github.com/akobr/mono.me/actions/runs/44970544370) (`vnext_runs=10`, `classic=false`) on `cbace0cb7`, the last commit of the code; its result and the pull request's own run are added below when they finish.
+In CI, on 2026-11-22:
+
+| Run | Commit | Result |
+| --- | --- | --- |
+| [44970544370](https://github.com/akobr/mono.me/actions/runs/44970544370), by hand, `vnext_runs=10`, `classic=false` | `cbace0cb7`, the last commit of the code | **10 of 10 vNext jobs green**, run at once on ten runners, 18–27 min each; `Classic emulator` skipped |
+| [44970706932](https://github.com/akobr/mono.me/actions/runs/44970706932), the pull request ([#211](https://github.com/akobr/mono.me/pull/211)) | `f105607aa` (this review's first version, same code) | `vNext emulator` green (25 min), `Classic emulator` green; the check keeps its name `vNext emulator` |
+
+So the acceptance criterion of ten green runs of the vNext job on an unchanged commit holds, as ten runs at once rather than one after another (each on its own runner, as a run of the job always is). None of the 11 jobs failed a step on `$GITHUB_ENV`.
 
 A review of the branch by three independent reviewers (the workflow, the test code, the versioning and the docs), each finding checked by a skeptic, confirmed two defects of the branch, both fixed: the `if` of the classic job in a call (section 7) and the wording of the no-retry claim (section 5). Two findings were outside this change and are follow-ups below.
 
