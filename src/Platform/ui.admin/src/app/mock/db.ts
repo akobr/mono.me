@@ -221,7 +221,7 @@ export function createSeed(scenario: MockScenario): MockDb {
         "Northwind's customer portal. A small catalog of customers and their responsibilities per context.",
       ),
       // The exhibition (424-267), under the names production will use. The user is no member of it in any scenario:
-      // they join it as a Reader, in onboarding.
+      // they join it as a Reader, in onboarding or on Organizations (424-271).
       exhibition: accessPoint('exhibition', { user_01MOCKGRACE: 'Owner' }),
       'exhibition.exhibition': accessPoint(
         'exhibition.exhibition',

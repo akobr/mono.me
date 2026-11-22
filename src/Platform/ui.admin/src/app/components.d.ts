@@ -70,6 +70,7 @@ declare module 'vue' {
     EmptyState: typeof import('./components/common/EmptyState.vue')['default']
     EnumControl: typeof import('./components/configuration/renderers/EnumControl.vue')['default']
     ErrorState: typeof import('./components/common/ErrorState.vue')['default']
+    ExhibitionOfferCard: typeof import('./components/orgs/ExhibitionOfferCard.vue')['default']
     ExportPanel: typeof import('./components/transfer/ExportPanel.vue')['default']
     FallbackJsonControl: typeof import('./components/configuration/renderers/FallbackJsonControl.vue')['default']
     FederatedSetupDialog: typeof import('./components/access/FederatedSetupDialog.vue')['default']

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { safeReturnTo } from '@/utils/return-to'
-import { groupMemberships, hasOrganization } from '@/utils/memberships'
+import { groupMemberships, hasOrganization, projectPath, withoutMembership } from '@/utils/memberships'
 import { currentSection, projectTarget, viewLocation, viewTarget } from '@/utils/context-paths'
 import { accessibleContext, buildNavigation, mergeContext, navigationScope } from '@/utils/navigation'
 import { clampDetailWidth, detailMode } from '@/utils/detail-panel'
 import { describeError, errorMessage, formatWindow, stepUpText, writeFailureTitle } from '@/utils/errors'
-import { StorytellerError } from '@42for.net/2splatform.sdk'
+import { StorytellerError, type Account } from '@42for.net/2splatform.sdk'
 
 describe('safeReturnTo', () => {
   it.each([
@@ -51,6 +51,23 @@ describe('memberships', () => {
     expect(hasOrganization(accessMap, 'northwind')).toBe(true)
     expect(hasOrganization(accessMap, 'north')).toBe(false)
     expect(hasOrganization(undefined, 'acme')).toBe(false)
+  })
+
+  it('opens a project at the annotations of its default view', () => {
+    expect(projectPath('exhibition', 'exhibition')).toBe('/exhibition/exhibition/default/annotations')
+  })
+
+  it('drops one membership of an account and keeps the rest', () => {
+    const account: Account = { Id: 'user_1', Name: 'Ada', AccessMap: { acme: 'Owner', 'acme.shipping': 'Contributor' } }
+
+    expect(withoutMembership(account, 'acme.shipping')).toEqual({
+      Id: 'user_1',
+      Name: 'Ada',
+      AccessMap: { acme: 'Owner' },
+    })
+    expect(withoutMembership({ Id: 'user_1' }, 'acme.shipping')).toEqual({ Id: 'user_1', AccessMap: {} })
+    // the account itself stays as it was
+    expect(account.AccessMap).toHaveProperty(['acme.shipping'], 'Contributor')
   })
 })
 
@@ -336,7 +353,8 @@ describe('describeError', () => {
 
     expect(describeError(stepUp)).toEqual({
       title: 'Sign in again to continue',
-      message: 'For your security, this needs a recent sign-in. Sign in again, then repeat it. A sign-in counts for 10 minutes.',
+      message:
+        'For your security, this needs a recent sign-in. Sign in again, then repeat it. A sign-in counts for 10 minutes.',
       status: 401,
     })
     expect(errorMessage(stepUp)).toBe(describeError(stepUp).message)

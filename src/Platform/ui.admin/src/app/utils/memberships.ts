@@ -1,4 +1,4 @@
-import { roleRank, type AccountRoleName } from '@42for.net/2splatform.sdk'
+import { roleRank, type Account, type AccountRoleName } from '@42for.net/2splatform.sdk'
 
 export interface ProjectMembership {
   org: string
@@ -51,4 +51,13 @@ export function groupMemberships(accessMap: Record<string, string> | undefined |
 /** True when the user has any membership in the organization: its access point or one of its projects. */
 export function hasOrganization(accessMap: Record<string, string> | undefined | null, org: string): boolean {
   return Object.keys(accessMap ?? {}).some((key) => key === org || key.startsWith(`${org}.`))
+}
+
+/** The address that opens a project: the annotations of its default view. */
+export const projectPath = (organization: string, project: string) => `/${organization}/${project}/default/annotations`
+
+/** The account without its membership of the access point: what it is once the member left it (424-271). */
+export function withoutMembership(account: Account, accessPointKey: string): Account {
+  const { [accessPointKey]: _left, ...rest } = account.AccessMap ?? {}
+  return { ...account, AccessMap: rest }
 }

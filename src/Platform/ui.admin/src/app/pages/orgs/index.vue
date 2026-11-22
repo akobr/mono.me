@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useExhibition, useJoinExhibition } from '@/composables/useExhibition'
 import { useSessionStore } from '@/stores/session'
 import { groupMemberships } from '@/utils/memberships'
 
 const session = useSessionStore()
 const organizations = computed(() => groupMemberships(session.accessMap))
 const creating = ref(false)
+
+// The exhibition for a user who is no member of it (424-271): the last card of the grid, below the empty state when the
+// user has no organization.
+const exhibition = useExhibition()
+const { offered } = exhibition
+const { joining, join } = useJoinExhibition(exhibition)
 </script>
 
 <template>
@@ -34,7 +41,11 @@ const creating = ref(false)
         <UButton label="New organization" icon="i-lucide-plus" @click="creating = true" />
       </EmptyState>
 
-      <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div
+        v-if="organizations.length > 0 || offered"
+        class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+        :class="{ 'mt-6': organizations.length === 0 }"
+      >
         <UCard v-for="organization in organizations" :key="organization.name" :ui="{ body: 'p-0 sm:p-0' }">
           <template #header>
             <div class="flex items-center justify-between gap-2">
@@ -67,6 +78,7 @@ const creating = ref(false)
             </li>
           </ul>
         </UCard>
+        <ExhibitionOfferCard v-if="offered" :joining="joining" @join="join" />
       </div>
 
       <OrganizationCreateDialog v-model:open="creating" />
