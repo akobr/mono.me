@@ -1,10 +1,11 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
-import { http } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { deleteAnnotation, getAnnotation, setAnnotation, type Annotation } from '@42for.net/2splatform.sdk'
 import { useAnnotationActions } from '@/composables/useAnnotationActions'
+import { useContextStore } from '@/stores/context'
 import { mockHandlers } from '@/mock/all-handlers'
 import { useCatalogStore } from '@/stores/catalog'
 import { mountScreen, settle } from '../../helpers'
@@ -25,6 +26,7 @@ interface Recorded {
   key: string
   contentType: string | null
   body: unknown
+  view: string
 }
 
 /** Every write to an annotation's own route; returning nothing lets the mock answer it. */
@@ -36,6 +38,7 @@ function recordWrites(): Recorded[] {
       key: String(params.key),
       contentType: request.headers.get('Content-Type'),
       body: await request.clone().json(),
+      view: String(params.view),
     })
   }
   server.use(http.patch(keyUrl, record), http.post(keyUrl, record))
@@ -94,7 +97,7 @@ describe('useAnnotationActions: bulk edits as PATCH', () => {
     unmount()
   })
 
-  it('adds a label with add /Labels/- guarded by the labels read, and skips a key that has it in any case', async () => {
+  it('adds a label with add /Labels/- guarded by the labels read, and only checks a key that has it in any case', async () => {
     const { actions, unmount } = await actionsOver(async () => {
       await writeElsewhere('sbt.northwind', { Labels: ['eu'] })
       await writeElsewhere('sbt.contoso', { Labels: ['Beta'] })
@@ -103,7 +106,15 @@ describe('useAnnotationActions: bulk edits as PATCH', () => {
 
     await actions.addLabel(['sbt.northwind', 'sbt.contoso'], ' beta ')
 
-    expect(writes).toEqual([
+    expect(writes.toSorted((a, b) => a.key.localeCompare(b.key))).toEqual([
+      {
+        method: 'PATCH',
+        key: 'sbt.contoso',
+        contentType: 'application/json-patch+json',
+        // the catalog's copy may be stale: the guard alone confirms it, and writes nothing
+        body: [{ op: 'test', path: '/Labels', value: ['Beta'] }],
+        view,
+      },
       {
         method: 'PATCH',
         key: 'sbt.northwind',
@@ -112,6 +123,7 @@ describe('useAnnotationActions: bulk edits as PATCH', () => {
           { op: 'test', path: '/Labels', value: ['eu'] },
           { op: 'add', path: '/Labels/-', value: 'beta' },
         ],
+        view,
       },
     ])
     expect((await read('sbt.northwind')).Labels).toEqual(['eu', 'beta'])
@@ -232,6 +244,67 @@ describe('useAnnotationActions: bulk edits as PATCH', () => {
     expect(entry('sbt.contoso')).toBeUndefined()
     expect(actions.progress.value).toBeUndefined()
     await settle()
+    unmount()
+  })
+})
+
+describe('useAnnotationActions: bulk edits against a catalog that moved on', () => {
+  it('adds a label that the catalog shows but someone removed meanwhile', async () => {
+    const { actions, unmount } = await actionsOver(async () => {
+      await writeElsewhere('sbt.northwind', { Labels: ['eu', 'pci'] })
+    })
+    await writeElsewhere('sbt.northwind', { Labels: ['eu'] })
+    const writes = recordWrites()
+
+    await actions.addLabel(['sbt.northwind'], 'pci')
+
+    expect(writes.map((write) => write.body)).toEqual([
+      [{ op: 'test', path: '/Labels', value: ['eu', 'pci'] }],
+      [
+        { op: 'test', path: '/Labels', value: ['eu'] },
+        { op: 'add', path: '/Labels/-', value: 'pci' },
+      ],
+    ])
+    expect((await read('sbt.northwind')).Labels).toEqual(['eu', 'pci'])
+    unmount()
+  })
+
+  it('takes a key deleted before the labels were read again from the catalog', async () => {
+    const { actions, unmount } = await actionsOver(async () => {
+      await writeElsewhere('sbt.northwind', { Labels: ['eu'] })
+    })
+    await writeElsewhere('sbt.northwind', { Labels: ['eu', 'gdpr'] })
+    // the guard fails, and the key is deleted before it is read again: the read answers a bare 404
+    server.use(http.get(keyUrl, () => new HttpResponse(null, { status: 404 })))
+
+    await expect(actions.addLabel(['sbt.northwind'], 'beta')).rejects.toThrow(
+      '1 of 1 annotations were not saved: sbt.northwind',
+    )
+    expect(entry('sbt.northwind')).toBeUndefined()
+    unmount()
+  })
+
+  it('keeps writing to the view it started in when the user moves to another view', async () => {
+    const keys = ['sbt.northwind', 'sbt.contoso', 'sbt.fabrikam', 'sbt.globex', 'sbt.initech', 'sbt.umbrella']
+    const { actions, unmount } = await actionsOver()
+    const present = keys.filter((key) => entry(key))
+    expect(present.length).toBeGreaterThan(4)
+    const writes = recordWrites()
+    // the first write moves the user to another view of the project
+    server.use(
+      http.patch(keyUrl, () => {
+        if (useContextStore().scope?.view === view) {
+          useContextStore().set({ org, project, view: 'staging' })
+        }
+      }),
+    )
+
+    await actions.setDisabled(present, true)
+
+    expect(writes.map((write) => write.view)).toEqual(present.map(() => view))
+    for (const key of present) {
+      expect(await read(key)).toMatchObject({ IsDisabled: true })
+    }
     unmount()
   })
 })
