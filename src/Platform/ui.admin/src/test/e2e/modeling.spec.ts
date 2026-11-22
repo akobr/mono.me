@@ -64,7 +64,7 @@ test('the starter document of a missing schema saves with the shortcut', async (
 // A Reader browses Modeling read-only (424-272); the Reader of northwind/portal has the type schemas of the seed.
 const reader = '/northwind/portal/default/modeling'
 
-test('a reader reads a schema without write actions, and the shortcut saves nothing', async ({ page }) => {
+test('a reader reads a schema without write actions', async ({ page }) => {
   const writes: string[] = []
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname
@@ -94,8 +94,18 @@ test('a reader reads a schema without write actions, and the shortcut saves noth
 })
 
 // Below Contributor nothing creates a missing schema, so the detail says that it does not exist instead of offering
-// the starter document (rst has no type schema in the seed).
-test('a reader gets No schema instead of the starter document of a missing schema', async ({ page }) => {
+// the starter document (rst has no type schema in the seed). The shortcut matters here: for a Contributor it creates
+// the schema from the untouched starter document, for a Reader it must send nothing.
+test('a reader gets No schema instead of the starter document of a missing schema, and the shortcut creates nothing', async ({
+  page,
+}) => {
+  const writes: string[] = []
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (request.method() !== 'GET' && path.startsWith('/api/')) {
+      writes.push(`${request.method()} ${path}`)
+    }
+  })
   await openApp(page, `${reader}/schemas/type/rst`)
   const detail = page.getByRole('region', { name: 'Responsibility schema' })
   await expect(detail.getByRole('heading', { name: 'No schema', exact: true })).toBeVisible()
@@ -103,4 +113,15 @@ test('a reader gets No schema instead of the starter document of a missing schem
   await expect(detail.getByText('This schema does not exist yet', { exact: true })).toHaveCount(0)
   await expect(detail.getByRole('textbox')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Create', exact: true })).toHaveCount(0)
+
+  await detail.getByRole('heading', { name: 'No schema', exact: true }).click()
+  await page.keyboard.press('ControlOrMeta+S')
+  // The versions are read after the shortcut, so a create would have been sent by then.
+  const versions = page.waitForResponse((response) =>
+    /\/configuration-schema\/type\/rst\/versions/.test(response.url()),
+  )
+  await detail.getByRole('tab', { name: 'Versions', exact: true }).click()
+  await versions
+  await expect(page.getByText(/^Schema saved|^The schema was not saved/)).toHaveCount(0)
+  expect(writes).toEqual([])
 })
