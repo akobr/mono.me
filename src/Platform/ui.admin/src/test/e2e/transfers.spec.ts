@@ -218,35 +218,31 @@ test('keeps what the view has with Skip, and shows the result again after a relo
   )
 })
 
-// Modeling is locked below Contributor (424-38), and with it this page.
-test('a reader sees the Modeling lock', async ({ page }) => {
-  await openApp(page, '/northwind/portal/default/modeling/export-import')
+// The export and the import need the Administrator role (424-66). The mock user is a Contributor of acme/shipping and
+// a Reader of northwind/portal, who browses Modeling read-only (424-272): the page keeps the four other tabs of
+// Modeling, with none selected, and shows a lock instead of the sections.
+for (const [role, project] of [
+  ['a contributor', '/acme/shipping'],
+  ['a reader', '/northwind/portal'],
+] as const) {
+  test(`${role} sees the lock of Administrators under the four other tabs`, async ({ page }) => {
+    await openApp(page, `${project}/default/modeling/export-import`)
 
-  await expect(page.getByRole('heading', { name: 'Contributors only' })).toBeVisible()
-  await expect(page.getByRole('tab')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Export', exact: true })).toHaveCount(0)
-  await expect(section(page, 'Export')).toHaveCount(0)
-  await expect(section(page, 'Import')).toHaveCount(0)
-})
+    await expect(page.getByRole('heading', { name: 'Administrators only' })).toBeVisible()
+    await expect(
+      page.getByText("The export and the import of the view are available to the project's Administrators."),
+    ).toBeVisible()
+    await expect(page.getByRole('tab')).toHaveText(['Schemas', 'Templates', 'Deleted', 'Compare views'])
+    await expect(page.getByRole('tab', { selected: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Export', exact: true })).toHaveCount(0)
+    await expect(section(page, 'Export')).toHaveCount(0)
+    await expect(section(page, 'Import')).toHaveCount(0)
 
-// The export and the import need the Administrator role (424-66). The mock user is a Contributor of acme/shipping: the
-// page keeps the four other tabs of Modeling, with none selected, and shows a lock instead of the sections.
-test('a contributor sees the lock of Administrators under the four other tabs', async ({ page }) => {
-  await openApp(page, '/acme/shipping/default/modeling/export-import')
-
-  await expect(page.getByRole('heading', { name: 'Administrators only' })).toBeVisible()
-  await expect(
-    page.getByText("The export and the import of the view are available to the project's Administrators."),
-  ).toBeVisible()
-  await expect(page.getByRole('tab')).toHaveText(['Schemas', 'Templates', 'Deleted', 'Compare views'])
-  await expect(page.getByRole('tab', { selected: true })).toHaveCount(0)
-  await expect(section(page, 'Export')).toHaveCount(0)
-  await expect(section(page, 'Import')).toHaveCount(0)
-
-  await page.getByRole('tab', { name: 'Schemas', exact: true }).click()
-  await expect(page).toHaveURL('/acme/shipping/default/modeling/schemas')
-  await expect(page.getByRole('tab', { name: 'Schemas', exact: true })).toHaveAttribute('aria-selected', 'true')
-})
+    await page.getByRole('tab', { name: 'Schemas', exact: true }).click()
+    await expect(page).toHaveURL(`${project}/default/modeling/schemas`)
+    await expect(page.getByRole('tab', { name: 'Schemas', exact: true })).toHaveAttribute('aria-selected', 'true')
+  })
+}
 
 test('a file that is not a zip is refused by the import', async ({ page }, testInfo) => {
   test.skip(isMobile(testInfo), 'One run is enough.')

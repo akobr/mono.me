@@ -67,6 +67,25 @@ test('a reader sees Annotation on a configuration', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Annotation', exact: true })).toBeVisible()
 })
 
+// A Reader browses Modeling read-only (424-272), so the template of the composition and the schemas of the Schema tab
+// link there for a Reader too. The execution has its own configuration in the seed of northwind/portal.
+test('a reader follows the template of the composition and a schema of the Schema tab into Modeling', async ({
+  page,
+}) => {
+  const reader = '/northwind/portal/default/configurations/exe.northwind.notifications.prod'
+  await openApp(page, `${reader}/effective?show=composition`)
+  const template = page.getByRole('link', { name: 'Template · Execution', exact: true })
+  await expect(template).toHaveAttribute('href', '/northwind/portal/default/modeling/templates/exe')
+  await template.click()
+  await expect(page.getByRole('region', { name: 'Execution template' })).toBeVisible()
+
+  await goto(page, `${reader}/schema`)
+  const schema = page.getByRole('link', { name: 'Execution', exact: true })
+  await expect(schema).toHaveAttribute('href', '/northwind/portal/default/modeling/schemas/type/exe')
+  await schema.click()
+  await expect(page.getByRole('region', { name: 'Execution schema' })).toBeVisible()
+})
+
 test('a dirty configuration asks before Annotation opens', async ({ page }) => {
   await openFromTemplate(page)
   await editJson(page, (content) => {

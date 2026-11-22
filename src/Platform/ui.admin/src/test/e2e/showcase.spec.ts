@@ -89,8 +89,34 @@ test('lets Ada only read the clinical integrations', async ({ page }, testInfo) 
     page.getByRole('button', { name: isMobile(testInfo) ? 'New annotation' : 'New', exact: true }),
   ).toHaveCount(0)
 
-  await goto(page, '/meridian-health/clinical-integrations/default/modeling')
-  await expect(page.getByRole('heading', { name: 'Contributors only' })).toBeVisible()
+  // Modeling opens read-only (424-272): the tabs of a Contributor, nothing to create.
+  const modeling = '/meridian-health/clinical-integrations/default/modeling'
+  await goto(page, modeling)
+  await expect(page).toHaveURL(`${modeling}/schemas`)
+  await expect(page.getByRole('tab')).toHaveText(['Schemas', 'Templates', 'Deleted', 'Compare views'])
+  await expect(page.getByRole('button', { name: 'New schema' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Contributors only' })).toHaveCount(0)
+
+  // The seeded deletions are listed without a selection, and their menus only show the details.
+  await goto(page, `${modeling}/deleted`)
+  for (const key of ['cnt.northgate.urgent-care-annex', 'uxe.riverside.billing-claims.radiology.claims-batch']) {
+    await expect(page.getByRole('row').filter({ hasText: key })).toBeVisible()
+  }
+  await expect(page.getByRole('checkbox')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Actions for cnt.northgate.urgent-care-annex' }).click()
+  await expect(page.getByRole('menuitem')).toHaveText(['Show details'])
+  await page.getByRole('menuitem', { name: 'Show details' }).click()
+  await expect(page.getByRole('dialog', { name: 'cnt.northgate.urgent-care-annex' })).toBeVisible()
+
+  // The five views of the project: a Reader compares them too.
+  await goto(page, '/meridian-health/clinical-integrations/views')
+  await page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('link', { name: 'staging', exact: true }) })
+    .getByRole('link', { name: 'Compare' })
+    .click()
+  await expect(page).toHaveURL(`${modeling}/compare?to=staging`)
+  await expect(page.getByRole('tab', { name: 'Compare views', exact: true })).toHaveAttribute('aria-selected', 'true')
 })
 
 test('the annotations of a showcase project have no serious accessibility violations', async ({ page }, testInfo) => {

@@ -229,8 +229,8 @@ for (const moved of movedPages) {
 }
 
 // The View section after 424-38: Templates, Schemas, Export & Import, Deleted and Compare views are the tabs of
-// Modeling. Every role sees the entry; a Reader sees it with the lock.
-test('lists Modeling in the View section of every role, locked for a reader', async ({ page }, testInfo) => {
+// Modeling. Every role sees the entry; a Reader sees it with the read-only lock of Annotations (424-272).
+test('lists Modeling in the View section of every role, read-only for a reader', async ({ page }, testInfo) => {
   const moved = ['templates', 'schemas', 'compare', 'export-import', 'deleted']
 
   for (const [project, locked] of [
@@ -257,6 +257,14 @@ test('lists Modeling in the View section of every role, locked for a reader', as
     if (isMobile(testInfo)) {
       await page.keyboard.press('Escape')
     }
+  }
+
+  // The icon rail describes the lock with the tooltip of the other read-only entries; a phone has no rail.
+  if (!isMobile(testInfo)) {
+    await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
+    const rail = page.locator('a[href="/northwind/portal/default/modeling"]')
+    await rail.hover()
+    await expect(rail).toHaveAccessibleDescription('Read-only for your role')
   }
 })
 
@@ -437,22 +445,68 @@ test('a contributor gets the tabs of Modeling without Export & Import', async ({
   await expect(page.getByRole('option', { name: /^Export & Import/ })).toHaveCount(1)
 })
 
-// Modeling is closed below Contributor (424-38): the Reader of northwind/portal gets the lock on every tab and detail.
-test('a reader gets the lock of Modeling instead of its tabs', async ({ page }) => {
+// A Reader browses Modeling read-only (424-272): the Reader of northwind/portal gets the four tabs of a Contributor,
+// documents without write actions, and the lock of Administrators on Export & Import. The project has one view.
+test('a reader browses the tabs of Modeling read-only', async ({ page }) => {
   const base = '/northwind/portal/default/modeling'
+  const tabs = ['Schemas', 'Templates', 'Deleted', 'Compare views']
   // Modeling opens on Schemas for a Reader too.
   await openApp(page, base)
   await expect.poll(() => relativeUrl(page)).toBe(`${base}/schemas`)
+  await expect(page.getByRole('tab')).toHaveText(tabs)
+  await expect(modelingTab(page, 'Schemas')).toHaveAttribute('aria-selected', 'true')
+  await expect(modelingTab(page, 'Compare views')).toBeDisabled()
+  await expect(page.getByRole('link', { name: 'Execution', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New schema' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Contributors only' })).toHaveCount(0)
 
-  for (const path of ['schemas', 'templates/exe', 'export-import', 'deleted', 'compare']) {
-    if (path !== 'schemas') {
-      await goto(page, `${base}/${path}`)
-    }
-    await expect(page.getByRole('heading', { name: 'Contributors only' })).toBeVisible()
-    await expect(page.getByRole('tab')).toHaveCount(0)
-    // no tab page is mounted, so neither is a detail
-    await expect(page.getByRole('region', { name: 'Execution template' })).toHaveCount(0)
+  // the document, read-only, with the badge that says so and without the footer
+  await goto(page, `${base}/templates/exe`)
+  const detail = page.getByRole('region', { name: 'Execution template' })
+  await expect(detail.getByRole('textbox', { name: 'Template', exact: true })).toContainText('"retries"')
+  await expect(detail.getByRole('textbox', { name: 'Template', exact: true })).not.toBeEditable()
+  await expect(detail.getByText('Read-only', { exact: true })).toBeVisible()
+  for (const name of ['Save', 'Revert', 'Delete', 'Create']) {
+    await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
   }
+
+  await goto(page, `${base}/export-import`)
+  await expect(page.getByRole('heading', { name: 'Administrators only' })).toBeVisible()
+  await expect(page.getByRole('tab')).toHaveText(tabs)
+  await expect(page.getByRole('tab', { selected: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Export', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Import', exact: true })).toHaveCount(0)
+
+  await goto(page, `${base}/deleted`)
+  await expect(modelingTab(page, 'Deleted')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('switch', { name: 'Show cascaded' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Nothing is deleted' })).toBeVisible()
+
+  // The tab is off without another view, but its address still opens the page, without a lock.
+  await goto(page, `${base}/compare`)
+  await expect(modelingTab(page, 'Compare views')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('heading', { name: 'No other view to compare with' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Contributors only' })).toHaveCount(0)
+})
+
+// A locked entry is read-only, not closed, so the command palette lists the tabs of a Reader's Modeling (424-272):
+// the four of a Contributor, without Export & Import.
+test('the command palette of a reader lists the tabs of Modeling without Export & Import', async ({ page }) => {
+  await openApp(page, '/northwind/portal/default/graph')
+  const palette = page.getByPlaceholder('Search annotations, pages, projects and actions…')
+  await page.getByRole('button', { name: 'Search…' }).click()
+
+  for (const tab of ['Schemas', 'Templates', 'Deleted', 'Compare views']) {
+    await palette.fill(tab)
+    await expect(page.getByRole('option', { name: new RegExp(`^${tab}\\s*Modeling$`) })).toHaveCount(1)
+  }
+  await palette.fill('Export & Import')
+  await expect(page.getByRole('option', { name: /^Export & Import/ })).toHaveCount(0)
+
+  await palette.fill('Templates')
+  await page.getByRole('option', { name: /^Templates\s*Modeling$/ }).click()
+  await expect(page).toHaveURL('/northwind/portal/default/modeling/templates')
+  await expect(modelingTab(page, 'Templates')).toHaveAttribute('aria-selected', 'true')
 })
 
 // A tab change changes the path, so a dirty editor asks first (424-38).

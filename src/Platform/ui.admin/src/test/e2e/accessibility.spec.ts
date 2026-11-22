@@ -85,21 +85,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
-    // A Reader gets the lock of Modeling instead of its tabs (424-38); the lock is checked, not a loading state.
-    test('the locked Modeling page of a reader has no serious accessibility violations', async ({ page }) => {
-      await openApp(page, '/northwind/portal/default/modeling/export-import')
-      await expect(page.getByRole('heading', { name: 'Contributors only' })).toBeVisible()
-      await expect(page.getByRole('tab')).toHaveCount(0)
+    // A Reader browses Modeling read-only (424-272): the template with its Read-only badge and no footer; the document
+    // is checked, not a loading state.
+    test('the read-only template of a reader has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/northwind/portal/default/modeling/templates/exe')
+      const detail = page.getByRole('region', { name: 'Execution template' })
+      await expect(detail.getByRole('textbox', { name: 'Template', exact: true })).toContainText('"retries"')
+      await expect(detail.getByText('Read-only', { exact: true })).toBeVisible()
       await expectAccessible(page)
     })
 
-    // A Contributor gets the lock of Administrators on Export & Import (424-66), under the tabs, none of them selected.
-    test('the Export & Import lock of a contributor has no serious accessibility violations', async ({ page }) => {
-      await openApp(page, '/acme/shipping/default/modeling/export-import')
-      await expect(page.getByRole('heading', { name: 'Administrators only' })).toBeVisible()
-      await expect(page.getByRole('tab')).toHaveCount(4)
-      await expectAccessible(page)
-    })
+    // A Contributor and a Reader get the lock of Administrators on Export & Import (424-66, 424-272), under the tabs,
+    // none of them selected.
+    for (const [role, project] of [
+      ['a contributor', '/acme/shipping'],
+      ['a reader', '/northwind/portal'],
+    ] as const) {
+      test(`the Export & Import lock of ${role} has no serious accessibility violations`, async ({ page }) => {
+        await openApp(page, `${project}/default/modeling/export-import`)
+        await expect(page.getByRole('heading', { name: 'Administrators only' })).toBeVisible()
+        await expect(page.getByRole('tab')).toHaveCount(4)
+        await expectAccessible(page)
+      })
+    }
 
     // The onboarding wizard (424-267), each step by its address; the step is checked, not the loading state before it.
     for (const [name, path, heading] of [

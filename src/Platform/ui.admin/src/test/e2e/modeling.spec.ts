@@ -60,3 +60,47 @@ test('the starter document of a missing schema saves with the shortcut', async (
   await expect(page.getByText('Schema saved (v1)', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeVisible()
 })
+
+// A Reader browses Modeling read-only (424-272); the Reader of northwind/portal has the type schemas of the seed.
+const reader = '/northwind/portal/default/modeling'
+
+test('a reader reads a schema without write actions, and the shortcut saves nothing', async ({ page }) => {
+  const writes: string[] = []
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (request.method() !== 'GET' && path.startsWith('/api/')) {
+      writes.push(`${request.method()} ${path}`)
+    }
+  })
+  await openApp(page, `${reader}/schemas/type/exe`)
+  const detail = page.getByRole('region', { name: 'Execution schema' })
+  const editor = detail.getByRole('textbox', { name: 'Schema document', exact: true })
+  await expect(editor).toContainText('"properties"')
+  await expect(editor).not.toBeEditable()
+  await expect(detail.getByText('Read-only', { exact: true })).toBeVisible()
+  for (const name of ['Save', 'Create', 'Revert', 'Delete']) {
+    await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+  }
+
+  // The editor takes no focus, so the shortcut reaches the page, which saves only for Contributors.
+  await editor.click()
+  await page.keyboard.press('ControlOrMeta+S')
+  // The versions load after it, so a save would have been sent by then; a Reader restores none of them.
+  await detail.getByRole('tab', { name: 'Versions', exact: true }).click()
+  await expect(detail.getByRole('button', { name: 'Compare', exact: true })).toBeVisible()
+  await expect(detail.getByRole('button', { name: /^Restore/ })).toHaveCount(0)
+  await expect(page.getByText(/^Schema saved|^The schema was not saved/)).toHaveCount(0)
+  expect(writes).toEqual([])
+})
+
+// Below Contributor nothing creates a missing schema, so the detail says that it does not exist instead of offering
+// the starter document (rst has no type schema in the seed).
+test('a reader gets No schema instead of the starter document of a missing schema', async ({ page }) => {
+  await openApp(page, `${reader}/schemas/type/rst`)
+  const detail = page.getByRole('region', { name: 'Responsibility schema' })
+  await expect(detail.getByRole('heading', { name: 'No schema', exact: true })).toBeVisible()
+  await expect(detail.getByText('This schema does not exist in this view, so it validates nothing.')).toBeVisible()
+  await expect(detail.getByText('This schema does not exist yet', { exact: true })).toHaveCount(0)
+  await expect(detail.getByRole('textbox')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Create', exact: true })).toHaveCount(0)
+})
