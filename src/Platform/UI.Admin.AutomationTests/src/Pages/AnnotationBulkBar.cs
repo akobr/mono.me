@@ -8,10 +8,12 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // The bulk bar of the annotations grid (components/annotations/AnnotationBulkBar.vue): the toolbar "Bulk actions" above
 // the grid while one or more rows are checked, Contributors and up, on the grid only (from 768 px; the phone list has
 // no checkboxes). "<n> selected", then Enable, Disable, Label (a popover with the input "Label", which suggests the
-// catalog's labels and offers 'Create "<text>"' for a new one, and Remove and Add), Delete (the confirmation "Delete
-// <n> annotations?" with "Delete <n>", no singular form) and "Clear selection". Every successful action shows its toast
-// ("Annotations disabled", "Annotations enabled", "Label <l> added", "Label <l> removed", "<n> annotations deleted" with
-// Undo for 10 seconds) and clears the selection, which removes the bar.
+// catalog's labels and offers 'Create "<text>"' for a new one, and Remove and Add), "Compare with view" (opens the
+// comparison of the selected annotations with another view, below Compare views of Modeling, and keeps the selection;
+// disabled, with the reason beside it, in a project without another view and above 100 rows), Delete (the confirmation
+// "Delete <n> annotations?" with "Delete <n>", no singular form) and "Clear selection". Every other successful action
+// shows its toast ("Annotations disabled", "Annotations enabled", "Label <l> added", "Label <l> removed", "<n>
+// annotations deleted" with Undo for 10 seconds) and clears the selection, which removes the bar.
 public sealed partial class AnnotationBulkBar(App app)
 {
     public ILocator Root => app.Page.GetByRole(AriaRole.Toolbar, new() { Name = "Bulk actions", Exact = true });

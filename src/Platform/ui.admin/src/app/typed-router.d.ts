@@ -285,6 +285,7 @@ declare module 'vue-router/auto-routes' {
       { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | '/[org]/[project]/[view]/modeling/'
       | '/[org]/[project]/[view]/modeling/compare'
+      | '/[org]/[project]/[view]/modeling/compare.selection'
       | '/[org]/[project]/[view]/modeling/deleted'
       | '/[org]/[project]/[view]/modeling/export-import'
       | '/[org]/[project]/[view]/modeling/schemas'
@@ -304,6 +305,13 @@ declare module 'vue-router/auto-routes' {
     '/[org]/[project]/[view]/modeling/compare': RouteRecordInfo<
       '/[org]/[project]/[view]/modeling/compare',
       '/:org/:project/:view/modeling/compare',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/modeling/compare.selection': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/compare.selection',
+      '/:org/:project/:view/modeling/compare/selection',
       { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
       { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
@@ -838,6 +846,7 @@ declare module 'vue-router/auto-routes' {
         | '/[org]/[project]/[view]/modeling'
         | '/[org]/[project]/[view]/modeling/'
         | '/[org]/[project]/[view]/modeling/compare'
+        | '/[org]/[project]/[view]/modeling/compare.selection'
         | '/[org]/[project]/[view]/modeling/deleted'
         | '/[org]/[project]/[view]/modeling/export-import'
         | '/[org]/[project]/[view]/modeling/schemas'
@@ -862,6 +871,14 @@ declare module 'vue-router/auto-routes' {
     'app/pages/[org]/[project]/[view]/modeling/compare.vue': {
       routes:
         | '/[org]/[project]/[view]/modeling/compare'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/modeling/compare.selection.vue': {
+      routes:
+        | '/[org]/[project]/[view]/modeling/compare.selection'
       views:
         | never
       pathParamNames:

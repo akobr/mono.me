@@ -132,7 +132,7 @@ test('the configurations grid shows the type names of the settings', async ({ pa
     return
   }
   const row = page.getByRole('row', { name: /exe\./ }).first()
-  await expect(row.getByRole('cell').first()).toHaveText('Job')
+  await expect(row.getByRole('cell').nth(1)).toHaveText('Job')
   await expect(page.getByRole('cell', { name: 'exe', exact: true })).toHaveCount(0)
 })
 

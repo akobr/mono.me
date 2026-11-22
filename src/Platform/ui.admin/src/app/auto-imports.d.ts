@@ -18,6 +18,7 @@ declare global {
   const defineShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').defineShortcuts
   const extendLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').extendLocale
   const extractShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').extractShortcuts
+  const filtersOf: typeof import('./composables/useViewCompare').filtersOf
   const hasStepUpItems: typeof import('./composables/useStepUp').hasStepUpItems
   const hasUnsavedChanges: typeof import('./composables/useUnsavedChanges').hasUnsavedChanges
   const injectBindingAssist: typeof import('./composables/useBindingAssist').injectBindingAssist
@@ -36,6 +37,7 @@ declare global {
   const shortcutGroups: typeof import('./composables/useShortcutsHelp').shortcutGroups
   const sidebarStorage: typeof import('./composables/useSidebar').sidebarStorage
   const signedInSince: typeof import('./composables/useStepUp').signedInSince
+  const stateOf: typeof import('./composables/useViewCompare').stateOf
   const staticBindingAssist: typeof import('./composables/useBindingAssist').staticBindingAssist
   const typeColorsStyleId: typeof import('./stores/type-appearance').typeColorsStyleId
   const undoKeys: typeof import('./composables/useAnnotationActions').undoKeys
@@ -68,6 +70,7 @@ declare global {
   const useLeaveProject: typeof import('./composables/useLeaveProject').useLeaveProject
   const useNavigationContext: typeof import('./composables/useNavigationContext').useNavigationContext
   const useOnboardingEnd: typeof import('./composables/useOnboardingEnd').useOnboardingEnd
+  const useOtherViews: typeof import('./composables/useOtherViews').useOtherViews
   const useOverlay: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useOverlay').useOverlay
   const usePageMemory: typeof import('./composables/usePageMemory').usePageMemory
   const usePageMemoryStore: typeof import('./stores/page-memory').usePageMemoryStore
@@ -89,6 +92,9 @@ declare global {
   const useTransfersStore: typeof import('./stores/transfers').useTransfersStore
   const useTypeAppearanceStore: typeof import('./stores/type-appearance').useTypeAppearanceStore
   const useUnsavedChanges: typeof import('./composables/useUnsavedChanges').useUnsavedChanges
+  const useViewCompare: typeof import('./composables/useViewCompare').useViewCompare
+  const useViewTransfer: typeof import('./composables/useViewTransfer').useViewTransfer
+  const useViewTransferStore: typeof import('./stores/view-transfer').useViewTransferStore
 }
 // for type re-export
 declare global {
@@ -119,6 +125,9 @@ declare global {
   // @ts-ignore
   export type { StepUpMode, RevealTarget } from './composables/useStepUp'
   import('./composables/useStepUp')
+  // @ts-ignore
+  export type { CompareFile, ViewCompareOptions } from './composables/useViewCompare'
+  import('./composables/useViewCompare')
   // @ts-ignore
   export type { CatalogStatus, CatalogProgress } from './stores/catalog'
   import('./stores/catalog')

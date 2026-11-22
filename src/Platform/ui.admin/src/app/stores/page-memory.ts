@@ -26,6 +26,8 @@ export interface AnnotationsMemory {
 }
 
 export interface ConfigurationsMemory {
+  /** By annotation key; a key that the filter hides stays selected. */
+  selection: RowSelectionState
   scrollTop: number
 }
 
@@ -64,7 +66,7 @@ export interface SectionMemories {
 
 const empty: { [S in RememberedSection]: () => SectionMemories[S] } = {
   annotations: () => ({ expanded: new Set(), selection: {}, sorting: [], scrollTop: 0 }),
-  configurations: () => ({ scrollTop: 0 }),
+  configurations: () => ({ selection: {}, scrollTop: 0 }),
   graph: () => ({ hidden: new Set() }),
   modeling: () => ({}),
 }

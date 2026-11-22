@@ -39,6 +39,8 @@ const canEdit = useCan('edit')
 const toast = useToast()
 const now = useNow({ interval: 60_000 })
 const { copy } = useClipboard({ legacy: true })
+// "Compare with view" for this annotation (spec "Copy and Compare Annotations and Configurations Between Views").
+const transfer = useViewTransfer('annotations', () => [props.annotationKey])
 
 const confirmDelete = ref(false)
 const deleting = ref(false)
@@ -102,6 +104,8 @@ const menu = computed<DropdownMenuItem[][]>(() => [
   ],
   ...(canEdit.value && !props.deleted
     ? [
+        // Another view is compared with what this view has, and a deleted annotation is not in it.
+        transfer.items.value,
         [
           {
             label: 'Delete',

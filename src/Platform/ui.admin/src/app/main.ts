@@ -14,6 +14,9 @@ import { setBootState, type BootState } from './boot/state'
 import { resetTelemetry, startTelemetry } from './boot/telemetry'
 import { createAppRouter } from './router'
 import { onSignOut, useSessionStore } from './stores/session'
+// For its sign-out hook: the keys of a compared selection are in sessionStorage, and after a reload no page that
+// loads the store may have been opened before the sign-out.
+import './stores/view-transfer'
 import { useStepUpStore } from './composables/useStepUp'
 
 // The e2e mode (vite --mode e2e) serves the API from MSW and signs in a fake user. The checks are static,

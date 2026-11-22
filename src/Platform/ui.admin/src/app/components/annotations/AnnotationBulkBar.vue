@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { useCatalogStore } from '@/stores/catalog'
 import { errorMessage, writeFailureTitle } from '@/utils/errors'
 
-/** Bulk actions for the selected rows (Contributor and above): enable, disable, add or remove a label, delete. */
+/**
+ * Bulk actions for the selected rows (Contributor and above): enable, disable, add or remove a label, compare with
+ * another view (spec "Copy and Compare Annotations and Configurations Between Views", section 8), delete.
+ */
 const props = defineProps<{ keys: string[] }>()
 const emit = defineEmits<{ clear: [] }>()
 
@@ -11,6 +14,10 @@ const catalog = useCatalogStore()
 const actions = useAnnotationActions()
 const notifyDeleted = useDeletionToast()
 const toast = useToast()
+// The comparison keeps the selection: it changes no row, and the page comes back as it was left.
+const { blocked, openCompare } = useViewTransfer('annotations', () => props.keys)
+// A disabled button takes no focus, so its tooltip is out of reach of a keyboard: the reason is also text beside it.
+const blockedId = useId()
 
 const label = ref<string>()
 const confirmDelete = ref(false)
@@ -122,6 +129,19 @@ async function deleteSelected() {
         </div>
       </template>
     </UPopover>
+    <UTooltip :text="blocked" :disabled="!blocked">
+      <UButton
+        label="Compare with view"
+        icon="i-lucide-git-compare"
+        size="xs"
+        color="neutral"
+        variant="outline"
+        :disabled="busy || !!blocked"
+        :aria-describedby="blocked ? blockedId : undefined"
+        @click="openCompare()"
+      />
+    </UTooltip>
+    <span v-if="blocked" :id="blockedId" class="text-xs text-muted">{{ blocked }}</span>
     <UButton
       label="Delete"
       icon="i-lucide-trash-2"

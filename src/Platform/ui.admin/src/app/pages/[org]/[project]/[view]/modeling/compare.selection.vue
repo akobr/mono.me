@@ -1,0 +1,391 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { filtersOf, stateOf, useViewCompare, type CompareFile } from '@/composables/useViewCompare'
+import { useContextStore } from '@/stores/context'
+import { useViewTransferStore } from '@/stores/view-transfer'
+import {
+  compareFilters,
+  compareLabel,
+  compareLocation,
+  parseCompareQuery,
+  viewTransferLimit,
+  type CompareFilter,
+} from '@/utils/view-compare'
+import { countOf } from '@/utils/view-documents'
+import { defaultViewBadge, isDefaultView } from '@/utils/views'
+
+// The comparison of a selection of annotations or configurations across two views of the project, as the "Files
+// changed" of a pull request (spec "Copy and Compare Annotations and Configurations Between Views", sections 3 to 5).
+// The source is the view of the route, where the rows were selected, and the target the view of ?to=. The page reads
+// from the source into the target: the target is the old side of every diff (left, red), the source the new one
+// (right, green). That is the opposite of Compare views, whose left side is the view of the route. Addressed by
+// ?kind=&to=&key=…&content=, or by ?set= for a selection that is too long for an address.
+const route = useRoute()
+const router = useRouter()
+const context = useContextStore()
+const transfer = useViewTransferStore()
+const others = useOtherViews()
+
+// The view of this page is the one of its route, which Swap views changes together with ?to=. The context guard puts
+// the next org, project and view in the store before a navigation lands; until the store and the route agree again,
+// nothing is preselected or read, as a router.replace would cancel that navigation (424-64).
+const page = computed(() => route.params as { org?: string; project?: string; view?: string })
+const landed = computed(
+  () => page.value.org === context.org && page.value.project === context.project && page.value.view === context.view,
+)
+
+const request = computed(() => parseCompareQuery(route.query, page.value.view, transfer.keysOf))
+const kind = computed(() => request.value.kind)
+const viewBase = computed(() => `/${context.org}/${context.project}/${context.view}`)
+
+const target = computed({
+  get: () => request.value.to,
+  set: (view) => {
+    if (!view) {
+      return
+    }
+    void router.replace({ query: { ...route.query, to: view } })
+    if (context.projectKey) {
+      transfer.rememberTarget(context.projectKey, view)
+    }
+  },
+})
+
+// With one other view there is nothing to pick; with several, the target last used in the project is the likely one.
+// A ?to= that names a view is kept, also one that is not listed: the Views page can link to a discovered view.
+watch(
+  [others.names, target, landed],
+  ([names, to, here]) => {
+    if (!here || to) {
+      return
+    }
+    const last = context.projectKey ? transfer.lastTarget(context.projectKey) : undefined
+    const preselected = names.length === 1 ? names[0] : names.find((name) => name === last)
+    if (preselected) {
+      void router.replace({ query: { ...route.query, to: preselected } })
+    }
+  },
+  { immediate: true },
+)
+
+/** The other views, and the compared one when it is not among them, so the select shows what is compared. */
+const targetItems = computed(() =>
+  target.value && !others.has(target.value) ? [...others.names.value, target.value] : others.names.value,
+)
+
+// The same comparison from the target: only this turns a comparison around, the view switcher opens Compare views.
+const swap = computed(() =>
+  context.scope && target.value
+    ? compareLocation(
+        { ...context.scope, view: target.value },
+        {
+          kind: kind.value,
+          keys: request.value.keys,
+          to: context.scope.view,
+          content: request.value.content,
+          set: request.value.set,
+        },
+      )
+    : undefined,
+)
+
+const content = computed({
+  get: () => request.value.content,
+  set: (value: string | number) =>
+    void router.replace({ query: { ...route.query, content: value === 'effective' ? 'effective' : undefined } }),
+})
+const contentItems = [
+  { label: 'Own', value: 'own' },
+  { label: 'Effective', value: 'effective' },
+]
+
+const layout = ref<'auto' | 'split' | 'unified'>('auto')
+const layoutItems = [
+  { label: 'Auto', value: 'auto' },
+  { label: 'Split', value: 'split' },
+  { label: 'Unified', value: 'unified' },
+]
+
+const { files, loaded } = useViewCompare({
+  source: () => context.scope,
+  target,
+  kind,
+  keys: () => request.value.keys,
+  content: () => request.value.content,
+  enabled: landed,
+})
+
+const title = computed(() => {
+  const count = countOf(kind.value, request.value.keys.length)
+  return target.value ? `${count}: ${context.view} → ${target.value}` : `${count}: ${context.view}`
+})
+const back = computed(() => ({
+  label: kind.value === 'annotations' ? 'Annotations' : 'Configurations',
+  to: `${viewBase.value}/${kind.value}`,
+}))
+
+const names = computed(() => ({
+  source: context.view ?? '',
+  target: target.value ?? '',
+  own: kind.value === 'configurations' && request.value.content === 'own',
+}))
+const legend = computed(() =>
+  kind.value === 'configurations' && request.value.content === 'effective'
+    ? `What ${names.value.target} and ${names.value.source} read.`
+    : 'Only the selected keys are compared.',
+)
+const progress = computed(() =>
+  loaded.value < files.value.length ? `Compared ${loaded.value} of ${files.value.length}…` : '',
+)
+
+// --- summary ---
+
+const counts = computed(() => {
+  const totals = new Map<CompareFilter, number>([['all', files.value.length]])
+  for (const file of files.value) {
+    for (const filter of filtersOf(file)) {
+      totals.set(filter, (totals.get(filter) ?? 0) + 1)
+    }
+  }
+  return totals
+})
+/** The chips with their counts; a result that no key has is not offered. */
+const chips = computed(() =>
+  compareFilters
+    .map((filter) => ({ filter, label: compareLabel(filter, names.value), count: counts.value.get(filter) ?? 0 }))
+    .filter((chip) => chip.filter === 'all' || chip.count > 0),
+)
+
+const filter = ref<CompareFilter>('all')
+// A chip that lost its last key is gone, and its filter would show nothing.
+watch(
+  () => counts.value.get(filter.value),
+  (count) => {
+    if (!count) {
+      filter.value = 'all'
+    }
+  },
+)
+const shown = computed(() =>
+  filter.value === 'all' ? files.value : files.value.filter((file) => filtersOf(file).includes(filter.value)),
+)
+
+// --- sections ---
+
+/** Different documents, and a document on one side only, are what the page is opened for. */
+function startsOpen(file: CompareFile): boolean {
+  const state = stateOf(file)
+  return state === 'different' || state === 'onlySource' || state === 'onlyTarget'
+}
+
+// The open state of a section by key: set when its documents first arrive, and by the user from then on. So a
+// section keeps its state when its documents are read again and compare differently.
+const opened = ref<Record<string, boolean>>({})
+const isOpen = (file: CompareFile) => opened.value[file.key] ?? startsOpen(file)
+
+// Another comparison starts with its own sections.
+watch([() => context.org, () => context.project, () => context.view, target, kind, () => request.value.content], () => {
+  opened.value = {}
+})
+// After the render: the results of the queries follow a change of the keys in a watcher of their own, and until
+// then a file could pair a key with the documents of another one.
+watch(
+  files,
+  (list) => {
+    const arrived = list.filter((file) => file.shown && !(file.key in opened.value))
+    if (arrived.length) {
+      opened.value = { ...opened.value, ...Object.fromEntries(arrived.map((file) => [file.key, startsOpen(file)])) }
+    }
+  },
+  { immediate: true, flush: 'post' },
+)
+
+function toggle(file: CompareFile) {
+  opened.value = { ...opened.value, [file.key]: !isOpen(file) }
+}
+
+function setAll(open: boolean) {
+  opened.value = Object.fromEntries(files.value.map((file) => [file.key, open]))
+}
+
+// The panel body scrolls, not the window. The sections watch for their place in it to build their editors.
+const root = useTemplateRef<HTMLElement>('root')
+const scrollRoot = shallowRef<HTMLElement | null>(null)
+onMounted(() => {
+  for (let parent = root.value?.parentElement; parent; parent = parent.parentElement) {
+    const overflow = getComputedStyle(parent).overflowY
+    if (overflow === 'auto' || overflow === 'scroll') {
+      scrollRoot.value = parent
+      return
+    }
+  }
+})
+</script>
+
+<template>
+  <UDashboardPanel id="compare-selection">
+    <template #header>
+      <ModelingHeader />
+    </template>
+    <template #body>
+      <div ref="root" class="space-y-4">
+        <template v-if="landed && context.scope">
+          <EmptyState
+            v-if="request.keys.length === 0"
+            icon="i-lucide-git-compare"
+            title="Nothing to compare"
+            :description="
+              request.lost
+                ? 'The selection is gone. A comparison of many rows opens only in the browser tab that started it.'
+                : 'Select rows on Annotations or Configurations and choose Compare with view.'
+            "
+          >
+            <UButton
+              label="Annotations"
+              icon="i-lucide-tags"
+              color="neutral"
+              variant="outline"
+              :to="`${viewBase}/annotations`"
+            />
+            <UButton
+              label="Configurations"
+              icon="i-lucide-settings-2"
+              color="neutral"
+              variant="outline"
+              :to="`${viewBase}/configurations`"
+            />
+          </EmptyState>
+
+          <template v-else>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h2 class="text-base font-semibold text-highlighted">{{ title }}</h2>
+              <UButton
+                :label="back.label"
+                :to="back.to"
+                icon="i-lucide-arrow-left"
+                color="neutral"
+                variant="link"
+                size="sm"
+                class="px-0"
+              />
+            </div>
+
+            <!-- Without another view the Compare views tab is disabled, but an address still opens the page. -->
+            <EmptyState
+              v-if="!target && others.alone.value"
+              icon="i-lucide-git-compare"
+              title="No other view to compare with"
+              description="The project has only this view. An Administrator can create another one on the Views page."
+            />
+
+            <template v-else>
+              <!-- The sides in the order of the diff, which also holds where the diff has one column. -->
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-base font-semibold text-error" aria-hidden="true">−</span>
+                  <USelect
+                    v-model="target"
+                    :items="targetItems"
+                    placeholder="Another view"
+                    class="w-48"
+                    aria-label="Target view"
+                  />
+                  <UBadge v-if="isDefaultView(target)" v-bind="defaultViewBadge" />
+                  <span class="text-xs text-muted">now</span>
+                </div>
+                <UButton
+                  label="Swap views"
+                  icon="i-lucide-arrow-left-right"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  :to="swap"
+                  :disabled="!swap"
+                />
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-base font-semibold text-success" aria-hidden="true">+</span>
+                  <span class="text-sm font-medium text-highlighted">{{ context.view }}</span>
+                  <span class="text-xs text-muted">after a copy</span>
+                </div>
+              </div>
+
+              <UAlert
+                v-if="request.truncated"
+                color="warning"
+                variant="subtle"
+                icon="i-lucide-triangle-alert"
+                :title="`Only the first ${viewTransferLimit} keys are compared.`"
+              />
+
+              <LoadingState v-if="!target && others.views.isPending.value" />
+              <EmptyState v-else-if="!target" icon="i-lucide-git-compare" title="Pick the view to compare with" />
+
+              <template v-else>
+                <p class="text-sm text-muted">{{ legend }}</p>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <div v-if="kind === 'configurations'" role="group" aria-label="Configuration content">
+                    <UTabs v-model="content" :items="contentItems" :content="false" size="xs" />
+                  </div>
+                  <div role="group" aria-label="Diff layout">
+                    <UTabs v-model="layout" :items="layoutItems" :content="false" size="xs" />
+                  </div>
+                  <UButton
+                    label="Expand all"
+                    icon="i-lucide-unfold-vertical"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    @click="setAll(true)"
+                  />
+                  <UButton
+                    label="Collapse all"
+                    icon="i-lucide-fold-vertical"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    @click="setAll(false)"
+                  />
+                </div>
+
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by result">
+                    <UButton
+                      v-for="chip in chips"
+                      :key="chip.filter"
+                      :label="`${chip.label} ${chip.count}`"
+                      size="sm"
+                      :color="filter === chip.filter ? 'primary' : 'neutral'"
+                      :variant="filter === chip.filter ? 'soft' : 'outline'"
+                      :aria-pressed="filter === chip.filter"
+                      @click="filter = filter === chip.filter ? 'all' : chip.filter"
+                    />
+                  </div>
+                  <!-- There before the first document arrives, so every change of it is read out. -->
+                  <p class="text-sm text-muted" aria-live="polite">{{ progress }}</p>
+                </div>
+
+                <div class="space-y-3">
+                  <ViewCompareFile
+                    v-for="file in shown"
+                    :key="file.key"
+                    :file="file"
+                    :kind="kind"
+                    :content="request.content"
+                    :source="context.scope"
+                    :target="target"
+                    :layout="layout"
+                    :open="isOpen(file)"
+                    :scroll-root="scrollRoot"
+                    @toggle="toggle(file)"
+                  />
+                </div>
+              </template>
+            </template>
+          </template>
+        </template>
+      </div>
+    </template>
+  </UDashboardPanel>
+</template>

@@ -185,6 +185,46 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
+    // The comparison of a selection across two views (424-309), once its diffs are drawn: annotations that differ and
+    // one that only the source has, and configurations in every state of the seed, with their notes. In the light
+    // theme the tinted lines of the diffs are left out: the syntax colors have less than 4.5:1 on them (a string 3.5:1
+    // on a changed line, 2.7:1 on the deleted text of the unified layout), as in every DiffEditor (Versions, Compare
+    // views), which no case checked with a diff drawn before.
+    // A document that only one side has is drawn whole as added or removed in the unified layout (phones).
+    const tintedLines =
+      colorScheme === 'light' ? ['.cm-changedLine', '.cm-deletedChunk', '.cm-insertedLine', '.cm-deletedLine'] : []
+    for (const [kind, keys, open] of [
+      ['annotations', ['sbt.initech', 'sbt.northwind'], ['sbt.initech', 'sbt.northwind']],
+      [
+        'configurations',
+        [
+          'cnt.contoso.us',
+          'exe.northwind.reporting.test',
+          'sbt.contoso',
+          'sbt.northwind',
+          'usg.northwind.invoicing',
+          'uxe.northwind.notifications.prod.push',
+        ],
+        ['cnt.contoso.us', 'exe.northwind.reporting.test', 'sbt.contoso'],
+      ],
+    ] as const) {
+      test(`the comparison of ${kind} across views has no serious accessibility violations`, async ({ page }) => {
+        const query = keys.map((key) => `key=${key}`).join('&')
+        await openApp(page, `/acme/billing/default/modeling/compare/selection?kind=${kind}&to=staging&${query}`)
+        // Every document is read: no section is loading any more.
+        const sections = page.locator('section[data-key]')
+        await expect(sections).toHaveCount(keys.length)
+        await expect(sections.getByText('Loading…')).toHaveCount(0)
+        // The sections that start open build their editors as they come near the visible part of the page.
+        for (const key of open) {
+          const section = page.locator(`section[data-key="${key}"]`)
+          await section.scrollIntoViewIfNeeded()
+          await expect(section.getByRole('textbox').first()).toBeVisible()
+        }
+        await expectAccessible(page, tintedLines)
+      })
+    }
+
     // The scopes of a new machine (424-79): a preset with a management scope picked by an Owner; for a Contributor the
     // management scopes, the secrets scopes and their presets disabled.
     for (const [role, path] of [
