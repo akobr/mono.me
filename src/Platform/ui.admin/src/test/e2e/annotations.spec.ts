@@ -355,21 +355,38 @@ test('the bulk bar disables, enables and labels the selected rows with a patch o
 }, testInfo) => {
   test.skip(isMobile(testInfo), 'Below md the list has no row selection, so there is no bulk bar.')
   const keys = ['sbt.northwind', 'sbt.contoso']
-  // every write to an annotation's own route (424-225: a PATCH, never a whole body)
-  const writes: string[] = []
+  const url = (key: string) => `/api/v1/acme/billing/default/annotations/${key}`
+  // every write of the UI to an annotation's own route (424-225: a PATCH of the change alone, never a whole body)
+  const writes: { method: string; key: string; type?: string; body: unknown }[] = []
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname
-    if (/\/api\/v1\/acme\/billing\/default\/annotations\/[^/]+$/.test(path) && request.method() !== 'GET') {
-      writes.push(`${request.method()} ${decodeURIComponent(path.split('/').at(-1)!)}`)
+    const setup = !!request.headers()['x-e2e-setup']
+    if (/\/api\/v1\/acme\/billing\/default\/annotations\/[^/]+$/.test(path) && request.method() !== 'GET' && !setup) {
+      writes.push({
+        method: request.method(),
+        key: decodeURIComponent(path.split('/').at(-1)!),
+        type: request.headers()['content-type'],
+        body: JSON.parse(request.postData() ?? 'null'),
+      })
     }
   })
   await openApp(page, '/acme/billing/default/annotations?q=type:sbt')
 
   const stored = (key: string) =>
     page.evaluate(async (path) => {
-      const response = await fetch(`/api/v1/acme/billing/default/annotations/${path}?includeInactive=true`)
-      return (await response.json()) as { IsDisabled?: boolean | null; Labels?: string[] }
-    }, key)
+      const response = await fetch(`${path}?includeInactive=true`)
+      return (await response.json()) as { Title?: string; IsDisabled?: boolean | null; Labels?: string[] }
+    }, url(key))
+  // someone else renames sbt.northwind after the list loaded: the bulk edits must keep it
+  await page.evaluate(async (path) => {
+    const current = await (await fetch(`${path}?includeInactive=true`)).json()
+    await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-e2e-setup': '1' },
+      body: JSON.stringify({ ...current, Title: 'Renamed elsewhere' }),
+    })
+  }, url('sbt.northwind'))
+
   const bar = page.getByRole('toolbar', { name: 'Bulk actions' })
   const select = async () => {
     for (const key of keys) {
@@ -378,6 +395,7 @@ test('the bulk bar disables, enables and labels the selected rows with a patch o
     await expect(bar.getByText('2 selected')).toBeVisible()
   }
   const labelInput = page.getByPlaceholder('Label', { exact: true })
+  const popover = page.getByRole('dialog').filter({ has: labelInput })
   const chooseLabel = async (option: string) => {
     await bar.getByRole('button', { name: 'Label', exact: true }).click()
     await labelInput.fill('e2e-bulk')
@@ -385,17 +403,19 @@ test('the bulk bar disables, enables and labels the selected rows with a patch o
     await expect(labelInput).toHaveValue('e2e-bulk')
     // the suggestions may stay open over the buttons; a click on the popover's padding closes them
     if ((await labelInput.getAttribute('aria-expanded')) === 'true') {
-      await page
-        .getByRole('dialog')
-        .filter({ has: labelInput })
-        .click({ position: { x: 4, y: 4 } })
+      await popover.click({ position: { x: 4, y: 4 } })
     }
   }
-  const popover = page.getByRole('dialog').filter({ has: labelInput })
+  const sent = () => writes.splice(0).toSorted((a, b) => a.key.localeCompare(b.key))
 
   await select()
   await bar.getByRole('button', { name: 'Disable', exact: true }).click()
   await expect(page.getByText('Annotations disabled', { exact: true })).toBeVisible()
+  expect(sent()).toEqual(
+    keys
+      .toSorted()
+      .map((key) => ({ method: 'PATCH', key, type: 'application/merge-patch+json', body: { IsDisabled: true } })),
+  )
   for (const key of keys) {
     expect((await stored(key)).IsDisabled).toBe(true)
   }
@@ -403,6 +423,7 @@ test('the bulk bar disables, enables and labels the selected rows with a patch o
   await select()
   await bar.getByRole('button', { name: 'Enable', exact: true }).click()
   await expect(page.getByText('Annotations enabled', { exact: true })).toBeVisible()
+  expect(sent().map((write) => write.body)).toEqual([{ IsDisabled: null }, { IsDisabled: null }])
   for (const key of keys) {
     expect((await stored(key)).IsDisabled ?? false).toBe(false)
   }
@@ -411,6 +432,14 @@ test('the bulk bar disables, enables and labels the selected rows with a patch o
   await chooseLabel('Create "e2e-bulk"')
   await popover.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page.getByText('Label e2e-bulk added', { exact: true })).toBeVisible()
+  for (const write of sent()) {
+    // a test of the labels the list holds, then the label appended
+    expect(write).toMatchObject({ method: 'PATCH', type: 'application/json-patch+json' })
+    expect(write.body).toEqual([
+      { op: 'test', path: '/Labels', value: expect.any(Array) },
+      { op: 'add', path: '/Labels/-', value: 'e2e-bulk' },
+    ])
+  }
   for (const key of keys) {
     expect((await stored(key)).Labels).toContain('e2e-bulk')
   }
@@ -419,9 +448,14 @@ test('the bulk bar disables, enables and labels the selected rows with a patch o
   await chooseLabel('e2e-bulk')
   await popover.getByRole('button', { name: 'Remove', exact: true }).click()
   await expect(page.getByText('Label e2e-bulk removed', { exact: true })).toBeVisible()
+  for (const write of sent()) {
+    expect(write).toMatchObject({ method: 'PATCH', type: 'application/json-patch+json' })
+    expect((write.body as { op: string }[]).map((operation) => operation.op)).toEqual(['test', 'remove'])
+  }
   for (const key of keys) {
     expect((await stored(key)).Labels ?? []).not.toContain('e2e-bulk')
   }
 
-  expect(writes.toSorted()).toEqual(keys.flatMap((key) => Array.from({ length: 4 }, () => `PATCH ${key}`)).toSorted())
+  // the title written elsewhere survived all four bulk edits
+  expect((await stored('sbt.northwind')).Title).toBe('Renamed elsewhere')
 })
