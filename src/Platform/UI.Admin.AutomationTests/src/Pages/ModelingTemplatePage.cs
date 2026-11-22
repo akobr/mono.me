@@ -12,8 +12,10 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // annotation's own content. The tabs "Edit" and "Versions" (?tab=versions, VersionsView). A type without a template
 // shows "No <type> template" with "Create template", which puts {} into the editor "Template" and offers "Create"; an
 // existing one has "Delete", "<n> change(s)" while changed, "Revert" and "Save". Saving (Ctrl/Cmd+S too) says "Template
-// saved (v<n>)"; a concurrent change asks "Someone else changed this configuration". Contributor and up. The type names
-// follow the project's settings and the Preferences; a fresh browser shows the built-in ones.
+// saved (v<n>)"; a concurrent change asks "Someone else changed this configuration". The writes are Contributor and
+// up: a Reader gets the document read-only with the badge "Read-only" and without the footer, and the empty state
+// without "Create template". The type names follow the project's settings and the Preferences; a fresh browser shows
+// the built-in ones.
 public sealed partial class ModelingTemplatePage(App app, AppRoutes routes)
 {
     public DetailPanel Panel { get; } = new(app, "template-detail");

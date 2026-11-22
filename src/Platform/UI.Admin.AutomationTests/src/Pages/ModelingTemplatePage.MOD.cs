@@ -4,10 +4,14 @@ using Microsoft.Playwright;
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // The Modeling section's members of ModelingTemplatePage: the rows of the list, the empty state's description, the
-// version badge in the editor's actions, the typed delete "Delete the <type> template?" (the confirmation is the type's
-// code), the empty states of an unknown type in the URL and of the Versions of a missing template.
+// version badge and a Reader's "Read-only" badge in the editor's actions, the typed delete "Delete the <type>
+// template?" (the confirmation is the type's code), the empty states of an unknown type in the URL and of the Versions
+// of a missing template.
 public sealed partial class ModelingTemplatePage
 {
+    // The badge of a user below Contributor beside the version badge, instead of the footer.
+    public ILocator ReadOnlyBadge => Panel.Root.GetByText("Read-only", new() { Exact = true });
+
     // The rows of the list, one link per type: the list's items (the list that holds the Responsibility row).
     public ILocator TemplateListRows => app.Page.GetByRole(AriaRole.List)
         .Filter(new() { Has = app.Page.Locator("a[href$=\"/modeling/templates/rst\"]") })

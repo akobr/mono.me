@@ -5,7 +5,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // The Schema tab of a configuration (components/configuration/CombinedSchemaView.vue): the schemas that apply to the
 // annotation, merged. Without one the empty state "No schema applies"; otherwise the heading "Applied schemas, in
 // order" over an ordered list (per layer its index, the badge "Type", "Descendant type" or "Annotation", the type's
-// name or the annotation's key, a link to Modeling's schema for Contributors and up, plain text below, and "v<n>"),
+// name or the annotation's key, a link to Modeling's schema for every member, a Reader too, and "v<n>"),
 // then the read-only editor "Combined schema". A deployed target's type schema can add a layer: find a layer by its
 // label, never by its index.
 public sealed partial class CombinedSchemaView(App app, ILocator scope)
@@ -23,7 +23,7 @@ public sealed partial class CombinedSchemaView(App app, ILocator scope)
         return scope.GetByRole(AriaRole.Listitem).Filter(new() { Has = app.Page.GetByText(label, new() { Exact = true }) });
     }
 
-    // The layer's link to its schema in Modeling (Contributor and up).
+    // The layer's link to its schema in Modeling (every member; a Reader reads the schema there).
     public ILocator LayerLink(string label)
     {
         return Layer(label).GetByRole(AriaRole.Link, new() { Name = label, Exact = true });

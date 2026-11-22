@@ -6,8 +6,8 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // Modeling's Export & Import tab (…/modeling/export-import, pages/…/modeling/export-import.vue), Administrator and up:
 // the cards "Export" and "Import" (regions named by their h2, side by side from lg) and, once the view's latest import
-// succeeded, "Latest import". Both cards have the same four kind checkboxes, so scope them to their region. A
-// Contributor gets the lock "Administrators only" instead, under the four other tabs with none selected; the tab
+// succeeded, "Latest import". Both cards have the same four kind checkboxes, so scope them to their region. A Reader
+// or a Contributor gets the lock "Administrators only" instead, under the four other tabs with none selected; the tab
 // itself is listed from Administrator up.
 // - Export (ExportPanel.vue): the kinds (all checked; none is the field error "Pick at least one kind." and a disabled
 //   Export), the format "Folder of JSON files" (default) or "Git repository", and "Export". The server builds the zip
@@ -58,7 +58,7 @@ public sealed partial class ModelingExportImportPage(App app, AppRoutes routes)
 
     public ILocator LatestImportRegion => app.Page.GetByRole(AriaRole.Region, new() { Name = "Latest import", Exact = true });
 
-    // The lock of a Contributor.
+    // The lock of a Reader or a Contributor.
     public ILocator AdministratorsOnly => app.Page.GetByRole(AriaRole.Heading, new() { Name = "Administrators only", Exact = true });
 
     public ILocator AdministratorsOnlyDescription => app.Page.GetByText(AdministratorsOnlyText, new() { Exact = true });

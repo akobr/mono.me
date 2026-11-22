@@ -10,7 +10,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Navigation;
 [Area(Area.Navigation)]
 public sealed class NavigationMenuTests : PlatformTest
 {
-    // The lock badge of a menu entry that the role may only read or not open.
+    // The lock badge of a menu entry that the role may only read.
     private const string LockBadge = "[data-slot=\"linkTrailingBadge\"]";
 
     // NAV-MNU-01: Navigation menu opens the pages of the view, the project and the app.
@@ -171,9 +171,9 @@ public sealed class NavigationMenuTests : PlatformTest
     }
 
     // NAV-MNU-05: A Reader's menu locks the editing sections.
-    // A Reader of the project finds Annotations, Configurations, Values store and Modeling locked (the icon rail's
-    // tooltips say why) and Graph open, only Views and Settings of the project, and a palette without the editor
-    // actions and without Modeling's tabs.
+    // A Reader of the project finds Annotations, Configurations, Values store and Modeling locked read-only (the icon
+    // rail's tooltips say why) and Graph open, only Views and Settings of the project, and a palette without the editor
+    // actions, with Modeling's tabs but without Export & Import (an Administrator's tab).
     [Test]
     [TestCase(30)]
     [UserRole(Role.Reader)]
@@ -218,7 +218,7 @@ public sealed class NavigationMenuTests : PlatformTest
             await Page.Mouse.MoveAsync(700, 450);
             var modelingEntry = App.NavigationMenuLink(rail, Routes.Modeling);
             await modelingEntry.HoverAsync();
-            await Expect(modelingEntry).ToHaveAccessibleDescriptionAsync("Contributors only");
+            await Expect(modelingEntry).ToHaveAccessibleDescriptionAsync("Read-only for your role");
             await Page.Mouse.MoveAsync(700, 450);
         }
 
@@ -230,10 +230,14 @@ public sealed class NavigationMenuTests : PlatformTest
         await search.FillAsync("Modeling");
         await Expect(ExactOption($"ModelingView · {Routes.View}")).ToBeVisibleAsync();
 
-        // A locked Modeling lists no tabs: once the Modeling option has gone, the result is final.
+        // A lock means read-only, not closed, so the palette lists the Modeling tabs of the Reader's role.
         await search.FillAsync("Schemas");
-        await Expect(App.PaletteOption("Modeling")).ToHaveCountAsync(0);
+        await Expect(ExactOption("SchemasModeling")).ToBeVisibleAsync();
+
+        // The filter applies about 100 ms after the input: once the Schemas option has gone, the result is final.
+        await search.FillAsync("Export & Import");
         await Expect(App.PaletteOption("Schemas")).ToHaveCountAsync(0);
+        await Expect(App.PaletteOption("Export & Import")).ToHaveCountAsync(0);
 
         await Page.Keyboard.PressAsync("Escape");
         await Expect(App.CommandPalette).ToBeHiddenAsync();

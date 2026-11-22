@@ -64,7 +64,7 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
     // The exhibition step: its story, what it shows, and what checking the box does, under its label.
     public const string ExhibitionText = "Step into Fourth Wall Software, a fictional software house whose customers include Acme Corp and Globex. See how the platform keeps their CRM, HR and CAD solutions configured.";
 
-    public const string ExhibitionPromiseText = "Explore 30 annotations, configurations that resolve live, and the graph that ties them together.";
+    public const string ExhibitionPromiseText = "Explore 30 annotations, configurations that resolve live, the graph that ties them together, and the schemas and templates behind them.";
 
     public const string ExhibitionChoiceDescriptionText = "Adds the demo project to your account as a Reader. Nothing you do there can break it: you join read-only.";
 

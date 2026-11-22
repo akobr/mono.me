@@ -48,7 +48,7 @@ public sealed partial class NavigationContextSwitcherTests : PlatformTest
         menu = await App.MenuAsync();
         await Expect(App.NavigationViewLabel(menu, AppRoutes.DefaultView).GetByText("prod", new() { Exact = true })).ToBeVisibleAsync();
 
-        // Only the URL: a live Reader sees "Contributors only" there, and the tab stays in the URL all the same.
+        // Only the URL: the switcher keeps the tab, and what the tab shows to each role belongs to Modeling's cases.
         await App.GotoAsync(view.ModelingTab("templates"));
         await App.WaitForReadyAsync();
         await switcher.PickViewAsync(AppRoutes.DefaultView);

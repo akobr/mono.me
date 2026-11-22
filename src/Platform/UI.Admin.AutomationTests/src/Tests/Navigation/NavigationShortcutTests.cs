@@ -83,7 +83,7 @@ public sealed class NavigationShortcutTests : PlatformTest
         await App.PressShortcutAsync("g", "o");
         await App.ExpectAtAsync(Routes.Organizations);
 
-        // A Reader or a Contributor of a live target sees the locks of Modeling or Export & Import; the URLs hold.
+        // A Reader or a Contributor of a live target sees the lock of Export & Import; the URLs hold.
         (string Key, string Tab)[] tabs = [("s", "schemas"), ("t", "templates"), ("e", "export-import")];
         foreach (var (key, tab) in tabs)
         {
