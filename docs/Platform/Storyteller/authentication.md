@@ -2053,7 +2053,7 @@ az functionapp cors add --name <function-app> --resource-group <group> --allowed
 * Script reads the `ETag` of a cross-origin response only when `Access-Control-Expose-Headers` names it. The Function App's CORS settings hold the allowed origins and credentials only, so they cannot expose a response header: a cross-origin browser gets no tag to send back. A same-origin proxy avoids CORS altogether, and API Management in front of the API can add `ETag` to `Access-Control-Expose-Headers`.
 * A [merge `PATCH`](annotation-lifecycle.md#merge-writes-patch) without a condition needs no `ETag`. The preflight has to allow only the method `PATCH` and its `Content-Type` (`application/merge-patch+json` or `application/json-patch+json`), so a cross-origin client can change single members of an annotation without losing concurrent changes of the others.
 
-The admin UI uses neither yet: it writes whole bodies without a condition.
+The admin UI uses the merge `PATCH` without a condition: it writes every change of an existing annotation as a merge patch or a JSON Patch of only that change (a `test` operation in the body, not `If-Match`, guards its label edits), so it needs only `PATCH` and the two patch media types in the preflight. It sends neither `If-Match` nor `If-None-Match`.
 
 For the same reason a cross-origin browser reads neither `WWW-Authenticate` nor `X-2S-Secrets-Withheld`. The [step-up](#recent-sign-in-step-up) repeats its window in the body, and the admin UI tells a stale sign-in by the `auth_time` of its own token.
 

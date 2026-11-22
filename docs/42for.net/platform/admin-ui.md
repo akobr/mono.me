@@ -77,7 +77,7 @@ The tree shows only subjects, or only responsibilities, at the root, with every 
 | By subject | subject › context › execution › unit of execution<br>subject › usage › execution › unit of execution |
 | By responsibility | responsibility › unit › unit of execution<br>responsibility › usage › execution › unit of execution |
 
-So an annotation with two parents appears under both of them, for example an execution under its context and under its usage. Checking the box of one of its rows selects the annotation for the bulk actions, so all its rows are checked. A parent missing from the catalog is shown as a "(missing)" row. With a filter, the tree keeps the matching annotations and the rows above them, dimmed.
+So an annotation with two parents appears under both of them, for example an execution under its context and under its usage. Checking the box of one of its rows selects the annotation for the bulk actions, so all its rows are checked. The bulk actions (**Enable**, **Disable**, adding or removing a **Label**) change only that field of each selected annotation, so other changes made meanwhile are kept. A label is added once, whatever its case, and an annotation deleted meanwhile is not brought back: it is counted as not saved and leaves the list. A parent missing from the catalog is shown as a "(missing)" row. With a filter, the tree keeps the matching annotations and the rows above them, dimmed.
 
 The **Type** column, here and on **Configurations**, shows the full name of each type, with its icon and color, including the names from **Settings** and your Preferences. On a phone the list shows only the icon, to keep room for the name and key.
 
@@ -110,6 +110,7 @@ On a phone, the **Filters** button opens the same filters as toggles in a bottom
 The **detail** of an annotation has two tabs:
 
 - **Annotation:** the fields as a form, or as JSON or YAML. The form starts with the type icon and the key, with the name in bold: they are part of the key and cannot be edited. Title, description and documentation link have the same limits as the API (200, 10,000 and 2048 characters). The description is Markdown, and its **Preview** tab renders it. You can use headings, lists, block quotes, code blocks, tables, links and images. Raw HTML is shown as text, and only `http(s)`, `mailto` and relative links work. For a unit, the form, JSON, and YAML also edit the unit type and the unit definition. The type menu suggests Time, Message, and Volume, and any other text is saved. A Time definition that does not have 5 or 6 fields shows a hint and can still be saved.
+  Saving sends only the fields you changed, so a change someone else made to the other fields meanwhile is kept, and the form then shows both. **Labels** are saved as the whole list: when two people change the labels of one annotation at the same time, the later save decides them.
 - **History:** who changed it and when, newest first. An update lists every field with its old and new value; the description only shows that it changed. Deletes, restores, configuration saves and restored configuration versions (**Configuration restored as v8 from v5**) are entries too, and a re-created annotation starts a new lifetime.
 
 The header links to the configuration, drawn by where the configuration comes from:
@@ -144,7 +145,7 @@ The breadcrumb and **Lineage** show its ancestors in merge order.
 - **Delete permanently** removes it for good, with its history. Only Administrators and Owners see it, and it asks you to type the key.
 - Opening a deleted key shows when and by whom it was deleted, its history, and **Restore**.
 
-Creating an annotation whose key, or an ancestor's key, is deleted asks first: **Restore and update** brings back the deleted annotation with its configuration and history; **Create new** replaces it with an empty one. **Bulk create** asks the same for all its keys at once, and offers **Restore** instead of **Restore and update**, since it writes nothing over them.
+Creating an annotation whose key, or an ancestor's key, is deleted asks first: **Restore and update** brings back the deleted annotation with its configuration and history, and then writes only the title you entered (and the time zone, when the annotation had none) over it; **Create new** replaces it with an empty one. **Bulk create** asks the same for all its keys at once, and offers **Restore** instead of **Restore and update**, since it writes nothing over them.
 
 The command palette (`Ctrl K` / `⌘ K`) finds annotations, pages, projects and actions, and switches the theme.
 
