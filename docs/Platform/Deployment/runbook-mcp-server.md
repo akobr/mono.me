@@ -18,12 +18,15 @@ Everything is PowerShell 7.4+ on Windows, run from `src/Platform/Deployment` of 
 | 9 | Verify | an MCP client + checks | — |
 | 10 | Rolling back | — | — |
 
+Later, for the MCP clients ([424-302](https://linear.app/424fun/issue/424-302/arch-production-turns-on-the-mcp-token-exchange-with-no-client-allow)): [Trust a client](#trust-a-client), [Cut off one client](#cut-off-one-client) and [Cut off every unlisted client](#cut-off-every-unlisted-client). A client that isn't trusted only reads and reveals no secret.
+
 Stop and fix before going on whenever a check fails. Each change of `parameters/prod.bicepparam` goes to `main` through a pull request before its run, as in the production runbook: `main.bicep` owns the API's app settings, so a run from an old checkout would set them back.
 
 ## 0. Prerequisites
 
 - [424-239](https://linear.app/424fun/issue/424-239/accept-only-the-2s-authkit-applications-audiences-in-the-api) is done and in production: the API reads the list of 2S audiences (`authKitAudiences`), Multiple Applications is on in WorkOS production, the admin UI and `sform` sign in ([production runbook](runbook-azure-production.md#enabling-multiple-applications-in-workos)).
 - The implementation of [424-287](https://linear.app/424fun/issue/424-287) is merged to `main`: `modules/mcp.bicep`, `modules/mcp-existing.bicep`, the API's settings in `modules/functions.bicep`, the role in `modules/access.bicep`, `scripts/New-TokenExchangeApplication.ps1`, the container settings in `Mcp.csproj` and the workflow `Platform.Storyteller.Mcp.yml`.
+- The API in production is a build with [424-302](https://linear.app/424fun/issue/424-302/arch-production-turns-on-the-mcp-token-exchange-with-no-client-allow): it reads the client lists and knows the restriction `ReadOnly`. An older build ignores `mcpUntrustedClientRestrictions`, and every MCP client could change anything the person may change.
 - Your Azure sign-in is the subscription's Owner and an Application Administrator of the tenant:
 
 ```powershell
@@ -55,6 +58,54 @@ Before production, check how WorkOS issues MCP tokens with Multiple Applications
 5. Make the resource indicator the **default** one and repeat 4. If the admin UI's `aud` changed, put it back to non-default: production keeps it non-default too (phase 7).
 
 **Stop** if the MCP token's `aud` is not the resource URL (the JWT template or the application overrides it): the API's exchange would refuse every MCP sign-in. Ask WorkOS before going on.
+
+**The clients** ([424-302](https://linear.app/424fun/issue/424-302/arch-production-turns-on-the-mcp-token-exchange-with-no-client-allow)): which client id the API records, and what WorkOS lets a client do.
+
+6. Turn on the **Client ID Metadata Document** (CIMD) under **Connect → Configuration**, and check the AuthKit metadata:
+
+```powershell
+$authkit = 'https://<staging subdomain>.authkit.app'
+$metadata = Invoke-RestMethod "$authkit/.well-known/oauth-authorization-server"
+$metadata | Select-Object client_id_metadata_document_supported, token_endpoint_auth_methods_supported
+```
+
+**Expect** `True` and `none` among the methods. Claude uses CIMD only with both; otherwise it registers a new client on every fresh connection.
+
+7. Sign in once through a client that registers dynamically (DCR; Cursor has no CIMD) and once through one that uses CIMD (Claude Code 2.1.81 or newer and VS Code have a metadata document, but a client may still prefer DCR while it is on: the recorded id tells), and call `get_my_account` with each. Record the client id the API stored for each: the local API's request line `A request … via mcp (client <id>) answered …`, or `via mcp (client <id>)` in the local admin UI's access audit trail after an access change through the client. The exchange's line `… exchanged a user token of the account … (client <id>) …` names it too, but cuts it after 64 characters. **Expect** `client_01…` for the DCR client and the metadata URL for the CIMD one (e.g. `https://claude.ai/oauth/claude-code-client-metadata`). If a CIMD client's id is not its URL, no client can be trusted ([Trust a client](#trust-a-client)) and every client stays read only: note it and go on.
+
+8. A negative check of CIMD: ask for a code for Claude's metadata URL with a redirect that is not in its document.
+
+```powershell
+$query = 'response_type=code&scope=openid&code_challenge_method=S256&code_challenge=' + ('a' * 43) +
+  '&client_id=' + [uri]::EscapeDataString('https://claude.ai/oauth/mcp-oauth-client-metadata') +
+  '&redirect_uri=' + [uri]::EscapeDataString('https://example.com/callback') +
+  '&resource=' + [uri]::EscapeDataString('https://localhost:7180/mcp')
+Start-Process "$($metadata.authorization_endpoint)?$query"
+```
+
+**Expect** an error from WorkOS, no sign-in page and no redirect to `example.com`. **Stop** and don't trust any client in production if WorkOS signs you in: anyone could then take tokens in a trusted client's name.
+
+9. The precondition: a token of a self-registered client must never be an API bearer token. Once the custom AuthKit domain makes both issuers the same, only its `aud` keeps it out; the local API already has the AuthKit domain as its issuer, so the check holds for that case. Register a client, get a token without `resource`, call a plain API route, then repeat with `$resource` set to the 2S application's audience (the `aud` of step 4):
+
+```powershell
+$redirect = 'http://127.0.0.1:8765/callback'
+$client = Invoke-RestMethod -Method Post -Uri $metadata.registration_endpoint -ContentType 'application/json' -Body (@{
+    client_name = '2S precondition check'; redirect_uris = @($redirect); token_endpoint_auth_method = 'none'
+    grant_types = @('authorization_code'); response_types = @('code') } | ConvertTo-Json)
+$verifier = -join (1..64 | ForEach-Object { [char](Get-Random -Minimum 97 -Maximum 123) })
+$challenge = [Convert]::ToBase64String([Security.Cryptography.SHA256]::HashData([Text.Encoding]::ASCII.GetBytes($verifier))).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+$resource = ''   # the second time, from this line on: the aud of step 4
+$query = "response_type=code&scope=openid&code_challenge_method=S256&code_challenge=$challenge&client_id=$($client.client_id)" +
+  '&redirect_uri=' + [uri]::EscapeDataString($redirect) + $(if ($resource) { '&resource=' + [uri]::EscapeDataString($resource) })
+Start-Process "$($metadata.authorization_endpoint)?$query"
+# Sign in. The browser then fails to open 127.0.0.1:8765; copy the code from its address bar (?code=…).
+$code = Read-Host 'code'
+$token = Invoke-RestMethod -Method Post -Uri $metadata.token_endpoint -Body @{
+  grant_type = 'authorization_code'; code = $code; redirect_uri = $redirect; client_id = $client.client_id; code_verifier = $verifier }
+curl.exe -s -o NUL -w "%{http_code}`n" -H "Authorization: Bearer $($token.access_token)" http://localhost:7071/api/v1/access/account
+```
+
+**Expect** `401` both times. A `200` means the gap is open: with the custom AuthKit domain, such a client would call the API directly with the person's full rights, with no `Via`, no `ReadOnly` and no deny list. Production is safe from it while the WorkOS API issues its user tokens (`authKitCustomDomain = false`), so go on, but record it on the follow-up of 424-302 (a client allow-list for AuthKit bearer tokens) and don't add the custom AuthKit domain ([later](#later-the-custom-authkit-domain)) until the API checks the client of its bearer tokens.
 
 ## 2. The exchange app registration [S2]
 
@@ -98,6 +149,8 @@ param mcpAppExists = false
 param mcpCustomDomain = false
 ```
 
+The client lists stay as committed: `mcpUntrustedClientRestrictions = ['ReadOnly', 'NoSecretReveal']` and the three id lists empty, so every client reads, changes nothing and reveals no secret until one is trusted ([Trust a client](#trust-a-client)).
+
 Commit them to `main` through a pull request, pull `main`, then:
 
 ```powershell
@@ -113,7 +166,7 @@ az deployment sub what-if --name prod-2s-main --location swedencentral `
 - `+ Microsoft.Insights/diagnosticSettings/log-analytics` on `prod-2s-cae`: `ContainerAppConsoleLogs` and `ContainerAppSystemLogs` to `prod-2s-log`, `Dedicated`
 - `+ Microsoft.App/containerApps/prod-2s-mcp-ca`: the image of phase 3, `minReplicas` 0, `maxReplicas` 3, the identity, the 12 environment variables of the cookbook's step 17a, the three TCP probes, **no** `secrets` and no `customDomains`
 - `+ Microsoft.Authorization/roleAssignments/<guid>`: Container Apps Contributor (`358470bc-…`) for the deployment identity, scoped to `prod-2s-mcp-ca`
-- `~ Microsoft.Web/sites/prod-2s-api-fa/config/appsettings`: `Auth__TokenExchange__Enabled` `false` → `true`, `+ Auth__TokenExchange__AdditionalIssuers__0__Issuer` (`https://palatial-omen-84.authkit.app`) and `__JwksUri` (`…/oauth2/jwks`), `+ Auth__TokenExchange__Actors__0__Id` (`mcp`), `+ …__Authentication__WorkloadIdentity__Issuer` (`https://sts.windows.net/<tenant>/`), `__Subject` (the identity's object id: what-if may show it as an expression, since the identity doesn't exist yet), `__Audience` (`api://<mcpExchangeAppId>`), `+ …__SubjectAudiences__0` (`https://mcp.2s.42for.net/mcp`); every other setting unchanged.
+- `~ Microsoft.Web/sites/prod-2s-api-fa/config/appsettings`: `Auth__TokenExchange__Enabled` `false` → `true`, `+ Auth__TokenExchange__AdditionalIssuers__0__Issuer` (`https://palatial-omen-84.authkit.app`) and `__JwksUri` (`…/oauth2/jwks`), `+ Auth__TokenExchange__Actors__0__Id` (`mcp`), `+ …__Authentication__WorkloadIdentity__Issuer` (`https://sts.windows.net/<tenant>/`), `__Subject` (the identity's object id: what-if may show it as an expression, since the identity doesn't exist yet), `__Audience` (`api://<mcpExchangeAppId>`), `+ …__SubjectAudiences__0` (`https://mcp.2s.42for.net/mcp`), `+ …__UntrustedClientRestrictions__0` (`ReadOnly`) and `__1` (`NoSecretReveal`); no `…__AllowedClientIds__*`, `…__TrustedClientIds__*` or `Auth__TokenExchange__DeniedClientIds__*` while their lists are empty; every other setting unchanged.
 
 **Stop** on any `Delete`, any change of the Cosmos DB account or the vault, or a change of `Auth__AuthKit__Issuer` or the audiences. A missing parameter stops the what-if itself with its message (e.g. `mcpExchangeAppId must be the application id …`).
 
@@ -139,7 +192,7 @@ The `POST` answers `401` with `WWW-Authenticate: Bearer resource_metadata="https
 curl.exe -s https://api.2s.42for.net/api/v1/auth/configuration
 ```
 
-It answers as before, and the admin UI still signs in. Application Insights (`prod-2s-api-appi`, **Logs → traces**, the last 15 minutes) shows the API's warning that the actor `mcp` accepts any client's token for its audiences (`AllowedClientIds` empty, intended for dynamic registration) and no start failure.
+It answers as before, and the admin UI still signs in. Application Insights (`prod-2s-api-appi`, **Logs → traces**, the last 15 minutes) shows the API's information line that the actor `mcp` accepts a token of any client for `https://mcp.2s.42for.net/mcp` and that the clients outside its 0 `TrustedClientIds` get `ReadOnly` and `NoSecretReveal`, no warning about the actor, and no start failure. A warning that the actor `mcp` has no `AllowedClientIds` means the untrusted restrictions are missing or the API's build is older than 424-302: **stop**, and turn the exchange off ([10. Rolling back](#10-rolling-back)) until they are set.
 
 **Restrict the exchange application to the server's identity** (recommended): only `prod-2s-mcp-mi` then gets tokens for `api://<id>` from Entra; the API pins its object id anyway.
 
@@ -241,15 +294,17 @@ If the job fails with `AuthorizationFailed` on `Microsoft.App/containerApps/writ
 
 | Check | How | Expected |
 | --- | --- | --- |
-| Sign-in | Add `https://mcp.2s.42for.net/mcp` as a remote MCP server in an MCP client (e.g. `claude mcp add --transport http 2s https://mcp.2s.42for.net/mcp`), sign in with your production account | the WorkOS sign-in page of `palatial-omen-84.authkit.app`, then the client lists the tools |
+| Sign-in | Add `https://mcp.2s.42for.net/mcp` as a remote MCP server in an MCP client (e.g. `claude mcp add --transport http 2s https://mcp.2s.42for.net/mcp`), sign in with your production account | the WorkOS sign-in page of `palatial-omen-84.authkit.app`, then the client lists the tools: the read tools only, since no client is trusted yet |
 | The token | the client's token, decoded locally | `iss` the AuthKit domain, `aud` `https://mcp.2s.42for.net/mcp`, `sub` your `user_…`, `scope` with `openid` |
 | The exchange | the tool `get_my_account` | your account |
 | Your data | list your organizations and a project's annotations | the same as in the admin UI |
 | No account | sign in with a WorkOS user that has no Storyteller account | "No Storyteller account exists for this sign-in. Register once with sform or the admin UI." |
-| Audit | change one annotation through the assistant, then look at its audit in the admin UI | your account with `Via` `mcp` |
+| Read only | ask the assistant to change one annotation | nothing changes: the assistant has no write tool, or the call answers "The 2S API lets this client app only read for you, so the change was not made. …" (`ActorReadOnly`) |
+| The client | the API's Application Insights (`prod-2s-api-appi`, **Logs**): `traces \| where message has "via mcp (client" \| project timestamp, message \| take 20` | every request of the assistant: `A request … via mcp (client <id>) answered …`, with `client_01…` for a dynamically registered client or the metadata URL for one with CIMD |
+| Audit | once a client is trusted ([Trust a client](#trust-a-client)): an access change through it, e.g. `create_machine` and then `delete_machine` of a test machine, then the access audit trail in the admin UI | your account `via mcp (client <id>)` |
 | Secrets | ask for a secret value | refused (`NoSecretReveal`), and the secret tools are not listed |
 | No passthrough | send the MCP token to `GET https://api.2s.42for.net/api/v1/access/account` | `401` |
-| Logs | Log Analytics `prod-2s-log`: `ContainerAppConsoleLogs \| where ContainerAppName == "prod-2s-mcp-ca" \| take 50`, and the API's Application Insights | the exchange logged with the actor `mcp`, no token or body in any log |
+| Logs | Log Analytics `prod-2s-log`: `ContainerAppConsoleLogs \| where ContainerAppName == "prod-2s-mcp-ca" \| take 50`, and the API's Application Insights | the exchange logged with the actor `mcp` and the client, no token or body in any log |
 | Scale to zero | after 10 minutes without calls: `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` | no replica |
 | Cost | Cost Management after a few days, the resource group filtered by the new resources | 0 USD |
 
@@ -259,11 +314,71 @@ A request through the ingress ends after 240 seconds: a tool call that waits lon
 
 - **A bad image:** `az containerapp update -g prod-2s-eusec-rg -n prod-2s-mcp-ca --image <the image of an earlier revision>` (the revision list of phase 8 has their digests; `ghcr.io/akobr/2s-platform-mcp:<previous commit>` is the same image, since a commit's tag never moves). A later run of `main.bicep` keeps that image.
 - **The server unreachable at once, everything kept:** `az containerapp ingress disable -g prod-2s-eusec-rg -n prod-2s-mcp-ca`. The next run of `main.bicep` turns the ingress on again, so for longer use the next point.
-- **The exchange off in the API:** set `mcpEnabled = false` in `parameters/prod.bicepparam`, pull request, what-if (only `prod-2s-api-fa/appsettings`: `Auth__TokenExchange__Enabled` → `false`, the `AdditionalIssuers__0__*` and `Actors__0__*` settings removed), then create: every MCP call answers that the exchange is off. The identity, the environment, the app, its certificate, the role assignment and the exchange application stay (a template run doesn't delete them). Delete them by hand if wanted: `az containerapp delete`, `az containerapp env delete`, `az identity delete -n prod-2s-mcp-mi`, the role assignment (`az role assignment list --all --assignee <deployment principal id>`), `az ad app delete --id <mcpExchangeAppId>`, the DNS records and the GitHub variable `AZURE_MCP_APP_NAME`; then set `mcpAppExists = false` and `mcpCustomDomain = false`. If the exchange application stays while the identity goes, a later identity needs phase 4's `New-TokenExchangeApplication.ps1 -McpIdentityName prod-2s-mcp-mi` again, because the application requires an assignment.
+- **The exchange off in the API:** set `mcpEnabled = false` in `parameters/prod.bicepparam`, pull request, what-if (only `prod-2s-api-fa/appsettings`: `Auth__TokenExchange__Enabled` → `false`, the `AdditionalIssuers__0__*`, `Actors__0__*` and `DeniedClientIds__*` settings removed), then create: every MCP call answers that the exchange is off. The identity, the environment, the app, its certificate, the role assignment and the exchange application stay (a template run doesn't delete them). Delete them by hand if wanted: `az containerapp delete`, `az containerapp env delete`, `az identity delete -n prod-2s-mcp-mi`, the role assignment (`az role assignment list --all --assignee <deployment principal id>`), `az ad app delete --id <mcpExchangeAppId>`, the DNS records and the GitHub variable `AZURE_MCP_APP_NAME`; then set `mcpAppExists = false` and `mcpCustomDomain = false`. If the exchange application stays while the identity goes, a later identity needs phase 4's `New-TokenExchangeApplication.ps1 -McpIdentityName prod-2s-mcp-mi` again, because the application requires an assignment.
 - **The custom domain off:** `mcpCustomDomain = false` and a run of `main.bicep` removes the binding; the certificate stays in the environment until it is deleted (`az containerapp env certificate delete`). This takes the server out of service: its resource URL and the API's subject audience stay `https://mcp.2s.42for.net/mcp`, so clients can't sign in, and the workflow's last check fails until the domain is bound again. To stop the server, use one of the two points above.
+- **The API rolled back past 424-302:** an API build from before it ignores the client lists, so every MCP client could change anything again and a denied client could sign in again, and it refuses the tokens that carry `ReadOnly`. Turn the exchange off first (`mcpEnabled = false`, the point above), then roll the API back; turn the exchange on again only with a build that knows `ReadOnly`.
+
+## Trust a client
+
+Every MCP client outside `mcpTrustedClientIds` only reads and reveals no secret (`mcpUntrustedClientRestrictions`, [decisions](decisions.md#the-mcp-server)). A trusted client changes whatever the person's roles allow, and still reads no secret while the actor withholds them (`NoSecretReveal`, the default). Trust a client only when all of these hold:
+
+- It has a Client ID Metadata Document (CIMD) whose redirects are all web addresses (`https://…`), such as Claude's `https://claude.ai/oauth/mcp-oauth-client-metadata`. Never one whose document lists a loopback redirect (`http://localhost…`, `http://127.0.0.1…`), such as Claude Code's or VS Code's: any local process can present its URL with that redirect.
+- Its id is never a dynamically registered one (`client_01…`): that id is random per registration, and anyone can register a client with the same name.
+- CIMD is on in WorkOS production (**Connect → Configuration**), and the checks 6 and 8 of [phase 1](#1-workos-staging-check-s6) pass against production (`$authkit = 'https://palatial-omen-84.authkit.app'`, the `resource` `https://mcp.2s.42for.net/mcp`).
+
+1. Sign in through the client and call a read tool, e.g. `get_my_account`.
+2. Copy the id the API recorded, never one read from a decoded token: the API reads `azp`, then `appid`, then `client_id`, so a token with more than one of them is matched on the first. Run the query of the check **The client** of [phase 9](#9-verify-s11); the request lines end with `via mcp (client <id>) answered <status>`. Check the document behind the id:
+
+```powershell
+Invoke-RestMethod '<id>' | Select-Object client_id, redirect_uris   # the same client_id, only https:// redirects
+```
+
+3. In `parameters/prod.bicepparam`, exactly as recorded (the trust list compares case):
+
+```bicep
+param mcpTrustedClientIds = ['<id>']
+```
+
+Pull request, what-if (only `prod-2s-api-fa/appsettings`: `+ Auth__TokenExchange__Actors__0__TrustedClientIds__0`), then create. The Function App restarts with the new settings. The client's tokens of before keep `ReadOnly` until they expire, so it may take up to 10 minutes before it can change anything; then run the check **Audit** of phase 9.
+
+To trust it no longer, remove the entry and run the template the same way: once the API runs with the new settings, the client's live tokens get `ReadOnly` again.
+
+## Cut off one client
+
+For a client with a stable id: a CIMD metadata URL. Not for a dynamically registered client: it registers again under a new id, so use [Cut off every unlisted client](#cut-off-every-unlisted-client).
+
+1. Find the id the API recorded (step 2 of [Trust a client](#trust-a-client)).
+2. In `parameters/prod.bicepparam` (compared ignoring case; it wins over `mcpAllowedClientIds` and `mcpTrustedClientIds`):
+
+```bicep
+param mcpDeniedClientIds = ['<id>']
+```
+
+Pull request, what-if (only `prod-2s-api-fa/appsettings`: `+ Auth__TokenExchange__DeniedClientIds__0`), then create. The Function App restarts, and the client's live tokens end with it: the API answers them `401` and refuses its exchanges with "The client app the person signed in with is blocked for this deployment. Use another app, sform or the admin UI." The MCP server forgets a token the API refuses, so the person sees that text from the next exchange on.
+
+**In an emergency**, set the app setting by hand first, then commit the same entry before the next run of `main.bicep`: the template removes settings set by hand, and a run without the entry lets the client in again.
+
+```powershell
+# <n>: the next index, 0 while mcpDeniedClientIds is empty.
+az functionapp config appsettings set -g prod-2s-eusec-rg -n prod-2s-api-fa --settings "Auth__TokenExchange__DeniedClientIds__<n>=<id>" --output none
+```
+
+## Cut off every unlisted client
+
+The switch for dynamically registered clients, whose ids are random: list the clients that may sign in, and the exchange refuses every other one, also a sign-in that names no client. In `parameters/prod.bicepparam`, set the list to the trusted clients:
+
+```bicep
+param mcpAllowedClientIds = ['<each id of mcpTrustedClientIds>']
+```
+
+Pull request, what-if (only `prod-2s-api-fa/appsettings`: `+ Auth__TokenExchange__Actors__0__AllowedClientIds__<n>`), then create. From the restart on, the API refuses the exchange of every other client; the API checks this list at the exchange only, so the tokens such a client already has run out within 10 minutes (`TokenLifetimeMinutes`). With no trusted client there is nothing to list: turn the exchange off instead ([10. Rolling back](#10-rolling-back)).
+
+Turning dynamic client registration off in WorkOS production does the same for the whole environment, and also locks out Cursor and every other client without CIMD. Access tokens WorkOS issued before stay valid until they expire.
 
 ## Later: the custom AuthKit domain
 
 When [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer) sets `authKitDomain = 'auth.42for.net'` and `authKitCustomDomain = true`, the same run of `main.bicep` moves the server's issuer (`Mcp__Authentication__Issuer`) to `https://auth.42for.net` and removes the API's additional issuer, which would then equal `Auth__AuthKit__Issuer` (the API refuses to start with the same domain in both). Its what-if shows both changes. MCP clients find the new authorization server in the resource metadata and register again; people sign in once more. Dynamic client registration and the resource indicator are settings of the WorkOS environment and stay.
+
+With the custom domain both issuers are the same, and only `aud` keeps the token of a self-registered client off the API's routes ([424-302](https://linear.app/424fun/issue/424-302/arch-production-turns-on-the-mcp-token-exchange-with-no-client-allow)). Switch only if the check 9 of [phase 1](#1-workos-staging-check-s6) answered `401` both times, and run it again against production right after the switch (`$authkit = 'https://auth.42for.net'`, the route `https://api.2s.42for.net/api/v1/access/account`). A `200` there means any self-registered client can call the API with the person's full rights: set `authKitCustomDomain = false` again until the API checks the client of its bearer tokens.
 
 The API then checks MCP tokens with the keys of its own issuer, `https://api.workos.com/sso/jwks/<client id>`, not with the AuthKit domain's `…/oauth2/jwks`, which signs them: there is no setting for a second key set of the same issuer. On 2026-11-20 both URLs of production published the same single key (`sso_oidc_key_pair_01M3MMVAKJ4P2WW5CJ2B4D1T4E`). Compare the `kid` values of both again right before the switch, and after it run the check **The exchange** of phase 9 (`get_my_account` through the MCP server). If the keys differ, the switch needs a change of the API first.

@@ -84,3 +84,18 @@ param mcpCustomDomain = true
 // One replica always runs: no cold start on the first call after an idle period, about 4-5 USD a month at the idle rate
 // beyond the free grant (decisions, "The MCP server"). 0 scales it to zero again, for 0 USD.
 param mcpMinReplicas = 1
+
+// The MCP clients (runbook-mcp-server.md, "Trust a client"): every client outside mcpTrustedClientIds only reads and
+// reveals no secret. The trusted list stays empty until a sign-in of a client with a Client ID Metadata Document has been
+// recorded: copy the id the API recorded (its request log line "… via mcp (client <id>) …", or ViaClient in the access
+// audit trail), never one read from a decoded token, and only of a client whose document lists only web redirects,
+// none on loopback (any local process can present such a client's URL). Never a dynamically registered id (client_01…): it is random per registration.
+// mcpDeniedClientIds cuts off one client with a stable id; mcpAllowedClientIds set to the trusted list cuts off every
+// other client, dynamically registered ones too.
+param mcpAllowedClientIds = []
+param mcpTrustedClientIds = []
+param mcpUntrustedClientRestrictions = [
+  'ReadOnly'
+  'NoSecretReveal'
+]
+param mcpDeniedClientIds = []
