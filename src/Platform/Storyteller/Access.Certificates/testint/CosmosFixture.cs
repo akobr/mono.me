@@ -1,4 +1,5 @@
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 using _42.Platform.Storyteller.DbCreator;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using Microsoft.Extensions.Configuration;
