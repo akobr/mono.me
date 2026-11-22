@@ -29,7 +29,6 @@ describe('Modeling entry', () => {
       icon: 'i-lucide-puzzle',
       to: base,
       editRole: 'Contributor',
-      lockedHint: 'Contributors only',
       tabs: [
         { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas` },
         { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates` },
@@ -40,8 +39,10 @@ describe('Modeling entry', () => {
     })
   })
 
-  // Export & Import needs the Administrator role (424-66), so the command palette lists it from Administrator up.
+  // Export & Import needs the Administrator role (424-66), so the command palette lists it from Administrator up. A
+  // Reader browses the four others read-only (424-272).
   it.each([
+    ['Reader', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
     ['Contributor', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
     ['ContributorWithSecrets', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
     ['Administrator', ['Schemas', 'Templates', 'Export & Import', 'Deleted', 'Compare views']],
@@ -58,8 +59,20 @@ describe('Modeling entry', () => {
     })
   })
 
-  it('is shown to a reader, locked, because the whole page is closed below Contributor', () => {
-    expect(modeling('Reader')).toMatchObject({ locked: true, lockedHint: 'Contributors only' })
+  // The lock of a Reader's Modeling is the read-only one of Annotations, so the sidebar's tooltip says "Read-only for
+  // your role", and the command palette lists its tabs (424-272).
+  it('is shown to a reader, locked as read-only, with the four tabs a Reader browses', () => {
+    const base = '/acme/billing/staging/modeling'
+
+    expect(modeling('Reader')).toMatchObject({ locked: true, editRole: 'Contributor' })
+    expect(modeling('Reader')).not.toHaveProperty('lockedHint')
+    expect(modeling('Reader')?.tabs).toEqual([
+      { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas` },
+      { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates` },
+      { label: 'Deleted', icon: 'i-lucide-archive-restore', to: `${base}/deleted` },
+      { label: 'Compare views', icon: 'i-lucide-git-compare', to: `${base}/compare` },
+    ])
+    expect(modeling('Contributor')).toMatchObject({ locked: false })
     expect(modeling('Owner')).toMatchObject({ locked: false })
   })
 
@@ -140,7 +153,13 @@ describe('project section', () => {
 
   // The organization's Audit is an entry of its own section (424-263), so only the project section is checked.
   it('has no entry for a page that another one took over', () => {
-    const paths = buildNavigation({ org: 'acme', project: 'billing', view: 'default', projectRole: 'Owner', orgRole: 'Owner' })
+    const paths = buildNavigation({
+      org: 'acme',
+      project: 'billing',
+      view: 'default',
+      projectRole: 'Owner',
+      orgRole: 'Owner',
+    })
       .filter((section) => section.id !== 'org')
       .flatMap((section) => section.items.map((item) => item.to.split('/').at(-1)))
 

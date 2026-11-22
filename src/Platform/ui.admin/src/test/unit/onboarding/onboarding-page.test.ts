@@ -536,7 +536,7 @@ describe('the choice of the exhibition', () => {
     expect(isChecked()).toBe(false)
     expect(all('section[data-step="exhibition"] > div > p').map(text)).toEqual([
       'Step into Fourth Wall Software, a fictional software house whose customers include Acme Corp and Globex. See how the platform keeps their CRM, HR and CAD solutions configured.',
-      'Explore 30 annotations, configurations that resolve live, and the graph that ties them together.',
+      'Explore 30 annotations, configurations that resolve live, the graph that ties them together, and the schemas and templates behind them.',
       'This step is optional. To join only the exhibition and create your own organization later, check the box and choose Continue with the exhibition only in the last step.',
     ])
     expect(text(document.body.querySelector('section[data-step="exhibition"] label')!)).toBe('Show me the exhibition')

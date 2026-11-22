@@ -127,7 +127,8 @@ export const onboardingTexts = {
   exhibition: {
     heading: 'Join the exhibition',
     text: 'Step into Fourth Wall Software, a fictional software house whose customers include Acme Corp and Globex. See how the platform keeps their CRM, HR and CAD solutions configured.',
-    promise: 'Explore 30 annotations, configurations that resolve live, and the graph that ties them together.',
+    promise:
+      'Explore 30 annotations, configurations that resolve live, the graph that ties them together, and the schemas and templates behind them.',
     choice: 'Show me the exhibition',
     // The note names the button of the last step between its two parts.
     noteStart:

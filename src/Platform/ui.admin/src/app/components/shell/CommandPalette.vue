@@ -67,13 +67,13 @@ const recentItems = computed<CommandPaletteItem[]>(() =>
     : [],
 )
 
-// The tabs of an entry (the Modeling tabs of the caller's role, 424-66) follow it, so their pages stay findable by name
-// where they can be opened.
+// The tabs of an entry (the Modeling tabs of the caller's role, 424-66) follow it, so their pages stay findable by name.
+// A locked entry is read-only, not closed, so its tabs are listed too (424-272).
 const pageItems = computed<CommandPaletteItem[]>(() =>
   buildNavigation(navigation.value).flatMap((section) =>
     section.items.flatMap((item) => [
       { label: item.label, suffix: section.label, icon: item.icon, to: item.to },
-      ...(item.locked ? [] : (item.tabs ?? [])).map((tab) => ({
+      ...(item.tabs ?? []).map((tab) => ({
         label: tab.label,
         suffix: item.label,
         icon: tab.icon,

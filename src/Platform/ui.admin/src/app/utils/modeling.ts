@@ -5,7 +5,7 @@ interface ModelingTabEntry {
   label: string
   value: string
   icon: string
-  /** Hidden below this role (424-66); the other tabs follow the lock of the whole page. */
+  /** Hidden below this role (424-66); the other tabs are open to every member, read-only below Contributor. */
   minRole?: AccountRoleName
 }
 

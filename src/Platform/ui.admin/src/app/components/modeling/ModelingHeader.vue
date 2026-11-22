@@ -26,8 +26,8 @@ const views = useGetViews(
   { query: { enabled: () => !!context.project } },
 )
 
-// The tabs of the caller's role: Export & Import only from Administrator up (424-66), so on its locked page a
-// Contributor gets the four others and none is selected. Compare views is off only once the views are known and none
+// The tabs of the caller's role: Export & Import only from Administrator up (424-66), so on its locked page a Reader
+// or a Contributor gets the four others and none is selected. Compare views is off only once the views are known and none
 // of them is another view; while they load, or after an error, it stays on.
 const items = computed(() =>
   modelingTabsFor(role.projectRole.value).map((tab) => ({

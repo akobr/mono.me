@@ -120,27 +120,38 @@ describe('Compare on the Views page', () => {
     expect(compare('default')?.getAttribute('aria-disabled')).toBe('true')
   })
 
-  it('is not offered to a Reader', async () => {
+  // Compare views is a tab of Modeling, which a Reader browses read-only (424-272).
+  it('is offered to a Reader as to a Contributor, and never on the default view', async () => {
     const view = await mountViews('billing', { 'acme.billing': 'Reader' })
 
     expect(view.queryClient.getQueryState(['v1', 'acme', 'billing', 'views', { discover: false }])?.status).toBe(
       'success',
     )
-    expect(row('staging')).toBeDefined()
-    expect(compare('staging')).toBeUndefined()
-    expect(compare('default')).toBeUndefined()
+    const staging = compare('staging')!
+    expect(staging.getAttribute('href')).toBe('/acme/billing/default/modeling/compare?to=staging')
+    expect(staging.hasAttribute('aria-disabled')).toBe(false)
+    expect(compare('default')?.getAttribute('aria-disabled')).toBe('true')
+    expect(compare('default')?.hasAttribute('href')).toBe(false)
+
+    staging.click()
+    await settle()
+    expect(view.router.currentRoute.value.fullPath).toBe('/acme/billing/default/modeling/compare?to=staging')
   })
 })
 
 describe('Compare views', () => {
-  async function mountCompare(project: string, query: string) {
+  async function mountCompare(
+    project: string,
+    query: string,
+    accessMap: Record<string, string> = { 'acme.billing': 'Owner', 'acme.shipping': 'Owner' },
+  ) {
     const view = await mountScreen(
       ComparePage,
       {},
       {
         path: `/acme/${project}/default/modeling/compare?${query}`,
         scope: { org: 'acme', project, view: 'default' },
-        accessMap: { 'acme.billing': 'Owner', 'acme.shipping': 'Owner' },
+        accessMap,
         routes,
       },
     )
@@ -163,6 +174,23 @@ describe('Compare views', () => {
     await vi.waitFor(() =>
       expect(diffs(requests)).toEqual([`/api/v1/acme/billing/default/configuration/${key}/diff/staging`]),
     )
+  })
+
+  // The comparison only reads, which a Reader may (424-272).
+  it('compares default with staging for a Reader, and only reads', async () => {
+    const methods: string[] = []
+    server.events.on('request:start', ({ request }) => void methods.push(request.method))
+    const requests = recordRequests()
+    await mountCompare('billing', `to=staging&key=${key}`, { 'acme.billing': 'Reader' })
+
+    await vi.waitFor(() =>
+      expect(diffs(requests)).toEqual([`/api/v1/acme/billing/default/configuration/${key}/diff/staging`]),
+    )
+    await vi.waitFor(() => expect(document.body.querySelector('[data-diff]')).not.toBeNull())
+    expect(requests).toContain(`/api/v1/acme/billing/default/configuration/${key}`)
+    expect(requests).toContain(`/api/v1/acme/billing/staging/configuration/${key}`)
+    expect(text()).not.toContain('Compare a configuration across views')
+    expect(methods.filter((method) => method !== 'GET')).toEqual([])
   })
 
   it('requests nothing for ?to= naming the current view in a project without another view', async () => {

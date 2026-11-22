@@ -151,8 +151,9 @@ describe('the other texts', () => {
     expect(onboardingTexts.exhibition.text).toBe(
       'Step into Fourth Wall Software, a fictional software house whose customers include Acme Corp and Globex. See how the platform keeps their CRM, HR and CAD solutions configured.',
     )
+    // a visitor is a Reader, who reads the schemas and templates on Modeling (424-272)
     expect(onboardingTexts.exhibition.promise).toBe(
-      'Explore 30 annotations, configurations that resolve live, and the graph that ties them together.',
+      'Explore 30 annotations, configurations that resolve live, the graph that ties them together, and the schemas and templates behind them.',
     )
     expect(onboardingTexts.exhibition.choice).toBe('Show me the exhibition')
   })

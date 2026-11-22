@@ -6,9 +6,9 @@ import ImportPanel from '@/components/transfer/ImportPanel.vue'
 
 // Export & Import of the view (spec 4.1 of the Export and Import of a View): the Export and Import sections, side by
 // side on desktop and stacked on phones, and below them the result of the view's latest import, also after a reload.
-// A tab of Modeling, which is locked below Contributor (424-38), so Readers do not reach it. The export and the import
-// need the Administrator role, as in the API (424-66). Below it the page shows a lock instead of the sections, so
-// nothing is requested, and keeps the tabs of Modeling, so a Contributor who opens its URL reaches the four others.
+// A tab of Modeling (424-38). The export and the import need the Administrator role, as in the API (424-66). Below it
+// the page shows a lock instead of the sections, so nothing is requested, and keeps the tabs of Modeling, so a Reader or
+// a Contributor who opens its URL reaches the four others (424-272).
 const context = useContextStore()
 const transfers = useTransfersStore()
 const canTransfer = useCan('transfer')

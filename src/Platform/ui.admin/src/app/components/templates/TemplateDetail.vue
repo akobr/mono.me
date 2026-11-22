@@ -272,6 +272,14 @@ defineShortcuts({
                 variant="outline"
                 size="sm"
               />
+              <UBadge
+                v-if="!canEdit"
+                label="Read-only"
+                icon="i-lucide-lock"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              />
             </template>
           </DocumentEditor>
         </div>

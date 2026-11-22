@@ -7,6 +7,7 @@ import {
   type Annotation,
   type ConfigurationComposition as Composition,
 } from '@42for.net/2splatform.sdk'
+import CombinedSchemaView from '@/components/configuration/CombinedSchemaView.vue'
 import ConfigurationComposition from '@/components/configuration/ConfigurationComposition.vue'
 import ConfigurationEffective from '@/components/configuration/ConfigurationEffective.vue'
 import { invalidateByPath, pathToQueryKey } from '@42for.net/2splatform.sdk/vue-query'
@@ -377,10 +378,11 @@ describe('ConfigurationComposition', () => {
     expect(document.body.textContent).not.toContain('Read at different times')
   })
 
-  it('shows a template without a link below Contributor', async () => {
+  // The Templates tab of Modeling is open to a Reader, read-only (424-272).
+  it('links a template for a Reader too', async () => {
     await mountComposition({}, { accessMap: { 'acme.billing': 'Reader' } })
 
-    expect(row(5).querySelector('a')).toBeNull()
+    expect(row(5).querySelector('a')?.getAttribute('href')).toBe('/acme/billing/default/modeling/templates/exe')
     expect(row(5).textContent).toContain('Template · Execution')
     expect(row(3).querySelector('a')?.getAttribute('href')).toBe(
       '/acme/billing/default/configurations/usg.northwind.invoicing',
@@ -501,6 +503,32 @@ describe('ConfigurationComposition', () => {
 
     expect(rows().filter((item) => item.textContent?.includes('Deleted'))).toEqual([])
     expect(document.querySelectorAll('.line-through')).toHaveLength(0)
+  })
+})
+
+// The Schema tab of a configuration: its applied schemas link to the Schemas tab of Modeling, which a Reader browses
+// read-only (424-272).
+describe('CombinedSchemaView', () => {
+  it.each(['Reader', 'Contributor'] as const)('links every applied schema to its schema for a %s', async (role) => {
+    const view = await mountScreen(
+      CombinedSchemaView,
+      { annotationKey: key },
+      { path: `/acme/billing/default/configurations/${key}/schema`, accessMap: { 'acme.billing': role } },
+    )
+    mounted.push(view)
+    await settle(10)
+
+    const layers = [...document.body.querySelectorAll('ol li')]
+    expect(layers.map((layer) => layer.querySelector('a')?.getAttribute('href'))).toEqual([
+      '/acme/billing/default/modeling/schemas/type/exe',
+      '/acme/billing/default/modeling/schemas/annotation/sbt.northwind/type/exe',
+      `/acme/billing/default/modeling/schemas/annotation/${key}`,
+    ])
+    expect(layers.map((layer) => layer.querySelector('a')?.textContent?.trim())).toEqual([
+      'Execution',
+      'sbt.northwind',
+      key,
+    ])
   })
 })
 

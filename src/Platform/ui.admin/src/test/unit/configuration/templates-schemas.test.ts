@@ -324,6 +324,172 @@ describe('TemplateDetail', () => {
   })
 })
 
+// A Reader browses the schemas and the templates of Modeling read-only (424-272): a badge says so, the editor is
+// read-only, and no button or shortcut writes. The mock API reads the role of its own database, where the mock user
+// owns acme.billing, so a write that slipped through would be stored: the requests are counted instead.
+describe('the schemas and the templates of a Reader', () => {
+  const mounted: { host: VueWrapper }[] = []
+  afterEach(() => {
+    mounted.splice(0).forEach((view) => view.host.unmount())
+    server.events.removeAllListeners()
+  })
+
+  const reader = { accessMap: { 'acme.billing': 'Reader' } }
+  const contributor = { accessMap: { 'acme.billing': 'Contributor' } }
+  const text = () => document.body.textContent ?? ''
+  const labels = () => [...document.body.querySelectorAll('button')].map((button) => button.textContent?.trim())
+  const badge = (label: string) =>
+    [...document.body.querySelectorAll('span')].find((span) => span.textContent?.trim() === label)
+  const editor = () => document.body.querySelector('textarea')
+
+  /** The method and path of every request that is not a read, from now on. */
+  function recordWrites() {
+    const writes: string[] = []
+    server.events.on('request:start', ({ request }) => {
+      if (request.method !== 'GET') {
+        writes.push(`${request.method} ${new URL(request.url).pathname}`)
+      }
+    })
+    return writes
+  }
+
+  /** Edits the document as the editor's stub lets it, though a read-only CodeMirror takes no edit. */
+  async function edit(change: (document: Record<string, unknown>) => Record<string, unknown>) {
+    const textarea = mounted.at(-1)!.host.find('textarea')
+    await textarea.setValue(JSON.stringify(change(JSON.parse(textarea.element.value)), null, 2))
+    await settle()
+  }
+
+  /** ⌘S on macOS, Ctrl+S elsewhere: exactly one of the two is the editor's shortcut. */
+  async function pressSave() {
+    for (const modifier of [{ metaKey: true }, { ctrlKey: true }]) {
+      editor()!.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, ...modifier }))
+    }
+    await settle(10)
+  }
+
+  async function mountSchema(type: string, options: { accessMap: Record<string, string> }) {
+    const view = await mountScreen(
+      SchemaDetail,
+      { target: { kind: 'type', type } },
+      { path: `/acme/billing/default/modeling/schemas/type/${type}`, ...options },
+    )
+    mounted.push(view)
+    await settle(10)
+    return view
+  }
+
+  async function mountTemplate(type: string, options: { accessMap: Record<string, string> }) {
+    const view = await mountScreen(
+      TemplateDetail,
+      { type },
+      { path: `/acme/billing/default/modeling/templates/${type}`, ...options },
+    )
+    mounted.push(view)
+    await settle(10)
+    return view
+  }
+
+  it('shows a schema read-only, without Delete, Revert or Save, and ⌘S sends nothing', async () => {
+    const writes = recordWrites()
+    await mountSchema('cnt', reader)
+
+    expect(badge('Read-only')).toBeDefined()
+    expect(editor()?.hasAttribute('readonly')).toBe(true)
+    expect(JSON.parse(editor()!.value)).toEqual(latest(getDocument(loadDb(), scope, 'schema:type:cnt'))?.Content)
+    for (const label of ['Delete', 'Revert', 'Save', 'Create']) {
+      expect(labels()).not.toContain(label)
+    }
+    // its history stays readable
+    expect(labels()).toContain('Versions')
+
+    await edit((schema) => ({ ...schema, title: 'Context' }))
+    await pressSave()
+    expect(writes).toEqual([])
+    expect(latest(getDocument(loadDb(), scope, 'schema:type:cnt'))?.Version).toBe(3)
+  })
+
+  it('saves a schema with ⌘S for a Contributor, who gets no badge', async () => {
+    const writes = recordWrites()
+    await mountSchema('cnt', contributor)
+
+    expect(badge('Read-only')).toBeUndefined()
+    expect(editor()?.hasAttribute('readonly')).toBe(false)
+
+    await edit((schema) => ({ ...schema, title: 'Context' }))
+    await pressSave()
+    expect(writes).toEqual(['PUT /api/v1/acme/billing/default/configuration-schema/type/cnt'])
+  })
+
+  it('tells a Reader that a missing schema does not exist, without the starter document', async () => {
+    const writes = recordWrites()
+    // the mock has no schema of the type Responsibility
+    await mountSchema('rst', reader)
+
+    expect(text()).toContain('No schema')
+    expect(text()).toContain('This schema does not exist in this view, so it validates nothing.')
+    expect(text()).not.toContain('This schema does not exist yet')
+    expect(editor()).toBeNull()
+    expect(labels()).not.toContain('Create')
+    expect(labels()).toContain('Versions')
+
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, ctrlKey: true }))
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, metaKey: true }))
+    await settle(10)
+    expect(writes).toEqual([])
+  })
+
+  it('still offers a Contributor the starter document of a missing schema, with its alert', async () => {
+    await mountSchema('rst', contributor)
+
+    expect(JSON.parse(editor()!.value)).toEqual(starterSchema)
+    expect(text()).toContain('This schema does not exist yet')
+    expect(text()).not.toContain('This schema does not exist in this view')
+    expect(labels()).toContain('Create')
+    expect(badge('Read-only')).toBeUndefined()
+  })
+
+  it('shows a template read-only, without Delete, Revert or Save, and ⌘S sends nothing', async () => {
+    const writes = recordWrites()
+    await mountTemplate('exe', reader)
+
+    expect(badge('Read-only')).toBeDefined()
+    expect(badge('v3')).toBeDefined()
+    expect(editor()?.hasAttribute('readonly')).toBe(true)
+    for (const label of ['Delete', 'Revert', 'Save', 'Create']) {
+      expect(labels()).not.toContain(label)
+    }
+    expect(labels()).toContain('Versions')
+
+    await edit((template) => ({ ...template, retries: 6 }))
+    await pressSave()
+    expect(writes).toEqual([])
+    expect(latest(getDocument(loadDb(), scope, 'template:exe'))?.Version).toBe(3)
+  })
+
+  it('saves a template with ⌘S for a Contributor, who gets no badge', async () => {
+    const writes = recordWrites()
+    await mountTemplate('exe', contributor)
+
+    expect(badge('Read-only')).toBeUndefined()
+    expect(editor()?.hasAttribute('readonly')).toBe(false)
+
+    await edit((template) => ({ ...template, retries: 6 }))
+    await pressSave()
+    expect(writes).toEqual(['PATCH /api/v1/acme/billing/default/template/exe'])
+  })
+
+  it('offers a Reader no Create template on a missing template', async () => {
+    // the mock has no template of the type Responsibility
+    await mountTemplate('rst', reader)
+
+    expect(text()).toContain('No responsibility template')
+    expect(text()).toContain('Configurations of this type inherit only from their ancestors.')
+    expect(labels()).not.toContain('Create template')
+    expect(editor()).toBeNull()
+  })
+})
+
 // 424-158: a delete resets the editor consistently. The echoing stub reports every external value back, as CodeMirror
 // does for its own dispatch; without the guards the editor took the echoed {} for an edit, kept it instead of the
 // starter document or the empty state, and asked "Discard changes?".
