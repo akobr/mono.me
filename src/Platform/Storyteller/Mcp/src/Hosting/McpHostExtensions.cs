@@ -16,7 +16,9 @@ public static class McpHostExtensions
 {
     public const string McpPath = "/mcp";
 
-    public static readonly TimeSpan ApiCallTimeout = TimeSpan.FromMinutes(5);
+    // A call of the API may take the whole budget of a tool call; StorytellerCallFilter's deadline ends what several
+    // calls add up to.
+    public static readonly TimeSpan ApiCallTimeout = StorytellerCallFilter.ToolCallTimeout;
 
     public static WebApplicationBuilder AddStorytellerMcp(this WebApplicationBuilder builder)
     {
@@ -118,9 +120,11 @@ public static class McpHostExtensions
     // The scoped ISdkConfiguration wins over the SDK's own singleton (TryAdd): every request's clients send the token of
     // that request. Unsafe methods are never retried: a retried machine creation would create a second machine.
     //
-    // A call may take as long as ApiCallTimeout. The standard handler's 10-second attempt (and HttpClient's 100-second)
-    // timeout would drop the answer of a write the API still completes, the one-time credentials of a new machine
-    // among them. The circuit breaker samples at least two attempts, which its options validator requires.
+    // A call may take as long as ApiCallTimeout, the deadline of a tool call: below the 240 seconds the Container Apps
+    // ingress waits and the 230 seconds of the API's front end, so the tool answers before either cuts the call. The
+    // standard handler's 10-second attempt (and HttpClient's 100-second) timeout would drop the answer of a write the
+    // API still completes, the one-time credentials of a new machine among them. The circuit breaker samples at least
+    // two attempts, which its options validator requires.
     public static IServiceCollection AddStorytellerClients(this IServiceCollection services)
     {
         services.AddScoped<StorytellerAccessToken>();

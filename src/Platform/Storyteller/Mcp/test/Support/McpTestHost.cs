@@ -23,7 +23,7 @@ namespace _42.Platform.Storyteller.Mcp.UnitTests.Support;
 // (for the actor's key and token file). The token exchange is stubbed (Tokens) unless exchange is true; then the host's
 // own exchange reaches the recording API too. The actor proves itself with the token file TokenFilePath, read only by
 // an exchange. The provider is Entra ID unless the settings name another (Mcp:Provider); each starts from its own
-// sign-in settings.
+// sign-in settings. A given clock replaces the host's TimeProvider (the system's).
 internal sealed class McpTestHost : WebApplicationFactory<Program>
 {
     public const string ActorId = "mcp";
@@ -32,11 +32,13 @@ internal sealed class McpTestHost : WebApplicationFactory<Program>
     private readonly Dictionary<string, string?> _settings;
     private readonly string _environment;
     private readonly bool _exchange;
+    private readonly TimeProvider? _clock;
 
-    public McpTestHost(IDictionary<string, string?>? settings = null, string environment = "Production", bool exchange = false)
+    public McpTestHost(IDictionary<string, string?>? settings = null, string environment = "Production", bool exchange = false, TimeProvider? clock = null)
     {
         _environment = environment;
         _exchange = exchange;
+        _clock = clock;
         _settings = DefaultSettings(settings?.TryGetValue("Mcp:Provider", out var provider) == true ? provider : null);
 
         foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
@@ -99,6 +101,12 @@ internal sealed class McpTestHost : WebApplicationFactory<Program>
             services.AddSingleton<IFileSystem>(Files);
 
             services.AddSingleton<ILoggerProvider>(Logs);
+
+            if (_clock is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(_clock);
+            }
         });
     }
 

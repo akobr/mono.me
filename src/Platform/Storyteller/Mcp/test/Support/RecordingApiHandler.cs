@@ -4,13 +4,15 @@ using System.Text;
 
 namespace _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
-// The Storyteller API as the SDK clients see it: every request is recorded, Respond decides the answer (200 {} when
-// unset).
+// The Storyteller API as the SDK clients see it: every request is recorded, RespondAsync (with the request's token) or
+// else Respond decides the answer (200 {} when neither is set).
 internal sealed class RecordingApiHandler : HttpMessageHandler
 {
     public ConcurrentQueue<RecordedRequest> Requests { get; } = new();
 
     public Func<HttpRequestMessage, HttpResponseMessage>? Respond { get; set; }
+
+    public Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? RespondAsync { get; set; }
 
     public static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK)
     {
@@ -32,6 +34,11 @@ internal sealed class RecordingApiHandler : HttpMessageHandler
             ContentType = request.Content?.Headers.ContentType?.MediaType,
             Headers = headers,
         });
+        if (RespondAsync is not null)
+        {
+            return await RespondAsync(request, cancellationToken);
+        }
+
         return Respond?.Invoke(request) ?? Json("{}");
     }
 }
