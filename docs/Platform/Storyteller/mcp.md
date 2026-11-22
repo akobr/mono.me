@@ -206,7 +206,7 @@ Settings are validated at start; a missing or wrong value stops the host. `Mcp:A
    ```
 
 2. Hash the secret: `printf '%s' '<the secret>' | sha256sum` gives the 64 hex digits.
-3. Turn the exchange on in the `Values` of the API's `local.settings.json`, whose `DOTNET_ENVIRONMENT` is `Development`:
+3. Turn the exchange on in the `Values` of the API's `local.settings.json` (the API runs in `Development` under `func start`, which sets `AZURE_FUNCTIONS_ENVIRONMENT`):
 
    ```json
    "Auth:TokenExchange:Enabled": "true",

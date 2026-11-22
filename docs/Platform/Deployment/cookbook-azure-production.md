@@ -323,6 +323,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 
 | Setting | Why |
 | --- | --- |
+| `AZURE_FUNCTIONS_ENVIRONMENT=Production` | the worker's host environment (it ignores `DOTNET_ENVIRONMENT`). Never `Development`: plain HTTP and the local-only settings are accepted there. A Debug build would not start here anyway: it starts only in `Development` and outside the hosting platforms ([authentication](../Storyteller/authentication.md#how-authkit-tokens-are-checked)) |
 | `Auth__AuthKit__Issuer` | must equal the `iss` of WorkOS tokens: `https://api.workos.com/user_management/<client id>` (the client id of step 13) until the custom domain exists, then `https://auth.42for.net` |
 | `Auth__AuthKit__Audience` | tokens must carry this `aud` (the JWT template, step 13): `https://2s.42for.net`, shared by every application of the environment (see "Open points") |
 | `Auth__AuthKit__Audiences__<n>` | not set yet: the audiences of the 2S applications, which replace the single value; set them before WorkOS gets a second application (see "Open points") |
@@ -545,6 +546,8 @@ Run from a clean checkout of `main`, with 424-230 and the setting of the certifi
 Deploy the admin UI (16.3) together with the API (16.1), or first, whenever the API brings the [step-up](../Storyteller/authentication.md#rollout-of-the-step-up) for the first time: an admin UI from before it answers the step-up with a plain sign-in redirect, which keeps the old sign-in, and nobody gets through to secrets, roles or machines.
 
 ### 16.1 The API
+
+Always a Release build: a Debug build (`DEV_AUTH`) skips the checks of users and refuses to start here, so the Function App would serve nothing.
 
 ```sh
 dotnet publish src/Platform/Storyteller/Api.Functions/src -c Release -o .publish/api

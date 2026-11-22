@@ -381,6 +381,7 @@ Each build-and-deploy below is **one script block** (`& { … }`): paste it whol
     if (Test-Path $path) { Remove-Item $path -Recurse -Force }
   }
 
+  # Release only: a Debug build (DEV_AUTH) refuses to start on the Function App.
   dotnet publish src/Platform/Storyteller/Api.Functions/src -c Release -o .publish/api
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   [System.IO.Compression.ZipFile]::CreateFromDirectory("$PWD/.publish/api", "$PWD/.publish/api.zip")
