@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.22722
  */
 import * as zod from "zod";
 
@@ -131,6 +131,7 @@ export const GetConfigurationCompositionResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -229,6 +230,7 @@ export const GetConfigurationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -278,6 +280,7 @@ export const GetConfigurationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -322,6 +325,7 @@ export const SetConfigurationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -384,6 +388,7 @@ export const PatchConfigurationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -438,6 +443,7 @@ export const GetResolvedConfigurationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -469,6 +475,7 @@ export const GetConfigurationVersionsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -505,6 +512,7 @@ export const GetConfigurationVersionResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -556,6 +564,7 @@ export const RestoreConfigurationVersionResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })

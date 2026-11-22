@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.22722
  */
 import * as zod from "zod";
 
@@ -93,6 +93,7 @@ export const GetAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -110,6 +111,7 @@ export const GetAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -129,6 +131,7 @@ export const GetAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
             IsRoot: zod.boolean().optional(),
@@ -199,6 +202,7 @@ export const SetAnnotationsBodyItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -214,6 +218,7 @@ export const SetAnnotationsBodyItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -231,6 +236,7 @@ export const SetAnnotationsBodyItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -294,6 +300,7 @@ export const SetAnnotationsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -309,6 +316,7 @@ export const SetAnnotationsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -326,6 +334,7 @@ export const SetAnnotationsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -408,6 +417,7 @@ export const GetAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -423,6 +433,7 @@ export const GetAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -440,6 +451,7 @@ export const GetAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -524,6 +536,7 @@ export const SetAnnotationBody = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -539,6 +552,7 @@ export const SetAnnotationBody = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -556,6 +570,7 @@ export const SetAnnotationBody = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -615,6 +630,7 @@ export const SetAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -630,6 +646,7 @@ export const SetAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -647,6 +664,7 @@ export const SetAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -742,6 +760,7 @@ export const PatchAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -757,6 +776,7 @@ export const PatchAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -774,6 +794,7 @@ export const PatchAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -809,6 +830,7 @@ export const DeleteAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -911,6 +933,7 @@ export const GetDescendantsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -928,6 +951,7 @@ export const GetDescendantsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -947,6 +971,7 @@ export const GetDescendantsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
             IsRoot: zod.boolean().optional(),
@@ -1023,6 +1048,7 @@ export const SetAnnotationsSimpleResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -1038,6 +1064,7 @@ export const SetAnnotationsSimpleResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -1055,6 +1082,7 @@ export const SetAnnotationsSimpleResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -1162,6 +1190,7 @@ export const GetResponsibilitiesResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1179,6 +1208,7 @@ export const GetResponsibilitiesResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1198,6 +1228,7 @@ export const GetResponsibilitiesResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
               IsRoot: zod.boolean().optional(),
@@ -1315,6 +1346,7 @@ export const GetSubjectsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1332,6 +1364,7 @@ export const GetSubjectsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1351,6 +1384,7 @@ export const GetSubjectsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
               IsRoot: zod.boolean().optional(),
@@ -1471,6 +1505,7 @@ export const GetUsagesResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1488,6 +1523,7 @@ export const GetUsagesResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1507,6 +1543,7 @@ export const GetUsagesResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
               IsRoot: zod.boolean().optional(),
@@ -1632,6 +1669,7 @@ export const GetContextsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1649,6 +1687,7 @@ export const GetContextsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1668,6 +1707,7 @@ export const GetContextsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
               IsRoot: zod.boolean().optional(),
@@ -1795,6 +1835,7 @@ export const GetExecutionsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1812,6 +1853,7 @@ export const GetExecutionsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1831,6 +1873,7 @@ export const GetExecutionsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
               IsRoot: zod.boolean().optional(),
@@ -1953,6 +1996,7 @@ export const GetUnitsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1970,6 +2014,7 @@ export const GetUnitsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -1989,6 +2034,7 @@ export const GetUnitsResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
               IsRoot: zod.boolean().optional(),
@@ -2125,6 +2171,7 @@ export const GetUnitsOfExecutionResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -2142,6 +2189,7 @@ export const GetUnitsOfExecutionResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
             })
@@ -2161,6 +2209,7 @@ export const GetUnitsOfExecutionResponse = zod.object({
                   Id: zod.string().optional(),
                   Name: zod.string().optional(),
                   Via: zod.string().optional(),
+                  ViaClient: zod.string().optional(),
                 })
                 .optional(),
               IsRoot: zod.boolean().optional(),
@@ -2280,6 +2329,7 @@ export const GetDeletedAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -2297,6 +2347,7 @@ export const GetDeletedAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -2316,6 +2367,7 @@ export const GetDeletedAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
             IsRoot: zod.boolean().optional(),
@@ -2393,6 +2445,7 @@ export const GetDeletedAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -2408,6 +2461,7 @@ export const GetDeletedAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -2425,6 +2479,7 @@ export const GetDeletedAnnotationResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -2514,6 +2569,7 @@ export const FindDeletedAnnotationsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -2529,6 +2585,7 @@ export const FindDeletedAnnotationsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -2548,6 +2605,7 @@ export const FindDeletedAnnotationsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
       IsRoot: zod.boolean().optional(),
@@ -2639,6 +2697,7 @@ export const RestoreAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -2656,6 +2715,7 @@ export const RestoreAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -2675,6 +2735,7 @@ export const RestoreAnnotationsResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
             IsRoot: zod.boolean().optional(),
@@ -2743,6 +2804,7 @@ export const GetAnnotationHistoryResponse = zod.object({
             Id: zod.string().optional(),
             Name: zod.string().optional(),
             Via: zod.string().optional(),
+            ViaClient: zod.string().optional(),
           })
           .optional(),
         Cause: zod
@@ -2851,6 +2913,7 @@ export const GetViewsResponseItem = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -2889,6 +2952,7 @@ export const CreateViewResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -2926,6 +2990,7 @@ export const UpdateViewResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })

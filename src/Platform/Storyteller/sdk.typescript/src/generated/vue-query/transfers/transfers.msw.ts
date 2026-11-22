@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.22722
  */
 import { faker } from "@faker-js/faker";
 
@@ -55,6 +55,10 @@ export const getStartViewExportResponseMock = (
         undefined,
       ]),
       Via: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      ViaClient: faker.helpers.arrayElement([
         faker.string.alpha({ length: { min: 10, max: 20 } }),
         undefined,
       ]),
@@ -128,6 +132,10 @@ export const getGetViewExportResponseMock = (
         undefined,
       ]),
       Via: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      ViaClient: faker.helpers.arrayElement([
         faker.string.alpha({ length: { min: 10, max: 20 } }),
         undefined,
       ]),
@@ -209,6 +217,10 @@ export const getStartViewImportResponseMock = (
         undefined,
       ]),
       Via: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      ViaClient: faker.helpers.arrayElement([
         faker.string.alpha({ length: { min: 10, max: 20 } }),
         undefined,
       ]),
@@ -400,6 +412,10 @@ export const getGetViewImportResponseMock = (
         undefined,
       ]),
       Via: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      ViaClient: faker.helpers.arrayElement([
         faker.string.alpha({ length: { min: 10, max: 20 } }),
         undefined,
       ]),

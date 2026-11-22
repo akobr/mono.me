@@ -220,6 +220,10 @@ const actionItems = [
             <td class="px-3 py-2 text-xs whitespace-nowrap">
               <AuditActorLink :actor="entry.Actor" />
               <span v-if="entry.Actor?.Via" class="text-muted"> via {{ entry.Actor.Via }}</span>
+              <!-- the client app the person used with the actor: an opaque id or a URL, so a long one may wrap -->
+              <span v-if="entry.Actor?.Via && entry.Actor.ViaClient" class="whitespace-normal wrap-anywhere text-muted">
+                (client {{ entry.Actor.ViaClient }})</span
+              >
             </td>
             <td class="px-3 py-2">
               <span v-if="entry.CorrelationId" class="inline-flex items-center gap-1 font-mono text-xs text-muted">

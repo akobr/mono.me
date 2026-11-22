@@ -42,7 +42,7 @@ public partial class AccessApiClient
     private const string SettingsWriteUnauthorizedMessage = "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing).";
     private const string SettingsServerErrorMessage = "Unexpected error occurred on the service.";
     private const string SettingsNotFoundMessage = "The project doesn't exist.";
-    private const string SettingsForbiddenWriteMessage = "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Changing the project settings needs the Administrator role.";
+    private const string SettingsForbiddenWriteMessage = "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Changing the project settings needs the Administrator role. Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly.";
     private const string SettingsConflictMessage = "The project changed concurrently twice in a row (ErrorCode Conflict); try again.";
     private const string SettingsPreconditionFailedMessage = "If-Match names another version of the settings (ErrorCode SettingsPreconditionFailed); Details.Version is the current version. Read them again and retry.";
     private const string SettingsBodyTooLargeMessage = "The request body is larger than 16 KiB (ErrorCode BodyTooLarge).";

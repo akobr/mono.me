@@ -112,7 +112,7 @@ npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 npm run prepare:local  # npm ci and npm run build, each only when its inputs changed (--force: always)
 ```
 
-To generate from a specific document: `SPEC=../open.api.v0.10.56.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.56.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.56.10738` → `0.10.56`).
+To generate from a specific document: `SPEC=../open.api.v0.10.58.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.58.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.58.22722` → `0.10.58`).
 
 After Orval, `npm run generate` runs `scripts/generate-catalog.mjs` (also on its own: `node scripts/generate-catalog.mjs`), which writes `src/generated/catalog/project-settings.ts` from the catalog of the conformance suite (`../conformance/project-settings.json`), formatted by Prettier as Orval formats its output. So a change of the catalog needs `npm run generate` too, and the check that `src/generated` matches a fresh generation guards the catalog module as well.
 
