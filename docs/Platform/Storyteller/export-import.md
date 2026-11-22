@@ -1,10 +1,10 @@
 # Export and Import of a View
 
-The documents of a view (its annotations, schemas, templates and configurations) can be exported as a zip, either as a folder of JSON files or as a git repository with every version as a commit. A zip can be imported back into any view of any project. Both run as jobs in the background: a request stores the job and queues it, a queue-triggered function does the work, and the client polls the job.
+The documents of a view (its annotations, schemas, templates and configurations) can be exported as a zip, either as a folder of JSON files or as a git repository with every version as a commit. A zip can be imported back into any view of any project. Both run as jobs in the background: a request stores the job and queues it, a queue-triggered function does the work, and the client polls the job. A job that ends leaves a notification in the [inbox](inbox.md) of its view.
 
 The code is in:
 
-- `src/Platform/Storyteller/Backend.Core/src/Transferring/`: the jobs, the file names, the archive reader (of a zip or of loose files) and writer, the git writer, the importer (`IViewImporter`, `ViewImporter`: the passes of an import, see [Import without a job](#import-without-a-job)), its tally (`ViewImportTally`) and the overlay;
+- `src/Platform/Storyteller/Backend.Core/src/Transferring/`: the jobs, the file names, the archive reader (of a zip or of loose files) and writer, the git writer, the importer (`IViewImporter`, `ViewImporter`: the passes of an import, see [Import without a job](#import-without-a-job)), its tally (`ViewImportTally`), the overlay, and the notification of an ended job (`ViewTransferNotifications`, see [Jobs](#jobs));
 - `Backend.CosmosDb/src/`: the reads and imports of each kind (`Annotating/CosmosAnnotationService.Import.cs`, `Configuring/CosmosConfigurationSchemaService.Import.cs`, `CosmosConfigurationTemplateService.cs`, `CosmosConfigurationService.cs`) and the jobs (`Transferring/`);
 - `Backend.AzureStorage/src/`: the archives and the queue;
 - `Api.Functions/src/`: the routes (`V1/ViewTransferHttp.cs`, `V1/ViewTransferRequests.cs`), the machine scopes of each kind (`Security/ViewTransferScopes.cs`), the access check with the scope `Configuration.Transfer` of machines (`Security/HttpRequestDataExtensions.cs`), and the queue and timer functions (`Transfers/ViewTransferFunctions.cs`);
@@ -434,7 +434,7 @@ A written document can carry warnings (`ViewImportItem.Warnings`, each a `Code` 
 
 - **Cost.** Each annotation takes several requests: reads of the key and its ancestors, and the writes of a create or an update. Each schema runs the compliance query of a save: one query over the configurations it affects and one validation per configuration. With `Skip`, the existence reads list the view's schemas and configurations once. An archive with thousands of annotations, or with many type schemas over many configurations, takes much longer than one with configurations only.
 - **Timeout.** A job is one invocation of the queue function, bound by the Functions timeout of the hosting plan (`host.json` sets no `functionTimeout`).
-- **Retries.** An import is idempotent. When an invocation is cut off, the queue delivers the message again, and the whole job runs again. The documents the first run wrote are then `Unchanged`. After three deliveries (`maxDequeueCount`), the message goes to the poison queue `configuration-transfers-poison`, where `AbandonViewTransfer` fails the job ("stopped on every attempt, for example because its worker ran out of memory"), so it no longer takes a slot of the project. A job that ended before stays as it is. Resuming where a run stopped is not supported.
+- **Retries.** An import is idempotent. When an invocation is cut off, the queue delivers the message again, and the whole job runs again. The documents the first run wrote are then `Unchanged`. After three deliveries (`maxDequeueCount`), the message goes to the poison queue `configuration-transfers-poison`, where `AbandonViewTransfer` fails the job ("stopped on every attempt, for example because its worker ran out of memory"), so it no longer takes a slot of the project. A job that ended before stays as it is; only its [notification](#jobs) is pushed again, which gives the same item. Resuming where a run stopped is not supported.
 - **Failures of single files.** Concurrent changes that outlast the retries of a write fail that file with `Conflict`, not the whole job. A `$remove` entry that is not a valid JSONPath, or that takes the whole document (`$`), fails its file with `PatchInvalid`.
 
 ### Import without a job
@@ -476,9 +476,22 @@ stateDiagram-v2
 ```
 
 - Every write restarts the item's `ttl` (`RetentionHours`), and `ExpiresAt` tells the client when it ends.
-- Writes use the item's ETag. A worker that loses a race stops. A repeated message of a finished job does nothing. A worker that crashed leaves the job `Running` until the queue delivers the message again.
+- Writes use the item's ETag. A worker that loses a race stops. A repeated message of a finished job changes nothing: it only pushes the job's notification again, which gives the same item (see below). A worker that crashed leaves the job `Running` until the queue delivers the message again.
 - A project can have at most `MaxActiveTransfers` jobs queued or running. A queued job counts for an hour after its last change; a running one, which saves its progress every few seconds, for 15 minutes. So an abandoned job does not block the project, even before the poison queue fails it. One more is refused with `409 TransferLimit`.
 - An export writes the zip into memory and uploads it as `{organization}/{project}/{view}/exports/{id}.zip`. An import reads its upload `…/imports/{id}.zip` into memory, and deletes it when it succeeds. `PurgeExpiredAsync` deletes archives an hour after the retention.
+- **A job that throws** is failed by the same invocation, with the message of the exception, unless the invocation was cancelled: the queue then delivers the message again. The call that fails the job deletes the archive of an export only when it saved the failure itself. A job that had already ended keeps its state and its archive: an export whose save of `Succeeded` reached the store while the answer was lost stays `Succeeded`, and its archive stays downloadable. When the failure could not be saved (the job is gone, another worker changed it, or the store failed), an archive that was already uploaded is left to the purge.
+
+**Notification.** A job that ends pushes one notification into the [inbox](inbox.md) of its view (`ViewTransferNotifications`, pushed by `ViewTransferService` through `IViewInboxPublisher`):
+
+- **Titles.** `Export finished` or `Export failed`; `Import finished`, `Import finished with failures` (the job succeeded and some files failed) or `Import failed`. A dry run reads `Check finished`, `Check found problems` or `Check failed`.
+- **Text.** Of a result, the counts: `12 annotations, 3 schemas, 2 templates, 40 configurations, 58 versions, 1.2 MB` for an export, `acme.zip: 3 created, 2 updated, 10 unchanged, 1 skipped, 0 failed` for an import, and `… 3 to create, 2 to update, …` for a dry run. Of a failure, the job's `Error`.
+- **Who sees it.** The item has the minimal role `Administrator`, the role of the job routes, so the project's Administrators and Owners. Its `CreatedBy` is the job's, a person or a machine, and its `Job` names the job (the kind, the id and the file name).
+- **Lifetime.** The notification of a result expires with its job (the job's `ExpiresAt`). The notification of a failure names no end and lives for the retention of the inbox (`ViewInbox:RetentionDays`, 30 days by default), so it outlives its job.
+- **One item per job.** The push has the key `ViewExport.{id}` or `ViewImport.{id}` and the time of the job's end. A message delivered again and the poison queue push the end of an ended job once more, which repairs a push that a crash lost and otherwise gives the same item. A notification that somebody dismissed stays dismissed.
+- **The push never fails the job.** A failure of the inbox is logged as a warning; the job keeps its state and an export its archive. The push does not listen to the token of the invocation.
+- A job that could not be queued fails inside the start request and pushes its failure too. A job in progress has no item, and a host without the inbox (`AddViewInbox`) pushes nothing.
+
+The levels, the exact texts and the places where an end is pushed are in [inbox.md](inbox.md#notifications-of-exports-and-imports). No route and no page reads the inbox yet ([inbox.md](inbox.md#not-there-yet)); the clients still learn the end of a job by polling it.
 
 `ViewExport` reports:
 
@@ -625,8 +638,8 @@ The operations are in the OpenAPI document since `open.api.v0.9.48.json` (`Sdk.N
 
 The background half is `Api.Functions/src/Transfers/ViewTransferFunctions.cs`:
 
-- `ProcessViewTransfer` is triggered by the queue `configuration-transfers` on `AzureWebJobsStorage`. `host.json` sets `batchSize` 1, so a worker runs one job at a time, and `maxDequeueCount` 3. A message that is not a valid job is logged and dropped. Any other failure fails the invocation (`ExceptionHandlingMiddleware` rethrows for invocations without an HTTP request), so the runtime delivers the message again.
-- `AbandonViewTransfer` is triggered by the poison queue `configuration-transfers-poison`, where the runtime moves a message after its last failed delivery. A crashed worker, for example out of memory, never ran the job's failure handling, so this function fails the job and deletes the partial archive of an export. A job that already ended is left alone.
+- `ProcessViewTransfer` is triggered by the queue `configuration-transfers` on `AzureWebJobsStorage`. `host.json` sets `batchSize` 1, so a worker runs one job at a time, and `maxDequeueCount` 3. A message that is not a valid job is logged and dropped. Any other failure fails the invocation (`ExceptionHandlingMiddleware` rethrows for invocations without an HTTP request), so the runtime delivers the message again. A message of a job that already ended runs nothing: it only pushes the job's [notification](#jobs) again.
+- `AbandonViewTransfer` is triggered by the poison queue `configuration-transfers-poison`, where the runtime moves a message after its last failed delivery. A crashed worker, for example out of memory, never ran the job's failure handling, so this function fails the job, which pushes the notification of the failure, and deletes the partial archive of an export. A job that already ended is left alone, with its state and the archive of its export; only its notification is pushed again, which gives the same item.
 - `PurgeViewTransfers` runs every hour at minute 17 and deletes archives older than the retention plus one hour.
 - Both functions had the names of the first spec (`ProcessConfigurationTransfer`, `PurgeConfigurationTransfers`). The queue, the container, the partition and the options section keep theirs (see [Storage](#storage)).
 
@@ -871,6 +884,7 @@ A dry run refreshes nothing.
 
 - Archives are blobs of the container `configuration-transfers`, and jobs are messages of the queue `configuration-transfers` (Base64, as the queue trigger expects). Both are created on first use. They keep the names of the first spec, like the partition `{project}.transfer` and the options section `ConfigurationTransfers`.
 - Both use the connection `AzureWebJobsStorage`, which the queue trigger listens on: a connection string, or an identity-based section with `accountName`, or `blobServiceUri` and `queueServiceUri`, and `clientId` for a user-assigned identity.
+- The notification of an ended job is an item of the container `organizations`, in the partition `{project}.inbox.{view}` (see [inbox.md](inbox.md#storage)). A job and its notification are not linked in storage: each expires by its own `ttl`, and nothing deletes one with the other.
 
 ## Limits
 
@@ -885,5 +899,7 @@ Section `ConfigurationTransfers` (`ViewTransferOptions`):
 | `MaxDocumentBytes` | 2 MiB | One document file of any kind, also when its declared size lies |
 | `MaxArchiveEntries` | 50,000 | Entries of an uploaded zip |
 | `MaxReportedItems` | 1,000 | Items kept in an import job; the summaries count all |
+
+`RetentionHours` is also the lifetime of the notification of a result, which carries the `ExpiresAt` of its job. The notification of a failure lives for `ViewInbox:RetentionDays` instead (30 days by default, see [inbox.md](inbox.md#configuration)).
 
 The upload limits are checked from the zip's central directory before anything is decompressed (`ViewArchiveReader.Validate`). Hidden paths, ignored files and excluded files don't count toward `MaxExtractedBytes` when the job reads the archive. An import parses every included file before its first write, and parsed JSON takes several times the memory of its text, so `MaxExtractedBytes` bounds the memory of the worker: raise it only on a plan with the memory for it. An export holds the documents of the view and the zip in memory.

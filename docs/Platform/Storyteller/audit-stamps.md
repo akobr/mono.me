@@ -30,6 +30,8 @@ The API names the caller with `HttpRequestDataExtensions.GetAuditActor()`. It ne
 
 Audit-log entries have their own time and carry only `Actor`.
 
+A fourth name, `Closed`, is used by one record only: the item of the [inbox of a view](inbox.md). It is the accept or the dismiss of the item, which is neither a change of its content nor a delete.
+
 | Record | Stamps |
 | --- | --- |
 | `Annotation` | `Created`, `Modified` |
@@ -45,10 +47,13 @@ Audit-log entries have their own time and carry only `Actor`.
 | `KeyValuePolicy` | `Modified` (null for the defaults) |
 | `ProjectSettings` | `Modified` (null only before the first change; it stays after a reset to the defaults, so `Version` and `Modified` tell reset settings from settings never set); see [Project settings](access.md#project-settings) |
 | `ClientEncryptionRecipient` | `Created` |
+| `ViewInboxItem` | `CreatedAt`, `CreatedBy` (an actor: who caused the item, so the actor that started the job it reports, or `System`), and `Closed` (who accepted or dismissed the item and when; null while the item is open, and cleared when the handler of an accepted action fails and the item opens again): see [inbox.md](inbox.md#the-model) |
 
 A configuration version keeps the time of its write. The configuration item is also rewritten by the platform when the effective document is cached or invalidated, but that changes neither `Modified` nor the listed time. A configuration that was never written (version 0, calculated on read) is stamped as the calculation by `System`.
 
 A version restore of a configuration, template or schema is a write: the new version's `Modified` is the caller who restored it, at the time of the restore, not the author of the version it copies. The copied version is named in the new version's `RestoredFrom`, so a version list shows both. A restore that changes nothing writes no stamp, and its `VersionRestoreResult` carries the `Modified` of the current version.
+
+An inbox item takes its `CreatedBy` from its producer: the notification of an export or an import copies the `CreatedBy` of its job, `Via` included. The actor of `Closed` is the one that the caller of `IViewInboxService` passes to accept or dismiss.
 
 ## Clients
 
@@ -56,7 +61,7 @@ Both SDKs carry the two types (`AuditActor`, `AuditStamp` in `Sdk.NSwag` and `@4
 
 ## Storage and request units
 
-The stamps are stored as they are returned. Organization containers keep them out of the index (`ContainerFactory.AuditStampPaths`): `/Created/*`, `/Modified/*`, `/Deleted/By/*`, `/Deletion/DeletedBy/*` and `/Actor/*`, next to the audit entries (`/Entries/*`). `Via` and `ViaClient` are inside these paths, so they are excluded too. Nothing filters or sorts on them; listings only project them. The deletion times stay indexed, because the deleted listings filter on `IS_DEFINED(c.Deleted.At)` and sort on `c.Deletion.DeletedAt`. `ContainerFactory.EnsureContainerSettingsAsync` adds the exclusions to existing containers.
+The stamps are stored as they are returned. Organization containers keep them out of the index (`ContainerFactory.AuditStampPaths`): `/Created/*`, `/Modified/*`, `/Deleted/By/*`, `/Deletion/DeletedBy/*` and `/Actor/*`, next to the audit entries (`/Entries/*`). `Via` and `ViaClient` are inside these paths, so they are excluded too. Nothing filters or sorts on them; listings only project them. `CreatedBy` and `Closed` of an inbox item are not among these paths, so they are indexed with the rest of the item, although nothing filters or sorts on them either. The deletion times stay indexed, because the deleted listings filter on `IS_DEFINED(c.Deleted.At)` and sort on `c.Deletion.DeletedAt`. `ContainerFactory.EnsureContainerSettingsAsync` adds the exclusions to existing containers.
 
 Measured on the Cosmos emulator, as the average of 20 creates of the same item:
 
