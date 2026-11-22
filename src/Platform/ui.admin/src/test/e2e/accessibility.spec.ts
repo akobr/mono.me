@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { createZip, textFile } from '../../app/mock/zip'
 import { expectAccessible, openApp, openBulkCreate, signedOut } from './support'
 
@@ -224,6 +224,70 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expectAccessible(page, tintedLines)
       })
     }
+
+    /**
+     * Opens the copy to another view (424-309) of the detail at the path, from its More actions menu, which a phone
+     * has too.
+     */
+    async function openCopyDialog(page: Page, path: string, key: string) {
+      await openApp(page, path)
+      // axe takes the content of a modal for hidden, and so leaves its colors unchecked: while a modal is open the
+      // body has overflow hidden, and it has no height, since the app is laid out in fixed boxes. A body as high as
+      // the window changes nothing on the screen, and axe then checks the contrast in the dialog too.
+      await page.addStyleTag({ content: 'body { min-height: 100vh }' })
+      await page.getByRole('button', { name: 'More actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Copy to view', exact: true }).click()
+      return page.getByRole('dialog', { name: `Copy ${key} to another view`, exact: true })
+    }
+
+    // The copy dialog with its options, with the plan of a check, and with the result of the copy. The configuration
+    // of an execution that staging lacks, below a context that it lacks too, so the table has annotations and a
+    // configuration, and the result links all of them.
+    test('the copy dialog has no serious accessibility violations', async ({ page }) => {
+      const key = 'exe.northwind.reporting.test'
+      const dialog = await openCopyDialog(page, `/acme/billing/default/configurations/${key}`, key)
+      const documents = (name: string) => dialog.getByRole('region', { name, exact: true })
+      await expect(dialog.getByRole('combobox', { name: 'Copy to', exact: true })).toHaveText('staging')
+      await expect(dialog.getByRole('checkbox', { name: 'Copy missing annotations too', exact: true })).toBeChecked()
+      await expectAccessible(page)
+
+      await dialog.getByRole('button', { name: 'Check', exact: true }).click()
+      await expect(dialog.getByText('Checked: nothing was written', { exact: true })).toBeVisible()
+      await expect(documents('Checked documents').getByRole('row')).toHaveCount(4)
+      await expectAccessible(page)
+
+      await dialog.getByRole('button', { name: 'Copy 3 to staging', exact: true }).click()
+      await expect(dialog.getByText('Copied to staging', { exact: true })).toBeVisible()
+      await expect(documents('Copied documents').getByRole('link')).toHaveCount(3)
+      await expectAccessible(page)
+    })
+
+    // The production view as the target: its badge, the warning, and the hint of the Copy button, which is off until
+    // a check ran. With Skip the plan has a document to skip and nothing to copy.
+    test('the copy dialog to the production view has no serious accessibility violations', async ({ page }) => {
+      const dialog = await openCopyDialog(page, '/acme/billing/staging/annotations/sbt.northwind', 'sbt.northwind')
+      await expect(dialog.getByRole('combobox', { name: 'Copy to', exact: true })).toHaveText('default')
+      await expect(dialog.getByText('default is the production view', { exact: true })).toBeVisible()
+      await expect(dialog.getByText('Check first: default is the production view.', { exact: true })).toBeVisible()
+      await expectAccessible(page)
+
+      await dialog.getByRole('radio', { name: 'Skip', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Check', exact: true }).click()
+      await expect(dialog.getByText('It is already in default.', { exact: true })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: 'Nothing to copy', exact: true })).toBeDisabled()
+      await expectAccessible(page)
+    })
+
+    // A copy that skipped a document ends in a warning, with the reason in its row.
+    test('the result of a copy that skipped a document has no serious accessibility violations', async ({ page }) => {
+      const dialog = await openCopyDialog(page, '/acme/billing/default/annotations/sbt.northwind', 'sbt.northwind')
+      await expect(dialog.getByRole('combobox', { name: 'Copy to', exact: true })).toHaveText('staging')
+      await dialog.getByRole('radio', { name: 'Skip', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Copy', exact: true }).click()
+      await expect(dialog.getByText('Copied to staging', { exact: true })).toBeVisible()
+      await expect(dialog.getByText('It is already in staging.', { exact: true })).toBeVisible()
+      await expectAccessible(page)
+    })
 
     // The scopes of a new machine (424-79): a preset with a management scope picked by an Owner; for a Contributor the
     // management scopes, the secrets scopes and their presets disabled.

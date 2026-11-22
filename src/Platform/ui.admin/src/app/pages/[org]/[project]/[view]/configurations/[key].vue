@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useClipboard } from '@vueuse/core'
 import type { DropdownMenuItem } from '@nuxt/ui'
@@ -20,9 +20,12 @@ const annotation = computed(() => catalog.byKey.get(key.value))
 const base = computed(() => `/${context.org}/${context.project}/${context.view}/configurations/${key.value}`)
 const query = computed(() => ({ q: route.query.q }))
 
-// More actions, as on the annotation detail: the link and the key for everyone, and "Compare with view" for
-// Contributors (spec "Copy and Compare Annotations and Configurations Between Views", section 8).
+// More actions, as on the annotation detail: the link and the key for everyone, and "Compare with view" and "Copy to
+// view" for Contributors (spec "Copy and Compare Annotations and Configurations Between Views", section 8).
 const transfer = useViewTransfer('configurations', () => [key.value])
+const copying = transfer.copying
+// The menu item that opened the copy dialog is gone when the dialog closes: the focus goes back to the menu's button.
+const more = useTemplateRef<{ $el?: HTMLElement }>('more')
 const menu = computed<DropdownMenuItem[][]>(() => [
   [
     {
@@ -88,7 +91,14 @@ function close() {
             <KeyText :value="key" copy />
           </div>
           <UDropdownMenu :items="menu" :content="{ align: 'end' }">
-            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" size="sm" aria-label="More actions" />
+            <UButton
+              ref="more"
+              icon="i-lucide-ellipsis"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              aria-label="More actions"
+            />
           </UDropdownMenu>
           <DetailPanelActions />
           <UButton
@@ -119,5 +129,13 @@ function close() {
     <RouterView v-slot="{ Component }">
       <component :is="Component" :annotation-key="key" />
     </RouterView>
+
+    <ViewCopyDialog
+      v-if="canEdit"
+      v-model:open="copying"
+      kind="configurations"
+      :keys="[key]"
+      @closed="more?.$el?.focus()"
+    />
   </DetailPanel>
 </template>

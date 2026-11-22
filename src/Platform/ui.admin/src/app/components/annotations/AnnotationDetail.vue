@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useClipboard, useNow } from '@vueuse/core'
 import type { DropdownMenuItem } from '@nuxt/ui'
@@ -39,8 +39,12 @@ const canEdit = useCan('edit')
 const toast = useToast()
 const now = useNow({ interval: 60_000 })
 const { copy } = useClipboard({ legacy: true })
-// "Compare with view" for this annotation (spec "Copy and Compare Annotations and Configurations Between Views").
+// "Compare with view" and "Copy to view" for this annotation (spec "Copy and Compare Annotations and Configurations
+// Between Views", section 8).
 const transfer = useViewTransfer('annotations', () => [props.annotationKey])
+const copying = transfer.copying
+// The menu item that opened the copy dialog is gone when the dialog closes: the focus goes back to the menu's button.
+const more = useTemplateRef<{ $el?: HTMLElement }>('more')
 
 const confirmDelete = ref(false)
 const deleting = ref(false)
@@ -162,7 +166,14 @@ async function remove() {
         <KeyText :value="annotationKey" copy />
       </div>
       <UDropdownMenu :items="menu" :content="{ align: 'end' }">
-        <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" size="sm" aria-label="More actions" />
+        <UButton
+          ref="more"
+          icon="i-lucide-ellipsis"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          aria-label="More actions"
+        />
       </UDropdownMenu>
       <DetailPanelActions />
       <UButton
@@ -211,6 +222,13 @@ async function remove() {
       :description="deleteDescription"
       :loading="deleting"
       @confirm="remove"
+    />
+    <ViewCopyDialog
+      v-if="canEdit && !deleted"
+      v-model:open="copying"
+      kind="annotations"
+      :keys="[annotationKey]"
+      @closed="more?.$el?.focus()"
     />
   </div>
 </template>

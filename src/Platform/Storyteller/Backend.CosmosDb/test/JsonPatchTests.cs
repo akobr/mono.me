@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Configuring;
 using FluentAssertions;
@@ -43,6 +44,54 @@ public class JsonPatchTests
         exception.Kind.Should().Be(JsonPatchFailureKind.TestFailed);
         exception.OperationIndex.Should().Be(1);
         exception.ErrorCode.Should().Be(ErrorCodes.PatchTestFailed);
+    }
+
+    // The copy to another view of the admin UI (424-309) replaces a whole own document with a test and a replace of
+    // the root, as sform and the MCP server do for a member whose name needs a pointer escape.
+    [Fact]
+    public async Task ApplyPatch_RootTestAndReplace_ReplacesTheWholeDocument()
+    {
+        var replacement = JObject.Parse("""{ "a/b": 1, "m~n": { "deep": [1, 2] }, "retries": 5 }""");
+        var patch = new JArray(
+            new JObject { ["op"] = "test", ["path"] = string.Empty, ["value"] = Document },
+            new JObject { ["op"] = "replace", ["path"] = string.Empty, ["value"] = replacement });
+
+        var result = await Document.ApplyPatch(patch);
+
+        result.Should().BeEquivalentTo(replacement);
+        result.Properties().Select(property => property.Name).Should().Equal("a/b", "m~n", "retries");
+    }
+
+    [Fact]
+    public async Task ApplyPatch_RootTestOfAChangedDocument_ThrowsTestFailed()
+    {
+        var read = JObject.Parse("""{ "retries": 3, "owner": "team-b" }""");
+        var patch = new JArray(
+            new JObject { ["op"] = "test", ["path"] = string.Empty, ["value"] = read },
+            new JObject { ["op"] = "replace", ["path"] = string.Empty, ["value"] = new JObject { ["retries"] = 5 } });
+
+        var act = () => Document.ApplyPatch(patch);
+
+        var exception = (await act.Should().ThrowAsync<JsonPatchException>()).Which;
+        exception.Kind.Should().Be(JsonPatchFailureKind.TestFailed);
+        exception.OperationIndex.Should().Be(0);
+        exception.ErrorCode.Should().Be(ErrorCodes.PatchTestFailed);
+    }
+
+    // A browser sends the document it read back as it parsed it: the members of an object in any order, and a number
+    // such as 2.0 as 2. Neither is a change of the document.
+    [Fact]
+    public async Task ApplyPatch_RootTestOfTheSameDocumentWrittenAnotherWay_Passes()
+    {
+        var stored = JObject.Parse("""{ "ratio": 2.0, "limits": { "low": 1, "high": 1e2 }, "tags": ["a", "b"] }""");
+        var read = JObject.Parse("""{ "tags": ["a", "b"], "limits": { "high": 100, "low": 1 }, "ratio": 2 }""");
+        var patch = new JArray(
+            new JObject { ["op"] = "test", ["path"] = string.Empty, ["value"] = read },
+            new JObject { ["op"] = "replace", ["path"] = string.Empty, ["value"] = new JObject { ["ratio"] = 3 } });
+
+        var result = await stored.ApplyPatch(patch);
+
+        result.Should().BeEquivalentTo(JObject.Parse("""{ "ratio": 3 }"""));
     }
 
     [Fact]

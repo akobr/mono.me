@@ -9,10 +9,13 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // the grid while one or more rows are checked, Contributors and up, on the grid only (from 768 px; the phone list has
 // no checkboxes). "<n> selected", then Enable, Disable, Label (a popover with the input "Label", which suggests the
 // catalog's labels and offers 'Create "<text>"' for a new one, and Remove and Add), "Compare with view" (opens the
-// comparison of the selected annotations with another view, below Compare views of Modeling, and keeps the selection;
-// disabled, with the reason beside it, in a project without another view and above 100 rows), Delete (the confirmation
-// "Delete <n> annotations?" with "Delete <n>", no singular form) and "Clear selection". Every other successful action
-// shows its toast ("Annotations disabled", "Annotations enabled", "Label <l> added", "Label <l> removed", "<n>
+// comparison of the selected annotations with another view, below Compare views of Modeling), "Copy to view" (opens
+// the dialog "Copy <n> annotations to another view", "Copy <key> to another view" for one row: the target under "Copy
+// to", Overwrite or Skip for what the target already has, Check for the plan, Copy, then the result "Copied to <view>"
+// with "Compare with <view>" and Done), Delete (the confirmation "Delete <n> annotations?" with "Delete <n>", no
+// singular form) and "Clear selection". "Compare with view" and "Copy to view" keep the selection, and are disabled,
+// with the reason once beside them, in a project without another view and above 100 rows. Every other successful
+// action shows its toast ("Annotations disabled", "Annotations enabled", "Label <l> added", "Label <l> removed", "<n>
 // annotations deleted" with Undo for 10 seconds) and clears the selection, which removes the bar.
 public sealed partial class AnnotationBulkBar(App app)
 {

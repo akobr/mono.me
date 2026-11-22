@@ -197,6 +197,7 @@ declare module 'vue' {
     VersionsView: typeof import('./components/versions/VersionsView.vue')['default']
     VersionTimeline: typeof import('./components/versions/VersionTimeline.vue')['default']
     ViewCompareFile: typeof import('./components/views/ViewCompareFile.vue')['default']
+    ViewCopyDialog: typeof import('./components/views/ViewCopyDialog.vue')['default']
     ZonedDateTimeInput: typeof import('./components/annotations/ZonedDateTimeInput.vue')['default']
   }
 }

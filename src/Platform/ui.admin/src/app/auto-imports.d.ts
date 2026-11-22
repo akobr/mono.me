@@ -93,6 +93,7 @@ declare global {
   const useTypeAppearanceStore: typeof import('./stores/type-appearance').useTypeAppearanceStore
   const useUnsavedChanges: typeof import('./composables/useUnsavedChanges').useUnsavedChanges
   const useViewCompare: typeof import('./composables/useViewCompare').useViewCompare
+  const useViewCopy: typeof import('./composables/useViewCopy').useViewCopy
   const useViewTransfer: typeof import('./composables/useViewTransfer').useViewTransfer
   const useViewTransferStore: typeof import('./stores/view-transfer').useViewTransferStore
 }

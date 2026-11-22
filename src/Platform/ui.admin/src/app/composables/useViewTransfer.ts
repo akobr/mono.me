@@ -1,4 +1,4 @@
-import { computed, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { useRouter, type RouteLocationRaw } from 'vue-router'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { useContextStore } from '@/stores/context'
@@ -7,10 +7,10 @@ import { compareLocation, fitsInAddress, viewTransferLimit } from '@/utils/view-
 import type { ViewItemKind } from '@/utils/view-documents'
 
 /**
- * The one place that knows the rules of comparing a selection with another view of the project (spec "Copy and
- * Compare Annotations and Configurations Between Views", section 8): the bulk bars of Annotations and Configurations
- * and the More actions menus of both details take their button and their menu item from here. `keys` are the selected
- * keys, or the one key of a detail.
+ * The one place that knows the rules of comparing a selection with another view of the project, and of copying it
+ * there (spec "Copy and Compare Annotations and Configurations Between Views", section 8): the bulk bars of Annotations
+ * and Configurations and the More actions menus of both details take their buttons and their menu items from here.
+ * `keys` are the selected keys, or the one key of a detail. Each of these places mounts one ViewCopyDialog on `copying`.
  */
 export function useViewTransfer(kind: ViewItemKind, keys: MaybeRefOrGetter<readonly string[]>) {
   const context = useContextStore()
@@ -51,16 +51,27 @@ export function useViewTransfer(kind: ViewItemKind, keys: MaybeRefOrGetter<reado
     await router.push(compareLocation(scope, { kind, keys: selected, set }))
   }
 
-  /** "Compare with view" as the items of a menu group. A blocked item stays, disabled, with the reason below it. */
+  /** The open state of the ViewCopyDialog of the place that shows the actions. */
+  const copying = ref(false)
+
+  /**
+   * "Compare with view" and "Copy to view" as the items of a menu group. A blocked item stays, disabled, with the
+   * reason below it.
+   */
   const items = computed<DropdownMenuItem[]>(() => {
-    const item: DropdownMenuItem = { label: 'Compare with view', icon: 'i-lucide-git-compare' }
+    const compare: DropdownMenuItem = { label: 'Compare with view', icon: 'i-lucide-git-compare' }
+    const copy: DropdownMenuItem = { label: 'Copy to view', icon: 'i-lucide-copy-plus' }
     if (blocked.value) {
-      return [{ ...item, disabled: true, description: blocked.value }]
+      return [compare, copy].map((item) => ({ ...item, disabled: true, description: blocked.value }))
     }
-    // A link where the keys fit in an address: it can be opened in a new tab, and a form with unsaved changes asks
-    // before it is left. A longer list has no address until it is kept, so its item opens the comparison itself.
-    return [compareTo.value ? { ...item, to: compareTo.value } : { ...item, onSelect: () => void openCompare() }]
+    return [
+      // A link where the keys fit in an address: it can be opened in a new tab, and a form with unsaved changes asks
+      // before it is left. A longer list has no address until it is kept, so its item opens the comparison itself.
+      compareTo.value ? { ...compare, to: compareTo.value } : { ...compare, onSelect: () => void openCompare() },
+      // The copy takes what is stored, so its dialog opens over a form with unsaved changes without asking.
+      { ...copy, onSelect: () => (copying.value = true) },
+    ]
   })
 
-  return { blocked, compareTo, openCompare, items }
+  return { blocked, compareTo, openCompare, copying, items }
 }

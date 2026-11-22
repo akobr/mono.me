@@ -8,9 +8,10 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // (section GraphSection). Its identity line (test id annotation-identity) shows the type's icon and the key, in the
 // Form mode only; an unknown key shows "Annotation not found". The header has the type, the Name as its heading, the key
 // with "Copy to clipboard", "More actions" (Show in graph or Show in list, Copy link, Copy key and, for Contributors
-// and up, "Compare with view", a link to the comparison of this annotation with another view, and Delete), the panel's
-// pin and full-screen buttons and "Close the detail" (from md). Deleting asks "Delete <key>?" (no typed confirmation),
-// then the toast "<key> deleted" with "Undo" (10 seconds) and the list.
+// and up, "Compare with view", a link to the comparison of this annotation with another view, "Copy to view", which
+// opens the dialog "Copy <key> to another view", and Delete), the panel's pin and full-screen buttons and "Close the
+// detail" (from md). Deleting asks "Delete <key>?" (no typed confirmation), then the toast "<key> deleted" with "Undo"
+// (10 seconds) and the list.
 public sealed partial class AnnotationDetail(App app, AppRoutes routes, string section = AnnotationDetail.AnnotationsSection)
 {
     public const string AnnotationsSection = "annotations";
@@ -50,8 +51,9 @@ public sealed partial class AnnotationDetail(App app, AppRoutes routes, string s
     }
 
     // An item of the open "More actions" menu: "Show in graph", "Show in list", "Copy link", "Copy key", "Compare with
-    // view", "Delete". In a project without another view "Compare with view" is disabled and its name ends with the
-    // reason, "The project has no other view", so the exact name does not find it.
+    // view", "Copy to view", "Delete". In a project without another view "Compare with view" and "Copy to view" are
+    // disabled and their names end with the reason, "The project has no other view", so the exact name does not find
+    // them.
     public ILocator MenuItem(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
