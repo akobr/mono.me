@@ -147,6 +147,30 @@ describe('context paths', () => {
     )
   })
 
+  // Inbox is a section of the view too (424-31), so the switchers keep it instead of opening Annotations.
+  it.each(['/acme/billing/staging/inbox', '/acme/billing/staging/inbox?tab=done'])(
+    'keeps Inbox, without its tab, when switching the project or the view from %s',
+    (path) => {
+      expect(currentSection(path)).toEqual({ kind: 'view', name: 'inbox' })
+      expect(viewTarget(path, 'acme', 'billing', 'default')).toBe('/acme/billing/default/inbox')
+      expect(projectTarget(path, 'acme', 'shipping')).toBe('/acme/shipping/default/inbox')
+      expect(viewLocation(path)).toEqual({
+        scope: { org: 'acme', project: 'billing', view: 'staging' },
+        section: 'inbox',
+        root: true,
+      })
+    },
+  )
+
+  // inbox is not a reserved view name: the Inbox page is the fourth segment, below the view.
+  it('tells the Inbox page from a view named inbox', () => {
+    expect(currentSection('/acme/billing/inbox/annotations')).toEqual({ kind: 'view', name: 'annotations' })
+    expect(currentSection('/acme/billing/inbox/inbox')).toEqual({ kind: 'view', name: 'inbox' })
+    expect(viewTarget('/acme/billing/default/inbox', 'acme', 'billing', 'inbox')).toBe('/acme/billing/inbox/inbox')
+    // three segments are a page of the project or the organization, never the inbox of a view
+    expect(currentSection('/acme/billing/inbox')).toEqual({ kind: 'org', name: undefined })
+  })
+
   it('opens Modeling on its first tab when the path names no tab', () => {
     expect(currentSection('/acme/billing/default/modeling')).toEqual({ kind: 'view', name: 'modeling' })
     expect(viewTarget('/acme/billing/default/modeling', 'acme', 'billing', 'staging')).toBe(

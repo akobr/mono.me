@@ -11,15 +11,20 @@ describe('Modeling entry', () => {
   const modeling = (projectRole: NavigationContext['projectRole']) =>
     viewItems(projectRole).find((item) => item.label === 'Modeling')
 
-  it.each(['Owner', 'Contributor', 'Reader'] as const)('ends the view section of %s with Modeling', (role) => {
-    expect(viewItems(role).map((item) => item.label)).toEqual([
-      'Annotations',
-      'Configurations',
-      'Values store',
-      'Graph',
-      'Modeling',
-    ])
-  })
+  // Inbox follows Modeling (424-31), so the five entries before it keep their positions.
+  it.each(['Owner', 'Contributor', 'Reader'] as const)(
+    'lists the six entries of the view section of %s, with Modeling before Inbox',
+    (role) => {
+      expect(viewItems(role).map((item) => item.label)).toEqual([
+        'Annotations',
+        'Configurations',
+        'Values store',
+        'Graph',
+        'Modeling',
+        'Inbox',
+      ])
+    },
+  )
 
   it('opens the Modeling page with the puzzle icon and lists the tabs of a Contributor in order', () => {
     const base = '/acme/billing/staging/modeling'
@@ -80,6 +85,65 @@ describe('Modeling entry', () => {
     // no other shortcut uses the same keys
     const keys = shortcutGroups.flatMap((group) => group.shortcuts.map((shortcut) => shortcut.keys.join('+')))
     expect(new Set(keys).size).toBe(keys.length)
+  })
+})
+
+// The inbox of a view is the last entry of its section (424-31); the sidebar marks it while it has open items.
+describe('Inbox entry', () => {
+  const context = (projectRole: NavigationContext['projectRole']): NavigationContext => ({
+    org: 'acme',
+    project: 'billing',
+    view: 'staging',
+    projectRole,
+    orgRole: 'Owner',
+  })
+  const items = (...args: Parameters<typeof buildNavigation>) =>
+    buildNavigation(...args).flatMap((section) => section.items)
+  const inbox = (...args: Parameters<typeof buildNavigation>) => items(...args).find((item) => item.label === 'Inbox')
+
+  it('opens the Inbox page of the view with the inbox icon, without a mark', () => {
+    expect(inbox(context('Contributor'))).toEqual({
+      label: 'Inbox',
+      icon: 'i-lucide-inbox',
+      to: '/acme/billing/staging/inbox',
+      editRole: 'Contributor',
+      lockedHint: 'Contributors only',
+      locked: false,
+    })
+  })
+
+  it('is shown to a reader, locked, because the API serves the inbox from Contributor up', () => {
+    expect(inbox(context('Reader'))).toMatchObject({ locked: true, lockedHint: 'Contributors only' })
+    expect(inbox(context('Contributor'))).toMatchObject({ locked: false })
+    expect(inbox(context('Owner'))).toMatchObject({ locked: false })
+  })
+
+  it('is marked when the menu asks for it, and no other entry is', () => {
+    const marked = items(context('Owner'), { inbox: true })
+
+    expect(marked.find((item) => item.label === 'Inbox')).toMatchObject({ marked: true })
+    expect(marked.filter((item) => 'marked' in item).map((item) => item.label)).toEqual(['Inbox'])
+  })
+
+  it.each([
+    ['nothing is passed', undefined],
+    ['no mark is named', {}],
+    ['the inbox has no open items', { inbox: false }],
+  ] as const)('has no mark on any entry when %s', (_, marks) => {
+    expect(items(context('Owner'), marks).filter((item) => 'marked' in item)).toEqual([])
+  })
+
+  it('has no entry outside a view', () => {
+    expect(inbox({ org: 'acme', project: 'billing', projectRole: 'Owner', orgRole: 'Owner' }, { inbox: true })).toBe(
+      undefined,
+    )
+  })
+
+  it('is reached with g i, which no other shortcut uses', () => {
+    const goTo = shortcutGroups.find((group) => group.title === 'Go to')!.shortcuts
+
+    expect(goTo).toContainEqual({ keys: ['G', 'I'], description: 'Inbox' })
+    expect(goTo.filter((shortcut) => shortcut.keys.join('+') === 'G+I')).toHaveLength(1)
   })
 })
 
