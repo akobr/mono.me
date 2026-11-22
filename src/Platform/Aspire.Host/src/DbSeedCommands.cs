@@ -107,12 +107,14 @@ internal static class DbSeedCommands
 
     /// <summary>
     /// The environment of <c>db-creator</c> (<c>stagingSeed__enabled</c>, <c>baseAccount__id</c>) and its
-    /// <c>Create with options…</c> command.
+    /// <c>Create with options…</c> command, whose base account id is prefilled with <paramref name="baseAccountId"/>,
+    /// else <paramref name="suggestedBaseAccountId"/>.
     /// </summary>
     public static IResourceBuilder<ProjectResource> WithCreateOptions(
         this IResourceBuilder<ProjectResource> dbCreator,
         string? baseAccountId,
-        bool seedStagingAccounts)
+        bool seedStagingAccounts,
+        string? suggestedBaseAccountId)
     {
         var pending = new PendingInvocation<CreateOptions>();
         dbCreator.WithEnvironment(context =>
@@ -148,7 +150,7 @@ internal static class DbSeedCommands
                         Label = "Base account id",
                         Description = "The owner's account id: under Entra ID the lower-case {tid}:{oid}, under AuthKit or Keycloak the sub. Empty: DbCreator's default.",
                         InputType = InputType.Text,
-                        Value = baseAccountId,
+                        Value = baseAccountId ?? suggestedBaseAccountId,
                     },
                     new InteractionInput
                     {

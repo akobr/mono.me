@@ -47,13 +47,15 @@ var seedStagingAccounts = cosmosMode.Equals("container", StringComparison.Ordina
 // AuthKit staging user (SeedAccounts.AuthKitOwner of DbCreator), the second owner of 42dotnet: one local sign-in opens
 // both.
 var baseAccountId = builder.Configuration["BaseAccount:Id"] is { Length: > 0 } configuredAccount ? configuredAccount : null;
-var defaultSeedOwner = baseAccountId ?? (seedStagingAccounts ? "user_01M41P6G2TTSXXMM88WNVMRQKG" : null);
+const string authKitStagingOwner = "user_01M41P6G2TTSXXMM88WNVMRQKG";
+var defaultSeedOwner = baseAccountId ?? (seedStagingAccounts ? authKitStagingOwner : null);
 
-// Start: the defaults above. Create with options…: asks for the base account and the staging accounts of one run.
+// Start: the defaults above. Create with options…: asks for the base account (prefilled with BaseAccount:Id, else the
+// default AuthKit staging user) and the staging accounts of one run.
 builder.AddProject<Projects.DbCreator>("db-creator")
     .WithReference(cosmos)
     .WaitFor(cosmos)
-    .WithCreateOptions(baseAccountId, seedStagingAccounts)
+    .WithCreateOptions(baseAccountId, seedStagingAccounts, authKitStagingOwner)
     .WithExplicitStart();
 
 // Start: the built-in data set showcase of DbCreator (the fabrikam / invoicing-suite scope of the admin UI's showcase
