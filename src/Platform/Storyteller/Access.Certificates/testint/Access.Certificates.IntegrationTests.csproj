@@ -35,4 +35,9 @@
     <ProjectReference Include="..\..\DbCreator\src\DbCreator.csproj" />
   </ItemGroup>
 
+  <!-- one copy of the pinned emulator images, as in DbCreator/testint -->
+  <ItemGroup>
+    <Compile Include="..\..\Backend.CosmosDb\test\CosmosTestEmulator.cs" Link="CosmosTestEmulator.cs" />
+  </ItemGroup>
+
 </Project>

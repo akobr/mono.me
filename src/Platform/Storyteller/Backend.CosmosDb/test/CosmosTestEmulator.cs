@@ -36,10 +36,13 @@ public sealed class CosmosTestEmulator
     public const string TraitName = "Emulator";
     public const string ClassicTrait = "Classic";
 
-    // Pinned to the releases the suites ran green on (vnext-latest and latest of 2026-11-09), so a new emulator release
-    // never changes a run by itself: move both tags on purpose and run the suites on them.
-    private const string VNextImage = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20261019";
-    private const string ClassicImage = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:2.14.28";
+    // Pinned by digest to the releases the suites ran green on, so a new emulator release never changes a run by itself:
+    // a tag of this registry can move (vnext-EN20261019 was pointed at the hotfix build 20261120.1 on 2026-11-21, which
+    // answers a duplicate create with 500 "cannot drop portal" instead of 409, Azure/azure-cosmos-db-emulator-docker#391).
+    // The tag stays for the reader. Move both on purpose, run the suites on them, and for vNext check that the new image
+    // keeps its start-up package update off (see BuildVNext).
+    private const string VNextImage = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20261019@sha256:db53613dae19d0a3d5ad50688d14aa6e957af082dafea56b52e1bd3a6b3f1406";
+    private const string ClassicImage = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:2.14.28@sha256:9a4f69121f20c1d6502db84625c71ebb441ab61b01880a7b2d3d8031c6dac429";
     private const int GatewayPort = 8081;
     private const int HealthPort = 8080;
 
@@ -97,10 +100,19 @@ public sealed class CosmosTestEmulator
 
     // The vNext emulator through the generic builder: Testcontainers' CosmosDbBuilder (4.16) builds an http:// connection
     // string, waits for the classic log line "Started" and publishes only the gateway port.
+    // Its packages stay the ones of the image. The pinned image runs "tdnf distro-sync" in the background on every start,
+    // which since PostgreSQL 16.16 (2026-11-20) replaces the libraries of the running PostgreSQL 16.15 about a minute after
+    // the start: from then on some requests fail with 500 "PostgresError(SqlState(E58P01))" (a DELETE or replace of a
+    // container) or "cannot drop portal" (Azure/azure-cosmos-db-emulator-docker#390). The update cannot reach the package
+    // repository with packages.microsoft.com on 127.0.0.1, and fails fast; ENABLE_PACKAGE_UPDATE=false is the switch of the
+    // later images (off by default there), for when the pin moves. The suites retry no 500 of the emulator: a new one fails
+    // the test, so a red run shows the next regression of the emulator instead of hiding it.
     private static IContainer BuildVNext(string reuseLabel)
     {
         return new ContainerBuilder(VNextImage)
             .WithCommand("--protocol", "https")
+            .WithExtraHost("packages.microsoft.com", "127.0.0.1")
+            .WithEnvironment("ENABLE_PACKAGE_UPDATE", "false")
             .WithPortBinding(GatewayPort, true)
             .WithPortBinding(HealthPort, true)
             .WithReuse(true)
