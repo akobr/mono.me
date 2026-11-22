@@ -40,35 +40,33 @@ IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvar
 var seedStagingAccounts = cosmosMode.Equals("container", StringComparison.OrdinalIgnoreCase)
     || string.Equals(builder.Configuration["StagingSeed:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
 
-var dbCreator = builder.AddProject<Projects.DbCreator>("db-creator")
-    .WithReference(cosmos)
-    .WaitFor(cosmos)
-    .WithEnvironment("stagingSeed__enabled", seedStagingAccounts ? "true" : "false")
-    .WithExplicitStart();
-
-// The built-in data set showcase of DbCreator (the fabrikam / invoicing-suite scope of the admin UI's showcase mock),
-// seeded on demand; the seed ensures the containers itself, and a second start reports the set as seeded already.
-var dbSeed = builder.AddProject<Projects.DbCreator>("db-seed")
-    .WithArgs("seed", "showcase")
-    .WithReference(cosmos)
-    .WaitFor(cosmos)
-    .WithExplicitStart();
-
 // The owner account DbCreator seeds (BaseAccount:Id in the user secrets of this host): under Entra ID the owner's
 // lower-case {tid}:{oid}, under AuthKit or Keycloak the sub. Without it DbCreator seeds its legacy Entra ID sub, which
 // matches no account; the seed makes the same owner the Owner of the organization it creates, and a later seed keeps
 // the project as it is. So without it, when db-creator seeds the staging accounts, the seed's owner is the default
 // AuthKit staging user (SeedAccounts.AuthKitOwner of DbCreator), the second owner of 42dotnet: one local sign-in opens
 // both.
-if (builder.Configuration["BaseAccount:Id"] is { Length: > 0 } baseAccountId)
-{
-    dbCreator.WithEnvironment("baseAccount__id", baseAccountId);
-    dbSeed.WithEnvironment("baseAccount__id", baseAccountId);
-}
-else if (seedStagingAccounts)
-{
-    dbSeed.WithArgs("--owner", "user_01M41P6G2TTSXXMM88WNVMRQKG");
-}
+var baseAccountId = builder.Configuration["BaseAccount:Id"] is { Length: > 0 } configuredAccount ? configuredAccount : null;
+var defaultSeedOwner = baseAccountId ?? (seedStagingAccounts ? "user_01M41P6G2TTSXXMM88WNVMRQKG" : null);
+
+// Start: the defaults above. Create with options…: asks for the base account and the staging accounts of one run.
+builder.AddProject<Projects.DbCreator>("db-creator")
+    .WithReference(cosmos)
+    .WaitFor(cosmos)
+    .WithCreateOptions(baseAccountId, seedStagingAccounts)
+    .WithExplicitStart();
+
+// Start: the built-in data set showcase of DbCreator (the fabrikam / invoicing-suite scope of the admin UI's showcase
+// mock); the seed ensures the containers itself, and a second start reports the set as seeded already. Seed with
+// options…: asks for the sets (those of DbCreator's data-sets folder), a folder, the owner, the target and the flags.
+var dbSeed = builder.AddProject<Projects.DbCreator>("db-seed")
+    .WithReference(cosmos)
+    .WaitFor(cosmos)
+    .WithSeedOptions(
+        Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../Storyteller/DbCreator/src/data-sets")),
+        baseAccountId,
+        defaultSeedOwner)
+    .WithExplicitStart();
 
 // Local Key Vault emulator (Lowkey Vault): the key-encryption keys of the Standard level of key/value secrets.
 // Relaxed ports let the vault answer on the host port that Aspire maps to 8443.
