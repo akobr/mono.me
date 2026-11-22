@@ -116,6 +116,7 @@ declare module 'vue' {
     OrganizationForm: typeof import('./components/orgs/OrganizationForm.vue')['default']
     PrimitiveArrayControl: typeof import('./components/configuration/renderers/PrimitiveArrayControl.vue')['default']
     ProjectCreateDialog: typeof import('./components/orgs/ProjectCreateDialog.vue')['default']
+    ProjectLeave: typeof import('./components/access/ProjectLeave.vue')['default']
     RecipientsCard: typeof import('./components/secrets/RecipientsCard.vue')['default']
     RelativeTime: typeof import('./components/common/RelativeTime.vue')['default']
     RoleBadge: typeof import('./components/common/RoleBadge.vue')['default']

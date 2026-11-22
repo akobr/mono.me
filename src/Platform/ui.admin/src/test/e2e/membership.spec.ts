@@ -105,3 +105,68 @@ test('the showcase has no exhibition to offer', async ({ page }) => {
   await expect(page.getByText('Project member', { exact: true }).first()).toBeVisible()
   await expect(offer(page)).toHaveCount(0)
 })
+
+// Leaving a project from its Settings (424-271): any member but the only Owner, without a recent sign-in.
+
+const leaveButton = (page: Page) => page.getByRole('button', { name: 'Leave project', exact: true })
+const leaveDialog = (page: Page, key: string) => page.getByRole('dialog', { name: `Leave ${key}?` })
+
+test('a Contributor leaves a project from its settings and loses access to it', async ({ page }) => {
+  await openApp(page, '/acme/shipping/settings')
+  await expect(page.getByText('Leave the project to remove it from your organizations.')).toBeVisible()
+  await leaveButton(page).click()
+  const dialog = leaveDialog(page, 'acme.shipping')
+  await expect(dialog).toBeVisible()
+  await expect(
+    dialog.getByText('You lose your Contributor role on acme.shipping. To come back, you need a new invitation.'),
+  ).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+
+  const deletes: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'DELETE') {
+      deletes.push(new URL(request.url()).pathname.replace(/^.*\/v1/, ''))
+    }
+  })
+  await leaveButton(page).click()
+  await leaveDialog(page, 'acme.shipping').getByRole('button', { name: 'Leave project', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/orgs$/)
+  await expect(page.getByText('You left acme.shipping', { exact: true })).toBeVisible()
+  expect(deletes).toEqual(['/access/points/acme.shipping/members/user_01MOCKADA'])
+  await expect(page.getByRole('link', { name: 'billing Owner', exact: true })).toBeVisible()
+  await expect(page.locator('a[href^="/acme/shipping/"]')).toHaveCount(0)
+
+  await goto(page, '/acme/shipping/default/annotations')
+  await expect(page.getByText('You have no access here', { exact: true })).toBeVisible()
+})
+
+test('a visitor leaves the exhibition, and the organizations page offers it again', async ({ page }) => {
+  await openApp(page, '/orgs')
+  await joinButton(page).click()
+  await expect(page).toHaveURL(exhibitionPath)
+
+  await goto(page, '/exhibition/exhibition/settings')
+  await leaveButton(page).click()
+  const dialog = leaveDialog(page, 'exhibition.exhibition')
+  await expect(
+    dialog.getByText(
+      'You lose your Reader role on exhibition.exhibition. You can join the exhibition again from Organizations.',
+    ),
+  ).toBeVisible()
+  await dialog.getByRole('button', { name: 'Leave project', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/orgs$/)
+  await expect(page.getByText('You left exhibition.exhibition', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'exhibition', exact: true })).toHaveCount(0)
+  await expect(joinButton(page)).toBeVisible()
+})
+
+test('the only Owner of a project cannot leave it', async ({ page }) => {
+  await openApp(page, '/acme/billing/settings')
+  await expect(
+    page.getByText('You are the only Owner of this project. Make another member an Owner before you leave.'),
+  ).toBeVisible()
+  await expect(leaveButton(page)).toBeDisabled()
+})
