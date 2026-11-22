@@ -275,10 +275,11 @@ A JSON Patch may not build a document larger than a body can be: every value an 
 
 **In the admin UI**, every change of an existing annotation is a `PATCH` without `If-Match` (424-225), so a concurrent change of another member is kept:
 
-- the edit form sends a merge patch of the members the user changed since the form loaded (a cleared member as `null`, `Labels` whole, `Values` as a recursive diff), or a JSON Patch with the same changes when a value is set to JSON `null`, which a merge patch cannot say;
+- the edit form sends a merge patch of the members the user changed since the form loaded (a cleared member as `null`, `Labels` whole, `Values` as a recursive diff). When the change sets a value to JSON `null`, which a merge patch cannot say, it sends a JSON Patch instead: `replace` per changed member, and each changed value name set whole (`add /Values/<name>`), so a concurrent change inside that same value is not kept there;
 - **Enable** and **Disable** of the bulk bar send `{"IsDisabled": null}` and `{"IsDisabled": true}`;
-- adding and removing a label are JSON Patches that start with a `test` of the labels the UI read: `add /Labels/-`, or a `remove` per spelling of the label; when the labels changed meanwhile (`412 PatchTestFailed`), the UI reads the annotation again and repeats the patch, at most three times. So a label is not added twice in another case (the API keeps labels ordinally) and an index that moved is not removed;
-- a key deleted meanwhile answers `404 AnnotationDeleted` and is no longer re-created.
+- adding and removing a label are JSON Patches that start with a `test` of the labels the UI read: `add /Labels/-`, or a `remove` per spelling of the label, and the `test` alone for an annotation whose labels need no change (its copy in the list may be stale). When the labels changed meanwhile (`412 PatchTestFailed`), the UI reads the annotation again and builds the patch anew, in three attempts at most. So a label is not added twice in another case (the API keeps labels ordinally) and an index that moved is not removed;
+- a bulk run writes to the view it started in, also when the user opens another view meanwhile;
+- a key deleted meanwhile answers `404` and is no longer re-created: it counts as not saved and leaves the list.
 
 ```text
 PATCH …/annotations/exe.northwind.invoicing.prod
