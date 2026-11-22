@@ -47,6 +47,7 @@ project uses the project's path, a workflow that spans a whole area uses the are
 | `Platform.Cli.AutomationTests.yml` | the CLI automation tests |
 | `Platform.Deployment.yml` | the Azure deployment templates |
 | `Platform.Storyteller-conformance.yml` | the Storyteller conformance suite |
+| `Platform.Storyteller.Api.Functions.UnitTests.yml` | the unit tests of the Storyteller API, in Release and in Debug |
 | `Platform.Storyteller.CosmosDb.yml` | the Cosmos DB suites of the Storyteller backend |
 | `Platform.Storyteller.Mcp.yml` | the MCP server: its tests, its container image and its deployment |
 | `Platform.Storyteller.Sdk-release.yml` | the release of the Storyteller SDKs |
