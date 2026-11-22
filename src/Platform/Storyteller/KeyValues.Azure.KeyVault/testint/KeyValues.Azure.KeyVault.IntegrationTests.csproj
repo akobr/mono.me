@@ -26,4 +26,9 @@
     <ProjectReference Include="..\src\KeyValues.Azure.KeyVault.csproj" />
   </ItemGroup>
 
+  <!-- the pinned Lowkey Vault image and its readiness check, shared with the Cosmos DB suites -->
+  <ItemGroup>
+    <Compile Include="..\..\Backend.CosmosDb\test\LowkeyVaultTestContainer.cs" Link="LowkeyVaultTestContainer.cs" />
+  </ItemGroup>
+
 </Project>

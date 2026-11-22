@@ -3,7 +3,6 @@
 using System;
 using System.IO;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Json;
 using _42.Platform.Storyteller.KeyValues;
@@ -13,49 +12,20 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using Testcontainers.LowkeyVault;
 using Xunit;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
-// Both stores together: the catalog in the Cosmos emulator, the key-encryption key in Lowkey Vault (Docker).
-public class KeyValueEndToEndTests(Startup startup)
-    : BaseTestsClass(startup), IAsyncLifetime
+// Both stores together: the catalog in the Cosmos emulator, the key-encryption key in Lowkey Vault (Docker). The vault
+// is a class fixture, started once for the tests of the class: started for each test, the second test met a vault that
+// was still restarting (424-310).
+public class KeyValueEndToEndTests(Startup startup, KeyValueEndToEndVault vault)
+    : BaseTestsClass(startup), IClassFixture<KeyValueEndToEndVault>
 {
     private const string Org = TestConstants.Organization;
     private const string View = Constants.DefaultViewName;
 
-    private LowkeyVaultContainer? _vault;
-    private Uri _vaultUri = new("https://localhost:8443/");
-
-    public async ValueTask InitializeAsync()
-    {
-        var configured = Environment.GetEnvironmentVariable("LOWKEY_VAULT_URL");
-
-        if (!string.IsNullOrWhiteSpace(configured))
-        {
-            _vaultUri = new Uri(configured);
-            return;
-        }
-
-        // Its own label, so its own reused vault: disposing a reused container stops it, which would cut off the
-        // KeyValues.Azure.KeyVault integration tests running at the same time.
-        _vault = new LowkeyVaultBuilder("nagyesta/lowkey-vault:7.3.112")
-            .WithReuse(true)
-            .WithLabel("net.42for.tests.lowkey-vault", "backend-cosmosdb-unittests")
-            .Build();
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-        await _vault.StartAsync(cancellation.Token);
-        _vaultUri = new Uri(_vault.GetBaseAddress());
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_vault is not null)
-        {
-            await _vault.DisposeAsync();
-        }
-    }
+    private readonly Uri _vaultUri = vault.VaultUri;
 
     [Fact]
     public async Task Secret_WrittenWithTheVaultKey_RoundTripsThroughCosmos()

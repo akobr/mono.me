@@ -34,9 +34,10 @@
     <ProjectReference Include="..\src\DbCreator.csproj" />
   </ItemGroup>
 
-  <!-- one copy of the pinned emulator images and of the organization guard of the Cosmos DB suites -->
+  <!-- one copy of the pinned emulator images (Cosmos DB and Lowkey Vault) and of the organization guard of the Cosmos DB suites -->
   <ItemGroup>
     <Compile Include="..\..\Backend.CosmosDb\test\CosmosTestEmulator.cs" Link="CosmosTestEmulator.cs" />
+    <Compile Include="..\..\Backend.CosmosDb\test\LowkeyVaultTestContainer.cs" Link="LowkeyVaultTestContainer.cs" />
     <Compile Include="..\..\Backend.CosmosDb\test\OrganizationQueryGuard.cs" Link="OrganizationQueryGuard.cs" />
   </ItemGroup>
 
