@@ -12,7 +12,7 @@ A cookbook for running the Storyteller API, the admin UI and the MCP server on o
 | Cosmos DB, Azurite, Lowkey Vault | Aspire (containers) or the local Windows emulator | see the Aspire page |
 | Sign-in | WorkOS AuthKit staging | `https://voluntary-entry-98-staging.authkit.app` |
 
-The API runs in `Development` (`DOTNET_ENVIRONMENT` in `local.settings.json`), so the MCP server can prove itself to the API with a client secret: no certificate and no tunnel are needed.
+The API runs in `Development` (Core Tools sets `AZURE_FUNCTIONS_ENVIRONMENT` under `func start`, also when Aspire starts it; the worker ignores `DOTNET_ENVIRONMENT`), so the MCP server can prove itself to the API with a client secret: no certificate and no tunnel are needed.
 
 ## 1. Tools
 
@@ -50,7 +50,7 @@ After changing WorkOS settings, clear the client's OAuth state and sign in again
 
 The API, the MCP server and `sform` read **user secrets in the `Development` environment**, after their own settings files, so a user secret overrides a value of `local.settings.json`, `appsettings*.json` or `app.config.json`. Keep local and secret values there and the tracked files unchanged. The keys are the configuration keys (`:` between sections).
 
-`local.settings.json` sets `DOTNET_ENVIRONMENT` to `Development` and already points at AuthKit staging (`Auth:Provider` `AuthKit`, `Auth:AuthKit:Issuer` the AuthKit domain). Add the actor of the token exchange for the MCP server as user secrets of the API:
+The API runs in `Development` under `func start` (see above), and `local.settings.json` already points at AuthKit staging (`Auth:Provider` `AuthKit`, `Auth:AuthKit:Issuer` the AuthKit domain). Add the actor of the token exchange for the MCP server as user secrets of the API:
 
 ```sh
 cd src/Platform/Storyteller/Api.Functions/src
@@ -180,6 +180,7 @@ What to try:
 | *The Storyteller API does not accept the MCP server as an actor…* | The MCP secret does not hash to the API's `ClientSecretHash` (often the hash was given to the MCP server), the actor id differs, or the API does not run in `Development` |
 | *The subject token is not accepted for this actor.* | `SubjectAudiences` does not hold the token's `aud`; the API's log names the reason |
 | *The API has the user token exchange turned off* | `Auth:TokenExchange:Enabled` is not `true`, or the API was not restarted |
+| The API stops at start: *Unhandled exception. System.InvalidOperationException: DEV_AUTH: this Debug build of the Storyteller API …* | A Debug build (`DEV_AUTH`, which skips the checks of users) starts only in `Development` and outside the hosting platforms. Unset an `ASPNETCORE_ENVIRONMENT` or `AZURE_FUNCTIONS_ENVIRONMENT` of another value in the shell, or run a Release build (`-c Release`); never deploy a Debug build |
 | `aspire run` ignores the profile | Use `dotnet run --project src/Platform/Aspire.Host/src --launch-profile <name>` |
 | Requests of the local API take about 2 s after a pause, with the Windows Cosmos DB emulator | A client that connects to `localhost` tries `::1` first, and the emulator listens on `127.0.0.1` only. The API connects to the emulators over IPv4 first since 424-166; update the branch. The Functions host listens on IPv4 only too: a .NET client of `http://localhost:7071` (the MCP server, `sform`) waits for the IPv6 attempt on each new connection, `http://127.0.0.1:7071` does not |
 | `500` with `TooManyRequests (429)` in the API's log, slow requests while UI tests run in parallel | The emulator limits the request rate; see [Cosmos DB modes](Aspire.Host/local-development.md#cosmos-db-modes) |

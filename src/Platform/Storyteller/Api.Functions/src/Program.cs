@@ -64,6 +64,11 @@ var host = new HostBuilder()
     })
     .ConfigureServices((context, services) =>
     {
+        // First: a Debug build (DEV_AUTH) skips the checks of users, so it starts only in Development and outside the hosting
+        // platforms. Nothing of the API is registered for a refused build; the exception ends the worker before it connects to
+        // the host, which logs its message (a logger is not wired yet).
+        DevelopmentAuthenticationGuard.Ensure(context.HostingEnvironment);
+
         // Registered after the OpenAPI extension's own singleton, so this one is used.
         // The extension's schema dictionary throws if two documents are built at once.
         services.AddSingleton<IOpenApiTriggerFunction>(sp =>
