@@ -276,7 +276,7 @@ A call through an [actor](#actors) never counts as email-verified, whatever the 
 
 ## Exhibition
 
-The exhibition is the demo project of a deployment: a project with the data of a fictional company, which any signed-in user may join as a `Reader`, without an invitation. The onboarding of the admin UI offers it to a new user. A deployment has one exhibition or none, and the exhibition is the view `default` of its project. `sform` and the MCP server have no command or tool for it.
+The exhibition is the demo project of a deployment: a project with the data of a fictional company, which any signed-in user may join as a `Reader`, without an invitation. The onboarding of the admin UI offers it to a new user, and its Organizations page to a user who has an account and is no member of it. A deployment has one exhibition or none, and the exhibition is the view `default` of its project. `sform` and the MCP server have no command or tool for it.
 
 | Method | Route | Needs | Result |
 | --- | --- | --- | --- |
@@ -362,7 +362,7 @@ A `Reader` reads no member, invitation or machine, no key/value audit or usage a
 - **Names in the versions.** A stamp carries the name and the account id of whoever made the change ([audit stamps](audit-stamps.md)), and the versions carry stamps. So change the exhibition through its seed, which writes as `System`: a change by hand shows the name of its author to every visitor.
 - **Other visitors.** A visitor sees no other member. The owner sees every visitor in the list of members, with the name and the user name, which is usually the email.
 - **The admin UI shows less.** Its **Modeling** page, with the schemas, the templates and the deleted annotations, is locked below `Contributor` (see [Roles](#roles)).
-- **Leaving.** A visitor cannot leave in the admin UI: the action is in its list of members, which only Administrators see. `DELETE v1/access/points/{key}/members/{own account id}` removes the membership, because any member may remove themselves (see [Members](#members)). The account stays, and a later join adds the membership again.
+- **Leaving.** A visitor leaves with **Leave project** on the Settings of the project, which the admin UI offers every member but the only Owner. It calls `DELETE v1/access/points/{key}/members/{own account id}`, because any member may remove themselves (see [Members](#members)). The account stays, and a later join adds the membership again: the Organizations page of the admin UI offers the exhibition again.
 
 ### Limits
 

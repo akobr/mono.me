@@ -225,7 +225,7 @@ STORYTELLER_TESTS_USE_CONTAINER=true dotnet test --project src/Platform/Storytel
 
 ### The exhibition
 
-The onboarding of the admin UI offers a new user the exhibition, a demo project they join as a Reader ([access](Storyteller/access.md#exhibition)). The API has one only with three settings, and `local.settings.json` stays without them, because the owner is your own account. Without them the onboarding has no exhibition step. To turn it on:
+The onboarding of the admin UI offers a new user the exhibition, a demo project they join as a Reader ([access](Storyteller/access.md#exhibition)), and its Organizations page offers it to a user who has an account and is no member of it. The API has one only with three settings, and `local.settings.json` stays without them, because the owner is your own account. Without them the onboarding has no exhibition step, and Organizations no card of it. To turn it on:
 
 1. Seed the set `exhibit` with your account as the owner. Pass it as `--owner`, with the Windows emulator and with the container of the Aspire host alike: without it and without `baseAccount__id`, DbCreator falls back to its legacy owner, which matches no account. It goes into its own names, `fourth-wall` / `toons-and-tyrants`, or into others with `--organization` and `--project`:
 
