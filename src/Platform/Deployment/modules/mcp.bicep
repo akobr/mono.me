@@ -174,7 +174,9 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
       ingress: {
         // MCP clients run anywhere, so no IP restriction: without a valid token a call only gets 401, though it still
         // wakes a replica, a scanner's call too (the host name is public in Certificate Transparency logs). The managed
-        // certificate needs the app reachable from the certificate authority too. A request may take 240 seconds.
+        // certificate needs the app reachable from the certificate authority too. The ingress drops a request after 240
+        // seconds in which nothing was sent (fixed on the Consumption profile), so the server ends a tool call after 200
+        // (StorytellerCallFilter.ToolCallTimeout).
         external: true
         // The port of .NET's container images (ASPNETCORE_HTTP_PORTS).
         targetPort: 8080
