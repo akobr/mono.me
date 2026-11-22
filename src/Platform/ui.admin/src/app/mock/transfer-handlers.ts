@@ -44,11 +44,17 @@ import {
   type StoredVersion,
 } from './documents'
 import { errorResponse, requireRole, withDb } from './handlers'
+import { exportNotification, importNotification, pushInboxItem } from './inbox'
 import { createZip, readZip, textFile, type ZipFile } from './zip'
 
 // Exports and imports of a view, on the routes and with the options of the API (export-import.md). A job is Running on
 // its first read and ends on the second one, so the UI shows its progress. A finished import is kept in sessionStorage,
 // so the Export & Import page shows it again after a reload, as the API keeps its jobs for a day.
+//
+// A job that ends leaves its notification in the inbox of the view (inbox.ts, 424-31), with the texts and the lifetimes
+// of the API: for Administrators, by the one who started the job, one item per job; a result expires with its job, a
+// failure after the retention of the inbox. The mock database keeps the item, but an export lives in the memory of the
+// page: the archive its item leads to is there until the page reloads, and answers 404 afterwards.
 //
 // An archive holds the four kinds of the mock database: annotations, the template: and schema: documents, and
 // configurations. The files are named like the API names them (archive-names.ts), one folder per kind, with
@@ -1280,6 +1286,7 @@ export const transferHandlers: HttpHandler[] = [
           VersionCount: built.versions,
           Size: built.zip.length,
         }
+        pushInboxItem(db, job.scope, exportNotification(job.state))
       }
       return HttpResponse.json(job.state)
     }),
@@ -1386,6 +1393,7 @@ export const transferHandlers: HttpHandler[] = [
       } else if (job.state.Status === 'Running') {
         runImport(db, job)
         keepFinishedImport(params.id, job)
+        pushInboxItem(db, job.scope, importNotification(job.state))
       }
       return HttpResponse.json(job.state)
     }),
