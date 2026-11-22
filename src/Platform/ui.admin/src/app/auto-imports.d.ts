@@ -24,6 +24,7 @@ declare global {
   const isRememberedSection: typeof import('./stores/page-memory').isRememberedSection
   const isSignInStale: typeof import('./composables/useStepUp').isSignInStale
   const isSignInTooOld: typeof import('./composables/useStepUp').isSignInTooOld
+  const leaveTexts: typeof import('./composables/useLeaveProject').leaveTexts
   const leaveWithoutPrompt: typeof import('./composables/useUnsavedChanges').leaveWithoutPrompt
   const markSidebarStarted: typeof import('./composables/useSidebar').markSidebarStarted
   const onSignOut: typeof import('./stores/session').onSignOut
@@ -64,6 +65,7 @@ declare global {
   const useHashScroll: typeof import('./composables/useHashScroll').useHashScroll
   const useJoinExhibition: typeof import('./composables/useExhibition').useJoinExhibition
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd
+  const useLeaveProject: typeof import('./composables/useLeaveProject').useLeaveProject
   const useNavigationContext: typeof import('./composables/useNavigationContext').useNavigationContext
   const useOnboardingEnd: typeof import('./composables/useOnboardingEnd').useOnboardingEnd
   const useOverlay: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useOverlay').useOverlay

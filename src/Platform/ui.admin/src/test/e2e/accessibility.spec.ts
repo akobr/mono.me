@@ -51,6 +51,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
+    // 424-271: the confirmation of Leave project, and the settings of a Contributor that offer it.
+    test('the leave project dialog has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/acme/shipping/settings')
+      await expectAccessible(page)
+      await page.getByRole('button', { name: 'Leave project', exact: true }).click()
+      await expect(page.getByRole('dialog', { name: 'Leave acme.shipping?' })).toBeVisible()
+      await expectAccessible(page)
+    })
+
     test('the invite dialog has no serious accessibility violations', async ({ page }) => {
       await openApp(page, '/acme/billing/members')
       await page.getByRole('button', { name: 'Invite', exact: true }).click()

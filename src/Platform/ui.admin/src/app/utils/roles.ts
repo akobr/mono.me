@@ -10,6 +10,14 @@ export const roleDescriptions: Record<AccountRoleName, string> = {
   Owner: 'Everything, including granting Owner and creating projects in the organization.',
 }
 
+/** The name of a role as the app shows it, in RoleBadge and in sentences: 'Contributor + secrets' for the long one. */
+export const roleLabel = (role: string | null | undefined) =>
+  role === 'ContributorWithSecrets' ? 'Contributor + secrets' : (role ?? 'None')
+
+/** The Owners of an access point's map of members; undefined while the map is not loaded. */
+export const ownerCount = (accessMap: Record<string, string> | null | undefined) =>
+  accessMap ? Object.values(accessMap).filter((role) => role === 'Owner').length : undefined
+
 export type AssignableRole = Exclude<AccountRoleName, 'None'>
 
 export const assignableRoles = roleOrder.filter((role): role is AssignableRole => role !== 'None')

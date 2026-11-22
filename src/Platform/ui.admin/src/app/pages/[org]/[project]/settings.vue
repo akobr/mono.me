@@ -19,6 +19,7 @@ import {
   useGetMachineAuthentication,
 } from '@42for.net/2splatform.sdk/vue-query'
 import { descriptionSchema } from '@/forms/names.schema'
+import { useExhibition } from '@/composables/useExhibition'
 import { invalidateAccess, invalidateProject } from '@/queries/invalidation'
 import { useProjectSettingsQuery } from '@/queries/project-settings'
 import { useProjectSummaries } from '@/queries/projects'
@@ -41,6 +42,7 @@ import {
   type ProjectSettingsDraft,
   type ProjectSettingsState,
 } from '@/utils/project-settings'
+import { ownerCount } from '@/utils/roles'
 import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 
 // Project settings (spec section 13): the machine authentication policy (Administrator: the enabled credential
@@ -341,6 +343,13 @@ const machinePolicy = useGetMachineAuthentication(() => context.projectKey ?? ''
 const projects = useProjectSummaries()
 const savedDescription = computed(() => projects.summaryOf(context.projectKey)?.Description ?? '')
 
+// Leave project (424-271), for every member: the only Owner may not. Only an Owner can be that, and an Owner reads the
+// access point; until it is loaded the API decides (409 LastOwner).
+const exhibition = useExhibition()
+const lastOwner = computed(
+  () => role.projectRole.value === 'Owner' && (ownerCount(accessPoint.data.value?.AccessMap) ?? Infinity) <= 1,
+)
+
 const secretsPolicy = useKeyValuePolicy()
 const recipients = computed(() => secretsPolicy.data.value?.Recipients ?? [])
 
@@ -502,6 +511,14 @@ async function downloadCa() {
             <dd v-if="savedDescription" class="break-words whitespace-pre-line">{{ savedDescription }}</dd>
             <dd v-else class="text-muted">No description</dd>
           </dl>
+          <template v-if="context.projectKey && role.projectRole.value !== 'None'" #footer>
+            <ProjectLeave
+              :project-key="context.projectKey"
+              :role="role.projectRole.value"
+              :last-owner="lastOwner"
+              :exhibition="exhibition.isExhibition(context.projectKey)"
+            />
+          </template>
         </UCard>
 
         <ErrorState

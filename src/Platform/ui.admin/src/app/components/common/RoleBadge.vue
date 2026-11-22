@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { roleLabel } from '@/utils/roles'
 
 const props = defineProps<{ role?: string | null }>()
 
@@ -19,9 +20,7 @@ const color = computed(() => {
   }
 })
 
-const label = computed(() =>
-  props.role === 'ContributorWithSecrets' ? 'Contributor + secrets' : (props.role ?? 'None'),
-)
+const label = computed(() => roleLabel(props.role))
 </script>
 
 <template>
