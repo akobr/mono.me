@@ -259,7 +259,9 @@ test('a new user joins the exhibition with an own organization and opens it as a
     page.getByText('Step into Fourth Wall Software, a fictional software house', { exact: false }),
   ).toBeVisible()
   await expect(
-    page.getByText('Explore 30 annotations, configurations that resolve live, and the graph that ties them together.'),
+    page.getByText(
+      'Explore 30 annotations, configurations that resolve live, the graph that ties them together, and the schemas and templates behind them.',
+    ),
   ).toBeVisible()
   await expect(
     page.getByText(
