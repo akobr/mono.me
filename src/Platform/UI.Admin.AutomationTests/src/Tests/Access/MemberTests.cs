@@ -7,10 +7,15 @@ using static Microsoft.Playwright.Assertions;
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Access;
 
 // Members: the project Members page with its members table, the locked own role and the Owner-only controls, the
-// roles legend and the highlight of a member, role changes and removal, and no access below Administrator.
+// roles legend and the highlight of a member, role changes and removal, no access below Administrator, and leaving a
+// project from its Settings, which every member but the only Owner may.
 [Area(Area.Access)]
 public sealed partial class MemberTests : PlatformTest
 {
+    // The exhibition of the mock: the project exhibition/exhibition of Grace Hopper, with a small catalog, which any
+    // user may join as a Reader.
+    private static readonly AppRoutes Exhibition = AppRoutes.Parse("exhibition/exhibition");
+
     // ACC-MEM-01: The project Members page lists the members, locks the own role and highlights a member.
     // As an Administrator or Owner, the project's Members page has its sections, Roles and Invite; the own row ("you")
     // has the own account id and a locked role select; the legend describes the five roles; ?highlight=<account id>
@@ -140,6 +145,94 @@ public sealed partial class MemberTests : PlatformTest
 
         await members.Legend.OpenAsync();
         await Expect(members.Legend.Roles).ToHaveTextAsync(RoleLegend.RoleLabels);
+    }
+
+    // ACC-MEM-05: A Contributor leaves a project from its Settings and loses access to it.
+    // Exactly a Contributor of the project (Target:RoleProjects; the mock's acme/shipping) finds "Leave project" in the
+    // footer of the Project card. Its confirmation names the role that goes and that only a new invitation brings it
+    // back; Cancel keeps the membership. A confirmed leave opens /orgs with a toast, the organization's card lists the
+    // project no more, and its address shows "You have no access here". Mock only: a leave drops the pool user's
+    // membership for good on a deployed target.
+    [Test]
+    [TestCase(512)]
+    [UserRole(Role.Contributor)]
+    [MockOnly("leaving drops the pool user's membership of the project for good on a deployed target")]
+    public async Task Members_ContributorLeavesProject_LosesAccess()
+    {
+        var key = $"{Routes.Organization}.{Routes.Project}";
+        var settings = new ProjectSettingsPage(App, Routes);
+        await settings.OpenAsync();
+        await Expect(settings.ProjectValue("Your role")).ToHaveTextAsync("Contributor");
+        await Expect(settings.LeaveProjectText).ToBeVisibleAsync();
+        await Expect(settings.LeaveProjectButton).ToBeEnabledAsync();
+
+        var leave = await settings.OpenLeaveDialogAsync();
+        await Expect(leave.Root).ToHaveAccessibleDescriptionAsync($"You lose your Contributor role on {key}. To come back, you need a new invitation.");
+        await leave.CancelAsync();
+        await Expect(settings.ProjectValue("Your role")).ToHaveTextAsync("Contributor");
+
+        await settings.OpenLeaveDialogAsync();
+        await settings.ConfirmLeaveAsync();
+        await Expect(App.Toast($"You left {key}")).ToBeVisibleAsync();
+
+        // The organization stays, with the user's other roles (the mock: Owner of acme and of acme/billing); no link of
+        // the page, the navigation's included, leads into the project.
+        var organizations = new OrganizationsPage(App, Routes);
+        await Expect(organizations.Organization(Routes.Organization)).ToBeVisibleAsync();
+        await Expect(organizations.LinksInto(Routes.Organization, Routes.Project)).ToHaveCountAsync(0);
+
+        await App.GotoAsync(Routes.Annotations);
+        await App.WaitForReadyAsync();
+        await Expect(App.NoAccessHeading).ToBeVisibleAsync();
+    }
+
+    // ACC-MEM-06: A visitor leaves the exhibition from its Settings, and the Organizations page offers it again.
+    // In the mock's default scenario the user joins the exhibition on /orgs and leaves it again on its Settings as a
+    // Reader. The confirmation says that the exhibition can be joined again from Organizations; the leave opens /orgs
+    // with a toast, without the exhibition's organization and with the offer of the exhibition back.
+    [Test]
+    [TestCase(513)]
+    [MockOnly("the exhibition of the mock, which the default scenario's user is no member of")]
+    public async Task Members_VisitorLeavesExhibition_OffersItAgain()
+    {
+        var key = $"{Exhibition.Organization}.{Exhibition.Project}";
+        var organizations = new OrganizationsPage(App, Routes);
+        await organizations.OpenAsync();
+        await organizations.JoinExhibitionAsync();
+        await App.ExpectAtAsync(Exhibition.Annotations);
+
+        var settings = new ProjectSettingsPage(App, Exhibition);
+        await settings.OpenAsync();
+        await Expect(settings.ProjectValue("Your role")).ToHaveTextAsync("Reader");
+        await Expect(settings.LeaveProjectButton).ToBeEnabledAsync();
+        var leave = await settings.OpenLeaveDialogAsync();
+        await Expect(leave.Root).ToHaveAccessibleDescriptionAsync($"You lose your Reader role on {key}. You can join the exhibition again from Organizations.");
+
+        await settings.ConfirmLeaveAsync();
+        await Expect(App.Toast($"You left {key}")).ToBeVisibleAsync();
+        await Expect(organizations.Organization(Exhibition.Organization)).ToHaveCountAsync(0);
+        await Expect(organizations.JoinExhibitionButton).ToBeVisibleAsync();
+    }
+
+    // ACC-MEM-07: The only Owner of a project cannot leave it.
+    // The creator of a new project is its only member and Owner: the footer of the Project card on its Settings has a
+    // disabled "Leave project" and says that another member must become an Owner first.
+    [Test]
+    [TestCase(514)]
+    [UserRole(Role.Owner)]
+    [DisposableProject]
+    public async Task Members_OnlyOwner_CannotLeave()
+    {
+        var project = await CreateDisposableProjectAsync();
+
+        var settings = new ProjectSettingsPage(App, project);
+        await settings.OpenAsync();
+        await Expect(settings.ProjectValue("Your role")).ToHaveTextAsync("Owner");
+
+        // The rule needs the project's members, which the page reads after it showed: the text comes with them.
+        await Expect(settings.OnlyOwnerText).ToBeVisibleAsync();
+        await Expect(settings.LeaveProjectButton).ToBeDisabledAsync();
+        await Expect(settings.LeaveProjectText).ToHaveCountAsync(0);
     }
 
     // The own role of an Administrator or Owner.

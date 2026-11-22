@@ -1,6 +1,6 @@
 # Test Cases of the Admin UI
 
-The functional test cases of the admin UI in Testiny project `2SP` (id 1) and the automated test of each, in `src/Platform/UI.Admin.AutomationTests/src/Tests/`. Every case has type Functional, status Ready for Test and automation Automated. Each Testiny folder is a folder of `Tests/`, and each sub-folder is a test class. The case's steps are in Testiny and in the plan [2026-11-02 Initial Test Cases of the Admin UI and Their Automation](specs/2026-11-02%20Initial%20Test%20Cases%20of%20the%20Admin%20UI%20and%20Their%20Automation.md), which also lists what is not automated and why; the steps of the cases of the onboarding wizard (ACC-SGN-06 to ACC-SGN-13) are in section 6 of the plan [2026-11-15 Onboarding Wizard with EU Hosting, Security and the Exhibition](../ui.admin/specs/2026-11-15%20Onboarding%20Wizard%20with%20EU%20Hosting,%20Security%20and%20the%20Exhibition.md). How to run and write the tests: [automation-tests.md](automation-tests.md).
+The functional test cases of the admin UI in Testiny project `2SP` (id 1) and the automated test of each, in `src/Platform/UI.Admin.AutomationTests/src/Tests/`. Every case has type Functional, status Ready for Test and automation Automated. Each Testiny folder is a folder of `Tests/`, and each sub-folder is a test class. The case's steps are in Testiny and in the plan [2026-11-02 Initial Test Cases of the Admin UI and Their Automation](specs/2026-11-02%20Initial%20Test%20Cases%20of%20the%20Admin%20UI%20and%20Their%20Automation.md), which also lists what is not automated and why; the steps of the cases of the onboarding wizard (ACC-SGN-06 to ACC-SGN-13) are in section 6 of the plan [2026-11-15 Onboarding Wizard with EU Hosting, Security and the Exhibition](../ui.admin/specs/2026-11-15%20Onboarding%20Wizard%20with%20EU%20Hosting,%20Security%20and%20the%20Exhibition.md), and the steps of joining and leaving the exhibition and a project after onboarding (ORG-ORG-03, ORG-ORG-04 and ACC-MEM-05 to ACC-MEM-07) in section 5 of the plan [2026-11-22 Join or Leave the Exhibition After Onboarding](../ui.admin/specs/2026-11-22%20Join%20or%20Leave%20the%20Exhibition%20After%20Onboarding.md). How to run and write the tests: [automation-tests.md](automation-tests.md).
 
 - **Reference**: `<section>-<sub-folder>-<n>`; it starts the Testiny precondition and the comment above the test.
 - **Priority**: Elementary (the section's PR-gate test, `[Elementary]`), High, Medium or Low.
@@ -18,12 +18,12 @@ The functional test cases of the admin UI in Testiny project `2SP` (id 1) and th
   - M: mock only (`[MockOnly]`).
   - P: in a disposable project (`[DisposableProject]`).
 
-240 cases:
+245 cases:
 
 | Section | Folder | Cases |
 |---|---|---|
-| [Access](#access) | `Tests/Access` | 40 |
-| [Organizations and Projects](#organizations-and-projects) | `Tests/Projects` | 10 |
+| [Access](#access) | `Tests/Access` | 43 |
+| [Organizations and Projects](#organizations-and-projects) | `Tests/Projects` | 12 |
 | [Navigation](#navigation) | `Tests/Navigation` | 23 |
 | [Annotations](#annotations) | `Tests/Annotations` | 34 |
 | [Configurations](#configurations) | `Tests/Configurations` | 28 |
@@ -63,6 +63,9 @@ The cases of the onboarding wizard (ACC-SGN-06 to ACC-SGN-13) are in the class's
 | ACC-MEM-02 | 52 | The only Owner of a new project can be neither demoted nor removed | Medium | Owner | B,P | `Members_OnlyOwner_CannotBeDemotedOrRemoved` |
 | ACC-MEM-03 | 54 | An Owner changes the role of a member and removes another member | Medium | Owner | M | `Members_ChangeRoleAndRemove_UpdatesTable` |
 | ACC-MEM-04 | 55 | Below Administrator the Members page offers no Invite and no access | Medium | Contributor | B | `Members_Contributor_ShowsNoAccess` |
+| ACC-MEM-05 | 512 | A Contributor leaves a project from its Settings and loses access to it | High | Contributor | M | `Members_ContributorLeavesProject_LosesAccess` |
+| ACC-MEM-06 | 513 | A visitor leaves the exhibition from its Settings, and the Organizations page offers it again | Medium | Any | M | `Members_VisitorLeavesExhibition_OffersItAgain` |
+| ACC-MEM-07 | 514 | The only Owner of a project cannot leave it | Medium | Owner | B,P | `Members_OnlyOwner_CannotLeave` |
 
 ### Invitations (`InvitationTests`)
 
@@ -120,6 +123,8 @@ The cases of the onboarding wizard (ACC-SGN-06 to ACC-SGN-13) are in the class's
 |---|---|---|---|---|---|---|
 | ORG-ORG-01 | 8 | New organization creates the organization with its first project and lists it | High | Any | B | `Organization_Create_ListsItWithFirstProject` |
 | ORG-ORG-02 | 23 | New organization validates the names and rejects an existing project | Medium | Owner | B | `Organization_CreateInvalid_ShowsFieldErrors` |
+| ORG-ORG-03 | 510 | A user with an account joins the exhibition from the Organizations page and opens it as a Reader | High | Any | M | `Organization_JoinExhibition_OpensItAsReader` |
+| ORG-ORG-04 | 511 | The Organizations page offers the exhibition only to a user who is not its member, on a deployment that has one | Medium | Any | M | `Organization_ExhibitionOffer_HiddenForMemberOrWithoutExhibition` |
 
 ### Projects (`ProjectTests`)
 

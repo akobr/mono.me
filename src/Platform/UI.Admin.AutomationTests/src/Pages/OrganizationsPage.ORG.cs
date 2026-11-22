@@ -10,9 +10,32 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // the names like the API's NameRules and shows the first error of each field under it, as the field's accessible
 // description (it replaces the help). A created organization closes the dialog, toasts "Organization <org> created"
 // and opens the project's annotations; a conflict of the API keeps the dialog open with a message under Organization.
+// The offer of the exhibition (ExhibitionOfferCard.vue, 424-271): for a user with an account and no role in the
+// deployment's exhibition, the last card of the grid (below the empty state without organizations) has the heading
+// "The exhibition", the wizard's two sentences about it (OnboardingPage.ExhibitionText and
+// OnboardingPage.ExhibitionChoiceDescriptionText) and the button "Join the exhibition", a button and not a link, so
+// ListedAsync lists no project for it. The page asks for the exhibition once per page load; a deployment without one
+// (or any failure of the request) shows no card.
 public sealed partial class OrganizationsPage
 {
+    // The heading (h2) of the offer of the exhibition.
+    public const string ExhibitionOfferHeadingText = "The exhibition";
+
+    // The button of the offer of the exhibition.
+    public const string JoinExhibitionText = "Join the exhibition";
+
+    // The toast of a join, the same as the onboarding wizard's.
+    public const string JoinedExhibitionToast = "You joined the exhibition";
+
     public ILocator NewOrganizationDialog => app.Page.GetByRole(AriaRole.Dialog, new() { Name = "New organization", Exact = true });
+
+    // The card of the offer of the exhibition (data-exhibition-offer); none while nothing is offered.
+    public ILocator ExhibitionOffer => app.Page.Locator("[data-exhibition-offer]");
+
+    // The heading of the offer and its button, which nothing else of the page has: none while nothing is offered.
+    public ILocator ExhibitionOfferHeading => app.Page.GetByRole(AriaRole.Heading, new() { Name = ExhibitionOfferHeadingText, Exact = true, Level = 2 });
+
+    public ILocator JoinExhibitionButton => app.Page.GetByRole(AriaRole.Button, new() { Name = JoinExhibitionText, Exact = true });
 
     // A required field's accessible name ends in '*' ("Organization*").
     public ILocator NewOrganizationName => NewOrganizationDialog.GetByRole(AriaRole.Textbox, new() { NameRegex = OrganizationLabel() });
@@ -30,6 +53,13 @@ public sealed partial class OrganizationsPage
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         return NewOrganizationDialog.GetByText(message, new() { Exact = true });
+    }
+
+    // A text of the offer of the exhibition by its exact words, e.g. OnboardingPage.ExhibitionText.
+    public ILocator ExhibitionOfferText(string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        return ExhibitionOffer.GetByText(text, new() { Exact = true });
     }
 
     // The badge next to the organization's link in its card: the user's role on the organization ("Owner", …), or
@@ -65,9 +95,23 @@ public sealed partial class OrganizationsPage
         await Expect(NewOrganizationDialog).ToBeHiddenAsync();
     }
 
+    // Clicks "Join the exhibition" and returns once the app left /orgs for the exhibition's annotations, i.e. the join
+    // succeeded (with the toast JoinedExhibitionToast). A refused join keeps the page, with a toast that says why ("The
+    // exhibition is no longer offered.", "Joining the exhibition failed"), so this then fails with the page still at
+    // /orgs.
+    public async Task JoinExhibitionAsync()
+    {
+        await JoinExhibitionButton.ClickAsync();
+        await Expect(app.Page).Not.ToHaveURLAsync(OrganizationsUrl());
+    }
+
     [GeneratedRegex("^Organization")]
     private static partial Regex OrganizationLabel();
 
     [GeneratedRegex("^First project")]
     private static partial Regex FirstProjectLabel();
+
+    // The URL of /orgs, whatever its query and hash.
+    [GeneratedRegex(@"/orgs/?(?:[?#].*)?$")]
+    private static partial Regex OrganizationsUrl();
 }
