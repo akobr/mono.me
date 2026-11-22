@@ -56,7 +56,10 @@ public class DevelopmentAuthenticationGuardTests
     [Theory]
     [InlineData("WEBSITE_SITE_NAME")]
     [InlineData("WEBSITE_INSTANCE_ID")]
+    [InlineData("WEBSITE_POD_NAME")]
+    [InlineData("LEGION_SERVICE_HOST")]
     [InlineData("CONTAINER_APP_NAME")]
+    [InlineData("KUBERNETES_SERVICE_HOST")]
     public void DebugBuild_InDevelopmentOnAHostingPlatform_IsRefused(string variable)
     {
         Func<string, string?> variables = name => name == variable ? "prod-2s-func" : null;
