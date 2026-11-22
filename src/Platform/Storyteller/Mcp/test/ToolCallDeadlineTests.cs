@@ -112,10 +112,12 @@ public sealed class ToolCallDeadlineTests : IDisposable
     [Fact]
     public async Task ToolCall_ThatEndsBeforeTheDeadline_Answers()
     {
-        // With the exchange, a second before the deadline.
-        _host.Api.RespondAsync = (_, _) =>
+        // With the exchange, a second before the deadline: the call's token is not cancelled yet.
+        var cancelled = true;
+        _host.Api.RespondAsync = (_, cancellationToken) =>
         {
             _clock.Advance(StorytellerCallFilter.ToolCallTimeout - ExchangeTime - TimeSpan.FromSeconds(1));
+            cancelled = cancellationToken.IsCancellationRequested;
             return Task.FromResult(RecordingApiHandler.Json(AnnotationJson));
         };
         await using var client = await _host.ConnectAsync();
@@ -126,6 +128,7 @@ public sealed class ToolCallDeadlineTests : IDisposable
 
         result.IsError.ShouldNotBe(true, result.Text());
         result.Text().ShouldContain(Key);
+        cancelled.ShouldBeFalse();
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 
 using _42.Platform.Storyteller.Mcp.Tools;
@@ -21,7 +22,15 @@ public sealed class UnfinishedCallTests : IDisposable
         { "connection", new HttpRequestException($"Connection reset ({Marker}).") },
         { "attempt timeout", new TimeoutRejectedException($"Timed out ({Marker}).") },
         { "HttpClient timeout", new TaskCanceledException($"Timed out ({Marker}).", new TimeoutException()) },
-        { "broken response body", new HttpIOException(HttpRequestError.ResponseEnded, $"The response ended early ({Marker}).") },
+        { "response body ended early", EndedEarly() },
+        { "connection reset during the body", Reset() },
+    };
+
+    // How SocketsHttpHandler reports a body read that breaks: an early end of the connection, or a reset (RST).
+    public static TheoryData<string, Exception> BodyFailures() => new()
+    {
+        { "ended early", EndedEarly() },
+        { "reset", Reset() },
     };
 
     [Theory]
@@ -45,23 +54,24 @@ public sealed class UnfinishedCallTests : IDisposable
     }
 
     // The one-time credentials of a new machine arrive in the body: a body that breaks while it is read is a call that
-    // may have completed, not a generic error.
-    [Fact]
-    public async Task CreateMachine_WhoseAnswerBreaksWhileItIsRead_SaysItMayHaveCompleted()
+    // may have completed, not a generic error. The SDK reports it as an ApiException with the status 200.
+    [Theory]
+    [MemberData(nameof(BodyFailures))]
+    public async Task CreateMachine_WhoseAnswerBreaksWhileItIsRead_SaysItMayHaveCompleted(string because, Exception failure)
     {
         _host.Api.Respond = _ => new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StreamContent(new BrokenBodyStream()) { Headers = { ContentType = new MediaTypeHeaderValue("application/json") } },
+            Content = new StreamContent(new BrokenBodyStream(failure)) { Headers = { ContentType = new MediaTypeHeaderValue("application/json") } },
         };
         await using var client = await _host.ConnectAsync();
 
         var result = await client.CallAsync("create_machine", new { organization = "house", project = "main", scopes = new[] { "AnnotationRead" } });
 
-        result.IsError.ShouldBe(true);
-        result.Text().ShouldBe(StorytellerCallFilter.UnfinishedCallMessage);
-        _host.Api.Requests.Count.ShouldBe(1);
-        _host.Logs.Entries.ShouldContain(entry => entry.Contains($"Tool create_machine: a call to the Storyteller API did not finish ({nameof(HttpIOException)}).", StringComparison.Ordinal));
-        _host.Logs.Entries.ShouldNotContain(entry => entry.Contains(Marker, StringComparison.Ordinal));
+        result.IsError.ShouldBe(true, because);
+        result.Text().ShouldBe(StorytellerCallFilter.UnfinishedCallMessage, because);
+        _host.Api.Requests.Count.ShouldBe(1, because);
+        _host.Logs.Entries.ShouldContain(entry => entry.Contains($"Tool create_machine: a call to the Storyteller API did not finish ({failure.GetType().Name}).", StringComparison.Ordinal), because);
+        _host.Logs.Entries.ShouldNotContain(entry => entry.Contains(Marker, StringComparison.Ordinal), because);
     }
 
     [Fact]
@@ -98,8 +108,12 @@ public sealed class UnfinishedCallTests : IDisposable
         _host.Dispose();
     }
 
-    // The start of an answer, then the connection ends, as SocketsHttpHandler reports it.
-    private sealed class BrokenBodyStream : Stream
+    private static HttpIOException EndedEarly() => new(HttpRequestError.ResponseEnded, $"The response ended early ({Marker}).");
+
+    private static IOException Reset() => new($"Unable to read data from the transport connection ({Marker}).", new SocketException((int)SocketError.ConnectionReset));
+
+    // The start of an answer, then the failure of the connection.
+    private sealed class BrokenBodyStream(Exception failure) : Stream
     {
         private readonly byte[] _start = Encoding.UTF8.GetBytes("""{"Machine":{"Id":"m-""");
         private bool _started;
@@ -122,7 +136,7 @@ public sealed class UnfinishedCallTests : IDisposable
         {
             if (_started)
             {
-                throw new HttpIOException(HttpRequestError.ResponseEnded, $"The response ended early ({Marker}).");
+                throw failure;
             }
 
             _started = true;
