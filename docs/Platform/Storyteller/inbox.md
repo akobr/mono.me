@@ -4,11 +4,12 @@ Every view has an **inbox**: the place where the platform leaves things for the 
 
 The inbox is there for two things. The result of background work gets a place where it stays, for everybody with the role, and not only for the browser tab that started the job. And the platform gets a way to ask people for a decision. The first producer is the [export and import of a view](export-import.md): every job that ends pushes a notification.
 
-This page describes what exists today, the back end: the model, the publisher for producers, the service for readers, and the Cosmos DB store. No HTTP route, no SDK client and no page of the administration UI reads the inbox yet (see [Not there yet](#not-there-yet)). The design and its decisions are in [the spec](specs/2026-11-22%20Inbox%20of%20a%20View.md).
+This page describes what exists today: the model, the publisher for producers, the service for readers, the Cosmos DB store, and the three [routes](#routes) of the API with their SDK clients. People with the Contributor role on the project read the inbox of a view and accept or dismiss its items; machines cannot. No page of the administration UI reads the inbox yet (see [Not there yet](#not-there-yet)). The design and its decisions are in [the spec](specs/2026-11-22%20Inbox%20of%20a%20View.md).
 
 The code is in:
 
 - `src/Platform/Storyteller/Abstractions.Access/src/Model/ViewInbox.cs`: the public model (`ViewInboxItem`, `ViewInboxJob`, `ViewInboxResponse` and their enums);
+- `Api.Functions/src/V1/ViewInboxHttp.cs`: the three routes, with the role of the caller from `Security/HttpRequestDataExtensions.cs` (`GetUserRoleInProjectAsync`);
 - `Backend.Core/src/Notifying/`: the publisher (`IViewInboxPublisher`, `ViewInboxPublisher`, `ViewInboxPush`), the service (`IViewInboxService`, `ViewInboxService`, `ViewInboxQuery`, `ViewInboxFilter`), the handlers of actions (`IViewInboxActionHandler`, `ViewInboxActionContext`, `ViewInboxActionResult`), the ids (`ViewInboxIds`), the topics (`ViewInboxTopics`), the options (`ViewInboxOptions`), the contract of the store (`IViewInboxStore`, `ViewInboxRecord`) and the registration (`ViewInboxEntryPoint`);
 - `Backend.Core/src/Transferring/`: the notifications of exports and imports (`ViewTransferNotifications`, pushed by `ViewTransferService`);
 - `Backend.CosmosDb/src/`: the store (`Notifying/CosmosViewInboxStore.cs`), the entity (`Entities/Inbox/ViewInboxEntity.cs`) and the partition (`PartitionKeys.cs`).
@@ -127,7 +128,7 @@ Roles are granted on a project, never on a view ([access.md](access.md#roles)). 
 
 - **An item above the role is not found.** Accept and dismiss answer `NotFoundException` with "The inbox item '{id}' does not exist or has expired.", which is also the answer for an unknown id, an id of another shape, an item of another view and an expired item. The role is looked at before the kind and the state, so a Contributor who accepts or dismisses an Administrator's item never gets a conflict that would tell that the item exists.
 - **The list and the count** apply the same rule: they ask the store only for the roles the caller sees.
-- **The service does not look the role up.** It takes it as a parameter (`ViewInboxQuery.Role`, the `role` of accept and dismiss); whoever calls the service gives the caller's role on the project.
+- **The service does not look the role up.** It takes it as a parameter (`ViewInboxQuery.Role`, the `role` of accept and dismiss); whoever calls the service gives the caller's role on the project. The [routes](#access) read it once per request and hand it over.
 
 ## Ids
 
@@ -200,7 +201,7 @@ var item = await inbox.PushAsync(new ViewInboxPush
 - **The token** is the base64url text, without padding, of `1:` and the id of the last item of the page. The next page holds the items just below that id, so nothing is repeated. An item whose id is above it (a new item, or one pushed later with the time of an earlier event) shows when the list is read again from the start. The token is not tied to the filter or the role: send the same ones with it.
 - **A token this inbox did not issue** is `InvalidInputException` with `InvalidQuery` and "The continuation token is not one of the inbox; start again without it." It is checked first, for every role. A blank token is the first page.
 - **`Count`** is the number of items of the page. **`OpenCount`** is every open item the caller sees, whatever the page and the filter. It is a count query of its own, run next to the list.
-- **A role below `Contributor`** gets an empty answer with `OpenCount` 0; the store is not asked.
+- **A role below `Contributor`** gets an empty answer with `OpenCount` 0; the store is not asked. A caller of the API never gets that answer: the route refuses the role first (`403`).
 - **The view is not checked.** The inbox of a view that does not exist is empty.
 - **Expiry.** The list and the count do not compare `ExpiresAt` with the clock. They rely on the `ttl` of the store (see [Storage](#storage)).
 
@@ -309,19 +310,189 @@ A handler starts a job through the service of the jobs, and that service pushes 
 
 ## Errors
 
-| Exception | `ErrorCode` | When |
-| --- | --- | --- |
-| `NotFoundException` | `NotFound` | Accept or dismiss of an item that does not exist in this view, has an id of another shape, has expired, or is above the caller's role |
-| `ConflictException` | `InboxItemNotAction` | Accept of a notification or a message |
-| `ConflictException` | `InboxItemClosed` | Accept or dismiss of an item that is already accepted or dismissed |
-| `ConflictException` | `Conflict` | The item kept changing: a replace was lost four times in a row |
-| `FeatureNotConfiguredException` | `InboxActionNotAvailable` | Accept of an action whose code has no handler |
-| `InvalidInputException` | `InvalidQuery` | A continuation token this inbox did not issue |
-| the handler's own | | Accept, when the handler throws; the item is open again |
+| Exception | `ErrorCode` | Status | When |
+| --- | --- | --- | --- |
+| `NotFoundException` | `NotFound` | `404` | Accept or dismiss of an item that does not exist in this view, has an id of another shape, has expired, or is above the caller's role |
+| `ConflictException` | `InboxItemNotAction` | `409` | Accept of a notification or a message |
+| `ConflictException` | `InboxItemClosed` | `409` | Accept or dismiss of an item that is already accepted or dismissed |
+| `ConflictException` | `Conflict` | `409` | The item kept changing: a replace was lost four times in a row |
+| `FeatureNotConfiguredException` | `InboxActionNotAvailable` | `501` | Accept of an action whose code has no handler |
+| `InvalidInputException` | `InvalidQuery` | `400` | A continuation token this inbox did not issue |
+| the handler's own | | by its type | Accept, when the handler throws; the item is open again |
 
-`InboxItemClosed`, `InboxItemNotAction` and `InboxActionNotAvailable` are new in `Backend.Core/src/ErrorCodes.cs`. The API maps these exceptions to `404`, `409`, `501` and `400` (`ErrorResponseMapping`); no route throws them yet.
+`InboxItemClosed`, `InboxItemNotAction` and `InboxActionNotAvailable` are new in `Backend.Core/src/ErrorCodes.cs`. The status is the one the API answers: the [routes](#routes) catch nothing, and `ErrorResponseMapping` (`Api.Functions/src/ErrorHandling/`) answers an exception by its type, with an `ErrorResponse` that carries its message and its `ErrorCode`. The routes add the `401` and the `403` of their own checks, and the `400` of a wrong `state`.
 
 The publisher throws `ArgumentException` for a wrong push, and `InvalidOperationException` when an item can be neither created nor read. Both are errors of a producer or of the store, not answers to a reader.
+
+## Routes
+
+Three routes of the API read the inbox of a view and close its items. They are below `v1/{organization}/{project}/{view}`, with the tag `Inbox`:
+
+- `Api.Functions/src/V1/ViewInboxHttp.cs`: the three routes;
+- `Definitions.cs`: the routes (`Routes.Inbox.V1`), the operation ids (`RouteIds.Inbox`), the tag (`Tags.Inbox`) and the descriptions of the answers;
+- `Security/HttpRequestDataExtensions.cs`: the role of the caller (`GetUserRoleInProjectAsync`);
+- `OpenApi/OperationAccess.cs`: the three operations among those for users only.
+
+| Method | Route | Operation | Answers |
+| --- | --- | --- | --- |
+| `GET` | `…/inbox?state=&continuationToken=` | `GetViewInbox` | `200` `ViewInboxResponse`; `400` `InvalidQuery` |
+| `POST` | `…/inbox/{id}/accept` | `AcceptViewInboxItem` | `200` `ViewInboxItem`; `404`; `409` `InboxItemNotAction`, `InboxItemClosed`, `Conflict`, or the handler's own; `501` `InboxActionNotAvailable` |
+| `POST` | `…/inbox/{id}/dismiss` | `DismissViewInboxItem` | `200` `ViewInboxItem`; `404`; `409` `InboxItemClosed`, `Conflict` |
+
+- Every route also answers `401` and `403` (see [Access](#access)).
+- `inbox` is a literal segment after the view, as `exports` and `imports` are, so the routes meet no other route.
+- **An item has no route of its own**, only its two actions, and the list is only read. `GET` or `DELETE …/inbox/{id}`, `GET …/inbox/{id}/accept`, `PUT …/inbox/{id}/dismiss`, another action such as `POST …/inbox/{id}/reopen`, and `POST …/inbox` match no function, so the host answers `404`.
+- **Today an acceptance never answers `200`**: no handler is registered, so an open action answers `501`, and any other item `409` or `404` (see [Accept and dismiss](#accept-and-dismiss)).
+
+### Access
+
+- **Users only.** A machine is refused in every build with `403 AccessDenied` and "Only users may call this operation; machines cannot.", whatever its credentials carry, `User.Impersonation` included, and before a role is looked up. No machine scope gives the inbox. So a pipeline that exports or imports as a machine never reads the notification of its own job: it polls the job, and the item stays open until a person dismisses it or it expires.
+- **A token that acts for a user.** Without `User.Impersonation` the answer is `401` without a body, as on every route for users.
+- **The `Contributor` role on the project.** `GetUserRoleInProjectAsync` reads the caller's role on `{organization}.{project}` (`IAccessService.GetAccountRoleAsync`), once per request. Below `Contributor` the answer is `403 AccessDenied` with the message of every role check of the API, for example `No Contributor access to 'acme.billing'.` The service is not asked, so a Reader learns nothing about an item, not even whether its id exists.
+- **The role is handed to the service.** The helper answers the role itself, not only whether it is enough, and the route gives it to the service as `ViewInboxQuery.Role` or as the `role` of accept and dismiss. The service lists and counts what that role sees, and an item above it is not found: `404`, as for an unknown id, whatever is asked of the item (see [Roles and visibility](#roles-and-visibility)). So the `403` tells that the caller has no inbox, and nothing tells that an item exists which the caller may not see.
+- **Through an actor**, such as the MCP server's token of a person, the role is the person's, and the stamp of an acceptance or a dismissal names the person with the actor as `Via`. No restriction of an actor applies.
+- **No step-up.** A sign-in that is not recent is served as a recent one: the routes change no access and reveal no secret.
+- **No access audit record**, and no event of another audit trail. What records an acceptance or a dismissal is the stamp `Closed` of the item.
+- **The view is not checked**, as on the other routes of a view. The inbox of a view without items, or of a view that does not exist, is an empty list, and accept and dismiss answer `404` there.
+- **Debug builds** (`DEV_AUTH`) skip the checks of users, `User.Impersonation` and the role, as on every route. No role is looked up, and the caller counts as `Owner`: the service hides nothing, also from an account that is only a Reader. A request without an identity is served as an `Owner`'s too, and its acceptance or dismissal is stamped `System`. The refusal of machines runs in every build. A unit test turns the role check back on with `UserRoleChecks.Enforce()`; a request without an identity is then `401`.
+
+A route checks in this order, and the first failure answers: a machine (`403`), `User.Impersonation` (`401`), the role (`403`), the query of the list (`400`), and then the service.
+
+### The list
+
+`GET …/inbox` answers one page of the items the caller's role sees, as a `ViewInboxResponse`.
+
+| Query parameter | Values | Default |
+| --- | --- | --- |
+| `state` | `Open`, or `Done`: the accepted and the dismissed items | `Open` |
+| `continuationToken` | The `ContinuationToken` of the page before | the first page |
+
+- **`state`** is read as the enums of the key/value queries are (`KeyValueQuery.GetEnum<ViewInboxFilter>`): a name in any casing (`open`, `DONE`), or the number of a value (`0` for `Open`, `1` for `Done`). Empty means `Open`. Anything else answers `400 InvalidQuery` with "The query parameter 'state' must be Open, Done." and reads no inbox: a state of an item (`Accepted`, `Dismissed`), `All`, two names (`Open,Done`), a number without a value (`2`). The OpenAPI document publishes the parameter as a plain string.
+- **`continuationToken`** goes to the service as it came. A token this inbox did not issue answers `400 InvalidQuery` with "The continuation token is not one of the inbox; start again without it." (see [Listing](#listing)).
+- **The role comes first.** It is checked before the query is read, so a Reader or a machine with a wrong `state` gets `403`, not `400`.
+- **The page** is newest first and holds at most 50 items. `Count` is the number of its items, and `OpenCount` every open item the caller sees, whatever the page and the `state`. `ContinuationToken` is there only when a page follows; send it back with the same `state`.
+- **The token of the invocation** goes to the service, so a caller that goes away stops the read.
+
+A page of an Administrator, with the end of an export and of an import (members that are null are left out):
+
+```json
+{
+  "Items": [
+    {
+      "Id": "20261122093012000000061c5e0d2a7b94f3e8a1d0c6b5f4e3d2c",
+      "Kind": "Notification",
+      "Topic": "ViewImport",
+      "Level": "Warning",
+      "Title": "Import finished with failures",
+      "Text": "acme.zip: 3 created, 2 updated, 10 unchanged, 1 skipped, 1 failed",
+      "MinimalRole": "Administrator",
+      "State": "Open",
+      "CreatedAt": "2026-11-22T09:30:12+00:00",
+      "CreatedBy": { "Kind": "Account", "Id": "user_01", "Name": "Ada Lovelace" },
+      "ExpiresAt": "2026-11-23T09:30:12+00:00",
+      "Job": {
+        "Kind": "ViewImport",
+        "Id": "9b1d4c7a2e5f4083a6c9d2e5f8b1a4c7",
+        "FileName": "acme.zip"
+      }
+    },
+    {
+      "Id": "20261122091407000000079aab47ca406989d11506daca106041b",
+      "Kind": "Notification",
+      "Topic": "ViewExport",
+      "Level": "Success",
+      "Title": "Export finished",
+      "Text": "12 annotations, 3 schemas, 2 templates, 40 configurations, 58 versions, 1.2 MB",
+      "MinimalRole": "Administrator",
+      "State": "Open",
+      "CreatedAt": "2026-11-22T09:14:07+00:00",
+      "CreatedBy": { "Kind": "Account", "Id": "user_01", "Name": "Ada Lovelace" },
+      "ExpiresAt": "2026-11-23T09:14:07+00:00",
+      "Job": {
+        "Kind": "ViewExport",
+        "Id": "5f0c2d7e9a414b6c8e3d1f2a4b6c8d0e",
+        "FileName": "export-acme-billing-default-20261122-091358Z.zip"
+      }
+    }
+  ],
+  "Count": 2,
+  "OpenCount": 2
+}
+```
+
+This page is the last one, so it has no `ContinuationToken`. A page that another one follows carries the token of its last item: `MToyMDI2MTEyMjA5MTQwNzAwMDAwMDA3OWFhYjQ3Y2E0MDY5ODlkMTE1MDZkYWNhMTA2MDQxYg` for a page that ends with the export above.
+
+### Accept and dismiss
+
+`POST …/inbox/{id}/accept` and `POST …/inbox/{id}/dismiss` take the id of an item of the list and answer the item as the call left it.
+
+- **No request body.** The routes read none: whatever a client sends is not read, so it cannot fail the request.
+- **The actor** is the audit actor of the request (`request.GetAuditActor()`): the account with its display name, and `Via` when an actor acts for the person. It becomes the stamp `Closed` of the item.
+- **Dismiss** closes an open item of any kind and starts nothing (see [Dismiss](#dismiss)).
+- **Accept** takes an open `Action` only and runs its handler (see [Accept](#accept)). The answer carries the `Job` the handler started, when there is one.
+- **The token of the invocation** goes to the service. A caller that goes away stops a dismissal, and an acceptance up to its claim; from the claim on the work runs to its end.
+
+| Status | `ErrorCode` | Route | When |
+| --- | --- | --- | --- |
+| `200` | | both | The item, `Accepted` or `Dismissed`, with its stamp `Closed` |
+| `401` | | both | Missing or invalid credentials, or a token that does not act for a user |
+| `403` | `AccessDenied` | both | A machine, or a user whose role on the project is below `Contributor` |
+| `404` | `NotFound` | both | The item does not exist in this view, has an id of another shape, has expired, or needs a higher role than the caller's: "The inbox item '{id}' does not exist or has expired." |
+| `409` | `InboxItemNotAction` | accept | The item is a notification or a message: "The inbox item is not an action; only an action can be accepted." |
+| `409` | `InboxItemClosed` | both | The item was already accepted or dismissed: "The inbox item was already accepted." or "The inbox item was already dismissed." |
+| `409` | `Conflict` | both | The item kept changing while the call saved it: "The inbox item changed; try again." |
+| `409` | the handler's own | accept | What the action starts could not start, such as `TransferLimit` of a job. The exception of the handler goes out as it is and is answered by its type, so another type is another status. The item is open again. |
+| `501` | `InboxActionNotAvailable` | accept | No handler is registered for the action of the item: "The action '{code}' of the inbox item is not available in this deployment." The item stays open. |
+
+The checks of the item come in the order of the service, and the first failure answers: visible (`404`), an action (`409 InboxItemNotAction`, accept only), open (`409 InboxItemClosed`), a handler (`501`, accept only).
+
+**Today every acceptance of an action answers `501`**, because no handler is registered ([Action handlers](#action-handlers)). No producer pushes an action either: the items of a deployment are the notifications of exports and imports, whose acceptance answers `409 InboxItemNotAction`. Dismiss works for all of them.
+
+The body of a refusal is an `ErrorResponse`:
+
+```json
+{
+  "Message": "The inbox item was already dismissed.",
+  "ErrorCode": "InboxItemClosed"
+}
+```
+
+### Examples
+
+```bash
+API=https://api.example.com/api/v1/acme/billing
+AUTH="Authorization: Bearer $TOKEN"
+
+# the open items of the view default, then the accepted and dismissed ones
+curl "$API/default/inbox" -H "$AUTH"
+curl "$API/default/inbox?state=Done" -H "$AUTH"
+
+# the next page: the ContinuationToken of the page before, with the same state
+curl "$API/default/inbox?state=Done&continuationToken=$NEXT" -H "$AUTH"
+
+# dismiss the notification of an export; accept an action
+curl -X POST "$API/default/inbox/20261122091407000000079aab47ca406989d11506daca106041b/dismiss" -H "$AUTH"
+curl -X POST "$API/default/inbox/2026112208000000000003f2b8c1d4e5f4a6b9c0d1e2f3a4b5c6d/accept" -H "$AUTH"
+```
+
+The `Job` of a notification names its job, so its archive or report is read with the routes of the [export and import](export-import.md#routes): `GET …/exports/{Job.Id}/archive` or `GET …/imports/{Job.Id}`, while the job lives.
+
+### OpenAPI and SDKs
+
+The document publishes the three operations with the tag `Inbox`, each without a request body:
+
+- **`401`** is the description of the routes for users (`ResponseUnauthorizedUserOnly`), without a body.
+- **`403`** has a description of its own (`ResponseForbiddenViewInbox`): "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). The inbox needs the Contributor role. An item above the caller's role is not found (404)."
+- **`404`** of accept and dismiss is `ResponseNotFoundInboxItem`: "The item doesn't exist in this view, has expired, or needs a higher role than the caller's."
+- **The schemas** are `ViewInboxResponse`, `ViewInboxItem` and `ViewInboxJob`. The enums are written inline, and `CreatedBy` and `Closed` reference the shared `AuditActor` and `AuditStamp`.
+- **Every member is optional in the generated types.** The model has the C# keyword `required` and no `[JsonProperty(Required = …)]`, so no schema has a `required` list, as `AccessAuditEntry` and `ViewExport` have none. A client treats `Id`, `State` and `OpenCount` as possibly missing.
+
+The tag gives each SDK a client of its own:
+
+- The C# SDK has `IInboxApiClient` (`InboxApiClient`, the eighth typed client, registered by `AddStorytellerSdk`): `GetViewInboxAsync(organization, project, view, string state = null, string continuationToken = null)`, `AcceptViewInboxItemAsync(organization, project, view, id)` and `DismissViewInboxItemAsync(organization, project, view, id)`. `state` is a string, as in the document.
+- The TypeScript SDK (`@42for.net/2splatform.sdk`) has the `inbox` tag: `getViewInbox(organization, project, view, { state, continuationToken })`, `acceptViewInboxItem` and `dismissViewInboxItem`, with their Vue Query composables (`useGetViewInbox` with `getGetViewInboxQueryKey`, `useAcceptViewInboxItem` and `useDismissViewInboxItem`), Zod schemas and MSW handlers (`getInboxMock()`, part of `getStorytellerMock()` in the `./msw` entry).
+
+`sform` has no command for the inbox, and the [MCP server](mcp.md#limits) no tool.
 
 ## Notifications of exports and imports
 
@@ -488,12 +659,27 @@ The range is checked when the setting is first read, and the publisher reads it 
 | `Backend.CosmosDb/test/` | `CosmosViewInboxStoreTests` | The create and its conflict, the point read through the view only, two pairs in one partition, the replace with the ETag, the list per filter and role in id order, a next page, the count, the stored `ttl` of every write read from the raw document, view discovery, and a list of 52 items through the service with its token |
 | | `ViewInboxIsolationTests` | Two organizations with the same project, view and ids, in the store and through a push with a key |
 | | `EntityOrganizationTests` | `ViewInboxEntity` among the stored entities that carry `Organization` |
+| `Api.Functions/test/` | `ViewInboxHttpTests` | Each route with a recording service: the role handed over for the four roles, `None` and `Reader` refused before the service is asked, a machine refused in every build, a token that does not act for a user, the caller as `Owner` without a lookup where the role check is skipped, a request without an identity, `state` (the default, the casing, the `400`), the continuation token, the actor with `Via`, a delegated user, the token of the invocation, no request body, no step-up, the refusals of the service with their statuses, the routes and the tag |
+| | `HttpRequestDataExtensionsTests` | `GetUserRoleInProjectAsync`: the caller's own role at or above the minimal one, `403` below it, `Owner` where the role check is skipped, a machine refused |
+| | `OpenApiExportTests` | `Document_HasTheViewInboxOperations_UnderTheInboxTag`: the three operations, their parameters, statuses and descriptions, no request body, the three schemas without a `required` list. `OperationAccess_MatchesTheTablesOfTheTests`: the three ids among the operations for users only |
+| | `OpenApiDocumentTests` | `ViewInboxSchemas_ArePublished`: the members, enums, formats and references of the three schemas |
+| | `RouteTableTests`, `RouteDispatchTests` | The three routes are registered and are the only ones with `/inbox`; a request matches exactly its function, also for a view named `inbox`; a request for one item, for another method or for another action matches none |
+| | `FunctionTransactionNamesTests` | The transaction name of `AcceptViewInboxItem` is its route template |
 
 The tests of `Backend.Core` use fakes (`InMemoryViewInboxStore`, `RecordingActionHandler`, `RecordingViewInboxPublisher`) and need nothing else:
 
 ```bash
 dotnet test --project src/Platform/Storyteller/Backend.Core/test --filter-class "*ViewInbox*"
 dotnet test --project src/Platform/Storyteller/Backend.Core/test --filter-class "*ViewTransfer*"
+```
+
+The tests of the routes need nothing else either. Run them in Debug and in Release: a Debug build (`DEV_AUTH`) skips the checks of users, so the `401` of a token that does not act for a user is tested in Release only, and the caller as `Owner` without a lookup, also for a request without an identity, in Debug only. The tests of the roles turn the role check on with `UserRoleChecks.Enforce()` and run the same in both builds.
+
+```bash
+dotnet test --project src/Platform/Storyteller/Api.Functions/test --filter-class "*ViewInboxHttpTests"
+dotnet test --project src/Platform/Storyteller/Api.Functions/test -c Release --filter-class "*ViewInboxHttpTests"
+dotnet test --project src/Platform/Storyteller/Api.Functions/test
+dotnet test --project src/Platform/Storyteller/Api.Functions/test -c Release
 ```
 
 The store tests need a Cosmos DB emulator. Without `STORYTELLER_TESTS_USE_CONTAINER=true` the suite uses the local Windows emulator and deletes its database `42.Platform.2S`:
@@ -508,6 +694,5 @@ STORYTELLER_TESTS_USE_CONTAINER=true STORYTELLER_TESTS_EMULATOR=classic dotnet t
 
 ## Not there yet
 
-- **The HTTP routes and the SDK clients** of the inbox, and the documentation of who may call them, come with phase 2 of 424-31.
-- **The page of the administration UI** and its mock API come with phase 3 of 424-31.
-- **The first suggested action**, its handler and what an action carries for its handler come with 424-8.
+- **The page of the administration UI** and its mock API come with phase 3 of 424-31. Until then nothing of the platform calls the routes: the SDKs have the clients, and the administration UI still learns the end of a job by polling it.
+- **The first suggested action**, its handler and what an action carries for its handler come with 424-8. Until then no item is an action, and the acceptance of one answers `501`.

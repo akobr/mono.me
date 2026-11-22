@@ -491,7 +491,7 @@ stateDiagram-v2
 - **The push never fails the job.** A failure of the inbox is logged as a warning; the job keeps its state and an export its archive. The push does not listen to the token of the invocation.
 - A job that could not be queued fails inside the start request and pushes its failure too. A job in progress has no item, and a host without the inbox (`AddViewInbox`) pushes nothing.
 
-The levels, the exact texts and the places where an end is pushed are in [inbox.md](inbox.md#notifications-of-exports-and-imports). No route and no page reads the inbox yet ([inbox.md](inbox.md#not-there-yet)); the clients still learn the end of a job by polling it.
+The levels, the exact texts and the places where an end is pushed are in [inbox.md](inbox.md#notifications-of-exports-and-imports). People read the item with the [routes of the inbox](inbox.md#routes). No page reads the inbox yet ([inbox.md](inbox.md#not-there-yet)); the clients still learn the end of a job by polling it.
 
 `ViewExport` reports:
 
@@ -537,6 +537,7 @@ The routes are below `v1/{organization}/{project}/{view}`, with the tag `Transfe
 - A started job answers with its `Location`: the job below the collection it was posted to (`…/exports/{id}` or `…/imports/{id}`).
 - The job holds `Include` resolved: distinct, in import order, and all four when the request named none. An import also holds `Existing`, `IsDryRun` and `IsForced`.
 - A job is found only through the view it was started in (see [Jobs](#jobs)).
+- The routes have no list of jobs: the end of a job is an item of the view's inbox, which users with the `Administrator` role read with [`GET …/inbox`](inbox.md#routes), and whose `Job` names the job with its id and file name.
 - **Upload.** The zip is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature. Then its central directory is checked (see [Limits](#limits)).
 
 ### Request options
