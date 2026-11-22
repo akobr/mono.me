@@ -12,7 +12,7 @@ public static class ServicesCollectionExtensions
         Func<ISdkConfiguration>? configurationFactory = null)
         => services.AddStorytellerSdk(configurationFactory, null);
 
-    // configureHttpClient runs for each of the seven typed clients, after the primary handler is set,
+    // configureHttpClient runs for each of the eight typed clients, after the primary handler is set,
     // for example to add a DelegatingHandler.
     public static IServiceCollection AddStorytellerSdk(
         this IServiceCollection services,
@@ -35,6 +35,7 @@ public static class ServicesCollectionExtensions
         ConfigureHttpClient<IKeyValuesApiClient, KeyValuesApiClient>(services, configureHttpClient);
         ConfigureHttpClient<ITemplatesApiClient, TemplatesApiClient>(services, configureHttpClient);
         ConfigureHttpClient<ITransfersApiClient, TransfersApiClient>(services, configureHttpClient);
+        ConfigureHttpClient<IInboxApiClient, InboxApiClient>(services, configureHttpClient);
 
         return services;
     }

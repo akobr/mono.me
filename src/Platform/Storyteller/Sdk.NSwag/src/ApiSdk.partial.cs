@@ -147,6 +147,27 @@ public partial class TransfersApiClient
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);
 }
 
+public partial class InboxApiClient
+{
+    private ISdkConfiguration? _configuration;
+
+    [ActivatorUtilitiesConstructor]
+    public InboxApiClient(HttpClient httpClient, ISdkConfiguration configuration)
+        : this(httpClient)
+    {
+        _configuration = configuration;
+        BaseUrl = configuration.BaseUrl;
+    }
+
+    // Members of an item this SDK does not know yet keep their date-like strings as stored; typed dates (CreatedAt,
+    // ExpiresAt, the stamps) still parse.
+    static partial void UpdateJsonSerializerSettings(JsonSerializerSettings settings)
+        => settings.DateParseHandling = DateParseHandling.None;
+
+    partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
+        => SdkRequestHelper.ApplyAuthorization(_configuration, request);
+}
+
 internal static class SdkRequestHelper
 {
     internal static void ApplyAuthorization(ISdkConfiguration? configuration, HttpRequestMessage request)

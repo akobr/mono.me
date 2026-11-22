@@ -4,7 +4,9 @@ import { setupServer } from 'msw/node'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   acceptInvitation,
+  acceptViewInboxItem,
   configureStoryteller,
+  dismissViewInboxItem,
   getAccount,
   getAuthConfiguration,
   getConfigurationComposition,
@@ -20,6 +22,7 @@ import {
   getViewExport,
   getViewExportArchive,
   getViewImport,
+  getViewInbox,
   getViews,
   joinExhibition,
   patchProjectSettings,
@@ -35,6 +38,8 @@ import * as mswEntry from '../msw'
 import { getGetMembersMockHandler, getStorytellerMock } from '../msw'
 import {
   AcceptInvitationResponse,
+  AcceptViewInboxItemResponse,
+  DismissViewInboxItemResponse,
   GetAccountResponse,
   GetAuthConfigurationResponse,
   GetConfigurationCompositionResponse,
@@ -49,6 +54,7 @@ import {
   GetTemplatesResponse,
   GetViewExportResponse,
   GetViewImportResponse,
+  GetViewInboxResponse,
   GetViewsResponse,
   JoinExhibitionResponse,
   PatchProjectSettingsBody,
@@ -95,6 +101,9 @@ describe('generated client against generated mocks', () => {
     ['getViewExport', () => getViewExport('acme', 'billing', 'default', 'job_01'), GetViewExportResponse],
     ['startViewImport', () => startViewImport('acme', 'billing', 'default', new Blob(['PK'], { type: 'application/zip' }), { include: ['Templates'], existing: 'Skip' }), StartViewImportResponse],
     ['getViewImport', () => getViewImport('acme', 'billing', 'default', 'job_02'), GetViewImportResponse],
+    ['getViewInbox', () => getViewInbox('acme', 'billing', 'default', { state: 'Done' }), GetViewInboxResponse],
+    ['acceptViewInboxItem', () => acceptViewInboxItem('acme', 'billing', 'default', 'item_01'), AcceptViewInboxItemResponse],
+    ['dismissViewInboxItem', () => dismissViewInboxItem('acme', 'billing', 'default', 'item_02'), DismissViewInboxItemResponse],
   ] as const)('%s returns data that passes its Zod schema', async (_name, call, schema) => {
     const response = await call()
 
