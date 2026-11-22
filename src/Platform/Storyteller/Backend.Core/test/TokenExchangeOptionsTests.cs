@@ -28,6 +28,7 @@ public class TokenExchangeOptionsTests
         options.Enabled.ShouldBeFalse();
         options.AdditionalIssuers.ShouldBeEmpty();
         options.Actors.ShouldBeEmpty();
+        options.DeniedClientIds.ShouldBeEmpty();
         options.TokenLifetimeMinutes.ShouldBe(10);
         options.MaxExchangesPerSubjectTokenPerMinute.ShouldBe(10);
         options.MaxActorTokenAgeMinutes.ShouldBe(1440);
@@ -48,6 +49,10 @@ public class TokenExchangeOptionsTests
             [$"{Section}:Actors:0:Authentication:WorkloadIdentity:Audience"] = "api://storyteller-token-exchange",
             [$"{Section}:Actors:0:SubjectAudiences:0"] = "https://mcp.example.com/mcp",
             [$"{Section}:Actors:0:AllowedClientIds:0"] = "vscode",
+            [$"{Section}:Actors:0:TrustedClientIds:0"] = "https://claude.ai/oauth/mcp-oauth-client-metadata",
+            [$"{Section}:Actors:0:UntrustedClientRestrictions:0"] = "ReadOnly",
+            [$"{Section}:Actors:0:UntrustedClientRestrictions:1"] = "NoSecretReveal",
+            [$"{Section}:DeniedClientIds:0"] = "https://chatgpt.com/oauth/client.json",
             [$"{Section}:Actors:1:Id"] = "reviewer",
             [$"{Section}:Actors:1:Authentication:ClientAssertion:JwksUri"] = "https://reviewer.example.com/.well-known/jwks.json",
             [$"{Section}:Actors:1:SubjectAudiences:0"] = "https://reviewer.example.com",
@@ -69,14 +74,19 @@ public class TokenExchangeOptionsTests
         mcp.Authentication.ClientSecretHash.ShouldBeNull();
         mcp.SubjectAudiences.ShouldBe(["https://mcp.example.com/mcp"]);
         mcp.AllowedClientIds.ShouldBe(["vscode"]);
+        mcp.TrustedClientIds.ShouldBe(["https://claude.ai/oauth/mcp-oauth-client-metadata"]);
+        mcp.UntrustedClientRestrictions.ShouldBe([ActorRestrictions.ReadOnly, ActorRestrictions.NoSecretReveal]);
         mcp.GetScopes().ShouldBe([UserScopes.Impersonation]);
         mcp.GetRestrictions().ShouldBe([ActorRestrictions.NoSecretReveal]);
+        options.DeniedClientIds.ShouldBe(["https://chatgpt.com/oauth/client.json"]);
 
         var reviewer = options.Actors[1];
         reviewer.Authentication.ClientAssertion.ShouldNotBeNull().JwksUri.ShouldBe("https://reviewer.example.com/.well-known/jwks.json");
         reviewer.Authentication.WorkloadIdentity.ShouldBeNull();
         reviewer.GetScopes().ShouldBe([UserScopes.Impersonation]);
         reviewer.GetRestrictions().ShouldBeEmpty();
+        reviewer.TrustedClientIds.ShouldBeEmpty();
+        reviewer.UntrustedClientRestrictions.ShouldBeEmpty();
     }
 
     // Binding appends to arrays, so a second registration must not bind the section again.
@@ -90,6 +100,9 @@ public class TokenExchangeOptionsTests
             [$"{Section}:Actors:0:SubjectAudiences:0"] = "https://mcp.example.com/mcp",
             [$"{Section}:Actors:0:Scopes:0"] = "User.Impersonation",
             [$"{Section}:Actors:0:Restrictions:0"] = "NoSecretReveal",
+            [$"{Section}:Actors:0:TrustedClientIds:0"] = "vscode",
+            [$"{Section}:Actors:0:UntrustedClientRestrictions:0"] = "ReadOnly",
+            [$"{Section}:DeniedClientIds:0"] = "cursor",
             ["MachineAuth:Federation:PublicBaseUrl"] = PublicBaseUrl,
         })).Build();
         var services = new ServiceCollection();
@@ -105,6 +118,9 @@ public class TokenExchangeOptionsTests
         actor.SubjectAudiences.ShouldBe(["https://mcp.example.com/mcp"]);
         actor.Scopes.ShouldBe([UserScopes.Impersonation]);
         actor.Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);
+        actor.TrustedClientIds.ShouldBe(["vscode"]);
+        actor.UntrustedClientRestrictions.ShouldBe([ActorRestrictions.ReadOnly]);
+        options.DeniedClientIds.ShouldBe(["cursor"]);
         services.Count(descriptor => descriptor.ServiceType == typeof(IValidateOptions<TokenExchangeOptions>)).ShouldBe(1);
     }
 
@@ -249,7 +265,7 @@ public class TokenExchangeOptionsTests
 
         result.Failures.ShouldBe(
         [
-            $"{Section}:Actors:1:SubjectAudiences names 'HTTPS://MCP.EXAMPLE.COM/MCP', which {Section}:Actors:0 ('mcp') also lists with other Restrictions, AllowSecrets or Scopes; a token issued for one actor could be exchanged by the other.",
+            $"{Section}:Actors:1:SubjectAudiences names 'HTTPS://MCP.EXAMPLE.COM/MCP', which {Section}:Actors:0 ('mcp') also lists with other Restrictions, AllowSecrets, Scopes or client lists; a token issued for one actor could be exchanged by the other.",
         ]);
     }
 
@@ -272,8 +288,100 @@ public class TokenExchangeOptionsTests
 
         result.Failures.ShouldBe(
         [
-            $"{Section}:Actors:1:SubjectAudiences names 'https://mcp.example.com/mcp', which {Section}:Actors:0 ('mcp') also lists with other Restrictions, AllowSecrets or Scopes; a token issued for one actor could be exchanged by the other.",
+            $"{Section}:Actors:1:SubjectAudiences names 'https://mcp.example.com/mcp', which {Section}:Actors:0 ('mcp') also lists with other Restrictions, AllowSecrets, Scopes or client lists; a token issued for one actor could be exchanged by the other.",
         ]);
+    }
+
+    // The client lists decide the restrictions per client, so they are part of the policy: a client trusted by one actor
+    // would else lift the restrictions of the untrusted clients of the other.
+    [Theory]
+    [InlineData(nameof(TokenExchangeActorOptions.AllowedClientIds))]
+    [InlineData(nameof(TokenExchangeActorOptions.TrustedClientIds))]
+    [InlineData(nameof(TokenExchangeActorOptions.UntrustedClientRestrictions))]
+    public void Validate_ActorsSharingAnAudience_WithOtherClientLists_Fail(string list)
+    {
+        var result = Validate(new TokenExchangeOptions
+        {
+            Actors =
+            [
+                Actor(),
+                Actor(actor =>
+                {
+                    actor.Id = "ops";
+
+                    switch (list)
+                    {
+                        case nameof(TokenExchangeActorOptions.AllowedClientIds):
+                            actor.AllowedClientIds = ["vscode"];
+                            break;
+                        case nameof(TokenExchangeActorOptions.TrustedClientIds):
+                            actor.TrustedClientIds = ["vscode"];
+                            break;
+                        default:
+                            actor.UntrustedClientRestrictions = [ActorRestrictions.ReadOnly];
+                            break;
+                    }
+                }),
+            ],
+        });
+
+        result.Failures.ShouldBe(
+        [
+            $"{Section}:Actors:1:SubjectAudiences names 'https://mcp.example.com/mcp', which {Section}:Actors:0 ('mcp') also lists with other Restrictions, AllowSecrets, Scopes or client lists; a token issued for one actor could be exchanged by the other.",
+        ]);
+    }
+
+    // As sets of trimmed entries, compared exactly: the order, repeats and stray spaces do not count, the case does.
+    [Fact]
+    public void Validate_ActorsSharingAnAudience_CompareTheClientListsAsTrimmedSets()
+    {
+        var same = Validate(new TokenExchangeOptions
+        {
+            Actors =
+            [
+                Actor(actor =>
+                {
+                    actor.AllowedClientIds = ["vscode", "https://claude.ai/oauth/mcp-oauth-client-metadata"];
+                    actor.TrustedClientIds = ["https://claude.ai/oauth/mcp-oauth-client-metadata"];
+                    actor.UntrustedClientRestrictions = [ActorRestrictions.ReadOnly, ActorRestrictions.NoSecretReveal];
+                }),
+                Actor(actor =>
+                {
+                    actor.Id = "mcp-staging";
+                    actor.AllowedClientIds = [" https://claude.ai/oauth/mcp-oauth-client-metadata ", "vscode", "vscode"];
+                    actor.TrustedClientIds = ["https://claude.ai/oauth/mcp-oauth-client-metadata "];
+                    actor.UntrustedClientRestrictions = [ActorRestrictions.NoSecretReveal, ActorRestrictions.ReadOnly];
+                }),
+            ],
+        });
+        var otherCase = Validate(new TokenExchangeOptions
+        {
+            Actors =
+            [
+                Actor(actor => actor.TrustedClientIds = ["claude-code"]),
+                Actor(actor =>
+                {
+                    actor.Id = "mcp-staging";
+                    actor.TrustedClientIds = ["Claude-Code"];
+                }),
+            ],
+        });
+
+        same.Succeeded.ShouldBeTrue();
+        otherCase.Succeeded.ShouldBeFalse();
+    }
+
+    // The deny list is exchange-wide, so an emergency entry never makes the policies of two actors differ.
+    [Fact]
+    public void Validate_ActorsSharingAnAudience_WithDeniedClients_Succeed()
+    {
+        var result = Validate(new TokenExchangeOptions
+        {
+            DeniedClientIds = ["https://chatgpt.com/oauth/client.json"],
+            Actors = [Actor(), Actor(actor => actor.Id = "mcp-staging")],
+        });
+
+        result.Succeeded.ShouldBeTrue();
     }
 
     // One server with two workload identities (or a staging and a production one) shares a resource and a policy.
@@ -596,6 +704,56 @@ public class TokenExchangeOptionsTests
             .Failures.ShouldBe([$"{Section}:Actors:0:AllowedClientIds entries must not be blank."]);
     }
 
+    // Exchange-wide, and checked also while the exchange is off.
+    [Fact]
+    public void Validate_DeniedClientIds_AreOptionalButNotBlank()
+    {
+        Validate(new TokenExchangeOptions { DeniedClientIds = ["https://chatgpt.com/oauth/client.json"] }).Succeeded.ShouldBeTrue();
+        Validate(new TokenExchangeOptions { DeniedClientIds = ["cursor", " "] })
+            .Failures.ShouldBe([$"{Section}:DeniedClientIds entries must not be blank."]);
+    }
+
+    [Fact]
+    public void Validate_TrustedClientIds_AreOptionalButNotBlank()
+    {
+        Validate(new TokenExchangeOptions { Actors = [Actor(actor => actor.TrustedClientIds = ["vscode"])] }).Succeeded.ShouldBeTrue();
+        Validate(new TokenExchangeOptions { Actors = [Actor(actor => actor.TrustedClientIds = ["vscode", string.Empty])] })
+            .Failures.ShouldBe([$"{Section}:Actors:0:TrustedClientIds entries must not be blank."]);
+    }
+
+    [Fact]
+    public void Validate_UntrustedClientRestrictions_AreKnown()
+    {
+        Validate(new TokenExchangeOptions { Actors = [Actor(actor => actor.UntrustedClientRestrictions = [ActorRestrictions.ReadOnly, ActorRestrictions.NoSecretReveal])] })
+            .Succeeded.ShouldBeTrue();
+        Validate(new TokenExchangeOptions { Actors = [Actor(actor => actor.UntrustedClientRestrictions = [ActorRestrictions.ReadOnly, "readonly", "NoWrites"])] })
+            .Failures.ShouldBe(
+            [
+                $"{Section}:Actors:0:UntrustedClientRestrictions names 'readonly', which is not one of NoSecretReveal, ReadOnly.",
+                $"{Section}:Actors:0:UntrustedClientRestrictions names 'NoWrites', which is not one of NoSecretReveal, ReadOnly.",
+            ]);
+    }
+
+    // Overlaps and lists without effect only warn at start (TokenExchangeActorNotice): a failed start takes the API down.
+    [Fact]
+    public void Validate_OverlappingClientLists_Succeed()
+    {
+        var result = Validate(new TokenExchangeOptions
+        {
+            DeniedClientIds = ["vscode"],
+            Actors =
+            [
+                Actor(actor =>
+                {
+                    actor.AllowedClientIds = ["vscode"];
+                    actor.TrustedClientIds = ["vscode", "cursor"];
+                }),
+            ],
+        });
+
+        result.Succeeded.ShouldBeTrue();
+    }
+
     [Fact]
     public void Validate_Scopes_ContainUserImpersonation()
     {
@@ -619,7 +777,9 @@ public class TokenExchangeOptionsTests
 
     [Theory]
     [InlineData("NoSecretReveal", true)]
+    [InlineData("ReadOnly", true)]
     [InlineData("noSecretReveal", false)]
+    [InlineData("Readonly", false)]
     [InlineData("NoWrites", false)]
     public void Validate_Restrictions_AreKnown(string restriction, bool valid)
     {
@@ -701,6 +861,65 @@ public class TokenExchangeOptionsTests
         Actor().GetRestrictions().ShouldBe([ActorRestrictions.NoSecretReveal]);
         Actor(actor => actor.Restrictions = [ActorRestrictions.NoSecretReveal]).GetRestrictions().ShouldBe([ActorRestrictions.NoSecretReveal]);
         Actor(actor => actor.AllowSecrets = true).GetRestrictions().ShouldBeEmpty();
+    }
+
+    // An untrusted client, a subject token without a client among them, gets UntrustedClientRestrictions on top of the
+    // actor's own; a trusted one only the actor's, which trust never shortens.
+    [Fact]
+    public void GetRestrictions_OfAClient_AddTheUntrustedClientRestrictionsUnlessItIsTrusted()
+    {
+        var actor = Actor(actor =>
+        {
+            actor.TrustedClientIds = ["https://claude.ai/oauth/mcp-oauth-client-metadata"];
+            actor.UntrustedClientRestrictions = [ActorRestrictions.ReadOnly, ActorRestrictions.NoSecretReveal];
+        });
+
+        actor.GetRestrictions("https://claude.ai/oauth/mcp-oauth-client-metadata").ShouldBe([ActorRestrictions.NoSecretReveal]);
+        actor.GetRestrictions("client_01JDCR").ShouldBe([ActorRestrictions.NoSecretReveal, ActorRestrictions.ReadOnly]);
+        actor.GetRestrictions(null).ShouldBe([ActorRestrictions.NoSecretReveal, ActorRestrictions.ReadOnly]);
+
+        var secrets = Actor(actor =>
+        {
+            actor.AllowSecrets = true;
+            actor.Restrictions = [ActorRestrictions.ReadOnly];
+            actor.TrustedClientIds = ["vscode"];
+            actor.UntrustedClientRestrictions = [ActorRestrictions.ReadOnly, ActorRestrictions.NoSecretReveal];
+        });
+
+        secrets.GetRestrictions("vscode").ShouldBe([ActorRestrictions.ReadOnly]);
+        secrets.GetRestrictions("cursor").ShouldBe([ActorRestrictions.ReadOnly, ActorRestrictions.NoSecretReveal]);
+        Actor().GetRestrictions("cursor").ShouldBe([ActorRestrictions.NoSecretReveal]);
+    }
+
+    // Exact after trimming the entries: a case variant of a trusted id is another client (Keycloak lets a registrant pick
+    // one, and URL paths are case-sensitive).
+    [Theory]
+    [InlineData("https://claude.ai/oauth/mcp-oauth-client-metadata", true)]
+    [InlineData("vscode", true)]
+    [InlineData("VSCode", false)]
+    [InlineData("https://claude.ai/OAuth/mcp-oauth-client-metadata", false)]
+    [InlineData("https://claude.ai/oauth/mcp-oauth-client-metadata/", false)]
+    [InlineData(null, false)]
+    public void IsTrustedClient_IsExactAfterTrimmingTheEntries(string? clientId, bool trusted)
+    {
+        var actor = Actor(actor => actor.TrustedClientIds = [" https://claude.ai/oauth/mcp-oauth-client-metadata", "vscode ", " "]);
+
+        actor.IsTrustedClient(clientId).ShouldBe(trusted);
+    }
+
+    // Ignoring case after trimming the entries: a wider match is the safe direction for a deny list.
+    [Theory]
+    [InlineData("https://chatgpt.com/oauth/client.json", true)]
+    [InlineData("HTTPS://ChatGPT.com/OAuth/Client.json", true)]
+    [InlineData("CURSOR", true)]
+    [InlineData("https://chatgpt.com/oauth/codex/client.json", false)]
+    [InlineData(null, false)]
+    public void IsDeniedClient_IgnoresCaseAfterTrimmingTheEntries(string? clientId, bool denied)
+    {
+        var options = new TokenExchangeOptions { DeniedClientIds = [" https://chatgpt.com/oauth/client.json ", "cursor", string.Empty] };
+
+        options.IsDeniedClient(clientId).ShouldBe(denied);
+        new TokenExchangeOptions().IsDeniedClient(clientId).ShouldBeFalse();
     }
 
     // A token for an actor's audience is for the exchange only, compared as the start check compares audiences.

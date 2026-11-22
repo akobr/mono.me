@@ -8,7 +8,12 @@ public static class ActorRestrictions
     // are evaluated without secrets. Writing secrets is not affected, because a write returns no value.
     public const string NoSecretReveal = "NoSecretReveal";
 
-    public static IReadOnlyList<string> All { get; } = [NoSecretReveal];
+    // The token may not change anything. Every request other than GET, HEAD and OPTIONS is refused, except the operations
+    // that only read (ReadOnlyOperations of the API). Reads keep their side effects: audit records of reveals and binding
+    // reads, and usage metering. It says nothing about secrets, which NoSecretReveal governs.
+    public const string ReadOnly = "ReadOnly";
+
+    public static IReadOnlyList<string> All { get; } = [NoSecretReveal, ReadOnly];
 
     // Ordinal and exact, as settings and tokens carry them.
     public static bool IsKnown(string? restriction)

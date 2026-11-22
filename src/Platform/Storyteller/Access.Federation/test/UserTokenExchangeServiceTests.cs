@@ -623,6 +623,75 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         (await _exchange.ExchangeAsync(Request())).Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);
     }
 
+    // A client outside TrustedClientIds, and a subject token without a client, get UntrustedClientRestrictions on top of
+    // the actor's own; the answer lists them too, so the actor knows them.
+    [Theory]
+    [InlineData(ClientId, new[] { "NoSecretReveal" })]
+    [InlineData("client_01UNTRUSTED", new[] { "NoSecretReveal", "ReadOnly" })]
+    [InlineData(null, new[] { "NoSecretReveal", "ReadOnly" })]
+    public async Task Restrictions_OfAnUntrustedClient_AddTheUntrustedClientRestrictions(string? clientId, string[] restrictions)
+    {
+        _exchangeOptions.Actors[0].AllowedClientIds = [];
+        _exchangeOptions.Actors[0].TrustedClientIds = [ClientId];
+        _exchangeOptions.Actors[0].UntrustedClientRestrictions = [ActorRestrictions.ReadOnly, ActorRestrictions.NoSecretReveal];
+        _subjects.Result = Subject(clientId: clientId);
+
+        var result = await _exchange.ExchangeAsync(Request());
+
+        result.Restrictions.ShouldBe(restrictions);
+        Payload(new JsonWebToken(result.AccessToken)).GetProperty("restrictions").EnumerateArray().Select(value => value.GetString()).ShouldBe(restrictions);
+    }
+
+    // Trust never removes a restriction of the actor itself; with AllowSecrets only UntrustedClientRestrictions keeps the
+    // secrets from an untrusted client.
+    [Fact]
+    public async Task Restrictions_OfATrustedClient_AreTheActorsOwn()
+    {
+        _exchangeOptions.Actors[0].AllowSecrets = true;
+        _exchangeOptions.Actors[0].Restrictions = [ActorRestrictions.ReadOnly];
+        _exchangeOptions.Actors[0].AllowedClientIds = [];
+        _exchangeOptions.Actors[0].TrustedClientIds = [ClientId];
+        _exchangeOptions.Actors[0].UntrustedClientRestrictions = [ActorRestrictions.NoSecretReveal];
+
+        (await _exchange.ExchangeAsync(Request())).Restrictions.ShouldBe([ActorRestrictions.ReadOnly]);
+
+        _subjects.Result = Subject(clientId: "client_01UNTRUSTED");
+        (await _exchange.ExchangeAsync(Request())).Restrictions.ShouldBe([ActorRestrictions.ReadOnly, ActorRestrictions.NoSecretReveal]);
+    }
+
+    // A denied client is refused with its own description before the account is read, even when the actor allows and
+    // trusts it, and the log names it; the deny list ignores case.
+    [Theory]
+    [InlineData(ClientId)]
+    [InlineData(" CLIENT_01hzx3y4 ")]
+    public async Task DeniedClient_IsInvalidGrant_BeforeTheAccount_AndIsLogged(string denied)
+    {
+        _exchangeOptions.DeniedClientIds = ["cursor", denied];
+        _exchangeOptions.Actors[0].TrustedClientIds = [ClientId];
+        _exchangeOptions.Actors[0].UntrustedClientRestrictions = [ActorRestrictions.ReadOnly];
+
+        var result = await _exchange.ExchangeAsync(Request());
+
+        ShouldBeRefused(result, OAuthTokenExchange.Errors.InvalidGrant, UserTokenExchangeResult.ClientBlockedDescription);
+        result.ErrorDescription.ShouldBe("The client app the person signed in with is blocked for this deployment. Use another app, sform or the admin UI.");
+        _access.Verify(service => service.GetAccountAsync(It.IsAny<string>()), Times.Never);
+        _signingKeys.Creates.ShouldBe(0);
+        var entry = _logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(Microsoft.Extensions.Logging.LogLevel.Information);
+        entry.Message.ShouldBe($"A user token exchange by the actor {ActorId} is refused: the client {ClientId} is in Auth:TokenExchange:DeniedClientIds");
+    }
+
+    // A subject token without a client is never denied; AllowedClientIds is what refuses it.
+    [Fact]
+    public async Task DeniedClients_DoNotRefuseASubjectTokenWithoutAClient()
+    {
+        _exchangeOptions.DeniedClientIds = [ClientId];
+        _exchangeOptions.Actors[0].AllowedClientIds = [];
+        _subjects.Result = Subject(clientId: null);
+
+        (await _exchange.ExchangeAsync(Request())).Succeeded.ShouldBeTrue();
+    }
+
     [Fact]
     public async Task NoSigningKey_IsUnavailable()
     {

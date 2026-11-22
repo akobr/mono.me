@@ -22,6 +22,13 @@ public class TokenExchangeOptions
 
     public List<TokenExchangeActorOptions> Actors { get; set; } = [];
 
+    // Clients (azp, appid or client_id of the subject token) blocked for every actor, even one that allows or trusts them:
+    // the exchange refuses them, and their live tokens get 401. The kill switch for clients with stable ids (Client ID
+    // Metadata Document URLs, Entra ID apps, Keycloak clients); a dynamically registered client registers again under a
+    // new id, which an actor's AllowedClientIds holds off. Exchange-wide, so an entry never makes the policies of actors
+    // that share an audience differ.
+    public string[] DeniedClientIds { get; set; } = [];
+
     // The longest lifetime of an issued token; never longer than the subject token's exp.
     public int TokenLifetimeMinutes { get; set; } = 10;
 
@@ -46,6 +53,14 @@ public class TokenExchangeOptions
 
         return actorAudiences.Count > 0
             && audiences.Any(audience => actorAudiences.Contains(NormalizeAudience(audience)));
+    }
+
+    // False for null (a subject token that names no client). Entries are trimmed and compared ignoring case: a wider match
+    // is the safe direction for a deny list.
+    public bool IsDeniedClient(string? clientId)
+    {
+        return clientId is not null
+            && DeniedClientIds.Any(denied => !string.IsNullOrWhiteSpace(denied) && string.Equals(denied.Trim(), clientId, StringComparison.OrdinalIgnoreCase));
     }
 
     // Trimmed and without a trailing '/'; compare the result ignoring case. Shared with the start check of actors that

@@ -49,6 +49,10 @@ var host = new HostBuilder()
         worker.UseMiddleware<TransportSecurityMiddleware>();
         worker.UseMiddleware<MachineAuthenticationMiddleware>();
         worker.UseMiddleware<BearerAuthenticationMiddleware>();
+
+        // Right after the bearer middleware, which stores the delegation: the restriction ReadOnly refuses the changes of
+        // a client app that may only read, before any role check.
+        worker.UseMiddleware<ActorRestrictionMiddleware>();
     })
     .ConfigureAppConfiguration((context, configuration) =>
     {

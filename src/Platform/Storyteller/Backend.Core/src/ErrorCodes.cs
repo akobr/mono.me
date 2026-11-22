@@ -19,6 +19,10 @@ public static class ErrorCodes
     // NoSecretReveal for a request of secret values.
     public const string ActorRestricted = "ActorRestricted";
 
+    // A token acts for the user through an actor for a client app that may only read (the restriction ReadOnly): every
+    // change is refused, before the role checks (403). Neither a new sign-in nor a role lifts it.
+    public const string ActorReadOnly = "ActorReadOnly";
+
     // The operation needs a recent sign-in of the user (Auth:StepUp, RFC 9470): 401 with WWW-Authenticate. Signing in
     // again helps, unlike every 403.
     public const string StepUpRequired = "StepUpRequired";
