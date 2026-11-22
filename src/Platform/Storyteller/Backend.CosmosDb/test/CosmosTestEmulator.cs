@@ -105,8 +105,9 @@ public sealed class CosmosTestEmulator
     // the start: from then on some requests fail with 500 "PostgresError(SqlState(E58P01))" (a DELETE or replace of a
     // container) or "cannot drop portal" (Azure/azure-cosmos-db-emulator-docker#390). The update cannot reach the package
     // repository with packages.microsoft.com on 127.0.0.1, and fails fast; ENABLE_PACKAGE_UPDATE=false is the switch of the
-    // later images (off by default there), for when the pin moves. The suites retry no 500 of the emulator: a new one fails
-    // the test, so a red run shows the next regression of the emulator instead of hiding it.
+    // later images (off by default there), for when the pin moves. No test retries a 500 of the emulator (only the
+    // fixtures' delete of the database at their start retries any error, as before): a new one fails the test, so a red
+    // run shows the next regression of the emulator instead of hiding it.
     private static IContainer BuildVNext(string reuseLabel)
     {
         return new ContainerBuilder(VNextImage)
