@@ -124,7 +124,11 @@ watch(
   },
   { immediate: true },
 )
-const settingsDirty = computed(() => settingsLoaded.value && !sameSettings(draft.value, savedSettings.value))
+// Only a draft that can still be saved is unsaved: after Leave project (424-271) the role is gone, and the navigation
+// away must not ask about it.
+const settingsDirty = computed(
+  () => canManageSettings.value && settingsLoaded.value && !sameSettings(draft.value, savedSettings.value),
+)
 const settingsEditable = computed(() => canManageSettings.value && settingsLoaded.value)
 useUnsavedChanges(settingsDirty, { message: 'Your changes of the project settings have not been saved.' })
 
@@ -511,7 +515,8 @@ async function downloadCa() {
             <dd v-if="savedDescription" class="break-words whitespace-pre-line">{{ savedDescription }}</dd>
             <dd v-else class="text-muted">No description</dd>
           </dl>
-          <template v-if="context.projectKey && role.projectRole.value !== 'None'" #footer>
+          <!-- Stays while a leave ends: the role is gone before the page is (424-271). -->
+          <template v-if="context.projectKey" #footer>
             <ProjectLeave
               :project-key="context.projectKey"
               :role="role.projectRole.value"

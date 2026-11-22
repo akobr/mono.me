@@ -13,13 +13,20 @@ const exhibitionTimeoutMs = 5_000
 
 /**
  * The deployment's exhibition as the API offers it (424-271), and whether the caller is a member of it. The API answers
- * the same to members and to others, so membership is the account's: a role on the exhibition project. One request per
- * session (the cache is cleared on sign-out).
+ * the same to members and to others, so membership is the account's: a role on the exhibition project. An answer is
+ * kept for five minutes and a 404 (none) until the cache drops it, both until sign-out clears the cache; another
+ * failure is asked again by the next page that needs it.
  */
 export function useExhibition() {
   const session = useSessionStore()
   const query = useGetExhibition({
-    query: { meta: { silent: true }, staleTime: 5 * 60_000 },
+    query: {
+      meta: { silent: true },
+      staleTime: 5 * 60_000,
+      // vue-query fetches a query in error again on every mount, and staleTime keeps data only: a 404 (none) is an
+      // answer, so it is kept as well. Each request of a deployment whose exhibition is not offered logs a Warning.
+      retryOnMount: (cached) => !isNotFound(cached.state.error),
+    },
     request: { timeoutMs: exhibitionTimeoutMs },
   })
 

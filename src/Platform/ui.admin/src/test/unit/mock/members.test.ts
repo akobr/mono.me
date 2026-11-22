@@ -126,7 +126,7 @@ describe('removing another member in the mock API', () => {
     expect(error.body).toMatchObject({ ErrorCode: 'MemberNotFound' })
   })
 
-  it('refuses an Administrator who removes an Owner', async () => {
+  it('refuses an Administrator who removes an Owner, as the API does', async () => {
     giveRole('acme.shipping', 'Administrator')
     // another Owner, so the last Owner rule does not decide
     const db = loadDb()
@@ -136,7 +136,17 @@ describe('removing another member in the mock API', () => {
     const error = await failure(() => removeMember('acme.shipping', grace))
 
     expect(error.status).toBe(403)
-    expect(error.body).toMatchObject({ ErrorCode: 'ElevatedRole' })
+    expect(error.body).toMatchObject({ ErrorCode: 'AccessDenied' })
+    expect(loadDb().accessPoints['acme.shipping']!.AccessMap).toHaveProperty(grace, 'Owner')
+  })
+
+  it('lets an Owner remove another Owner', async () => {
+    const db = loadDb()
+    db.accessPoints['acme.billing']!.AccessMap![grace] = 'Owner'
+    saveDb(db)
+
+    await expect(removeMember('acme.billing', grace)).resolves.toBeUndefined()
+    expect(loadDb().accessPoints['acme.billing']!.AccessMap).not.toHaveProperty(grace)
   })
 
   it('lets an Owner remove another member', async () => {

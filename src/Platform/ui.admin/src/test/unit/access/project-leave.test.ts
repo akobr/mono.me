@@ -1,9 +1,12 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from 'vue'
+import { RouterView, type RouteRecordRaw } from 'vue-router'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
+import TimeZoneSelect from '@/components/annotations/TimeZoneSelect.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import { loadDb, mockUser, resetDb, saveDb, type MockDb } from '@/mock/db'
+import { setStaleSignIn } from '@/mock/step-up'
 import SettingsPage from '@/pages/[org]/[project]/settings.vue'
 import { useContextStore } from '@/stores/context'
 import { useSessionStore } from '@/stores/session'
@@ -30,6 +33,7 @@ afterEach(() => {
   document.body.innerHTML = ''
   server.events.removeAllListeners()
   server.resetHandlers()
+  setStaleSignIn(false)
   // The toasts are global state of Nuxt UI: each test reads its own.
   createApp({}).runWithContext(() => useToast().clear())
 })
@@ -50,15 +54,31 @@ const projectCard = () =>
     .find((heading) => text(heading) === 'Project')
     ?.closest<HTMLElement>('[data-slot="root"]') ?? undefined
 
+// Settings as a route, so its guard of unsaved changes runs; every other address is a stand-in.
+const routes: RouteRecordRaw[] = [
+  { path: '/:org/:project/settings', component: SettingsPage },
+  { path: '/:pathMatch(.*)*', component: { render: () => null } },
+]
+
 /** Settings of the project with the account of the default dataset, after `change` of its data. */
-async function mountSettings(org: string, project: string, change?: (db: MockDb) => void) {
+async function mountSettings(
+  org: string,
+  project: string,
+  change?: (db: MockDb) => void,
+  extraRoutes: RouteRecordRaw[] = [],
+) {
   const db = resetDb('default')
   change?.(db)
   saveDb(db)
   const view = await mountScreen(
-    SettingsPage,
+    RouterView,
     {},
-    { path: `/${org}/${project}/settings`, scope: { org, project, view: 'default' }, account: loadDb().account },
+    {
+      path: `/${org}/${project}/settings`,
+      scope: { org, project, view: 'default' },
+      account: loadDb().account,
+      routes: [...extraRoutes, ...routes],
+    },
   )
   mounted.push(view)
   // a project page has no view (the context guard sets it from the route)
@@ -199,6 +219,63 @@ describe('Leave project in Settings', () => {
     expect(text(dialog())).toContain(
       'You lose your Reader role on exhibition.exhibition. You can join the exhibition again from Organizations.',
     )
+  })
+
+  it('needs no recent sign-in', async () => {
+    const view = await mountSettings('acme', 'shipping')
+    setStaleSignIn(true)
+
+    await confirmLeave()
+
+    await eventually(() => expect(view.route().path).toBe('/orgs'))
+    expect(body()).not.toContain("Confirm it's you")
+  })
+
+  it('keeps the confirmation, as it was opened, until the page is gone', async () => {
+    // Organizations loads slowly: the account has lost the project before the page goes.
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const slowOrganizations: RouteRecordRaw = {
+      path: '/orgs',
+      component: async () => {
+        await held
+        return { render: () => null }
+      },
+    }
+    const view = await mountSettings('acme', 'shipping', undefined, [slowOrganizations])
+
+    await confirmLeave()
+    await eventually(() => expect(useSessionStore().accessMap).not.toHaveProperty(['acme.shipping']))
+    await settle()
+
+    expect(view.route().path).toBe('/acme/shipping/settings')
+    expect(text(dialog())).toContain('Leave acme.shipping?')
+    expect(text(dialog())).toContain('You lose your Contributor role on acme.shipping.')
+    // the confirm button keeps its loading state, so a second click does nothing
+    expect(button('Leave project', dialog()!)?.disabled).toBe(true)
+    expect(deletes()).toHaveLength(1)
+    release()
+    await eventually(() => expect(view.route().path).toBe('/orgs'))
+  })
+
+  it('ends a draft of the project settings without asking, and the confirmation says it is lost', async () => {
+    const view = await mountSettings('acme', 'shipping', (db) => {
+      db.accessPoints['acme.shipping']!.AccessMap![mockUser.id] = 'Administrator'
+      db.account!.AccessMap!['acme.shipping'] = 'Administrator'
+    })
+    await eventually(() => expect(view.host.findComponent(TimeZoneSelect).props('disabled')).toBe(false))
+    view.host.findComponent(TimeZoneSelect).vm.$emit('update:modelValue', 'Asia/Tokyo')
+    await settle()
+
+    leaveButton()!.click()
+    await eventually(() => expect(dialog()).toBeTruthy())
+    expect(text(dialog())).toContain(
+      'You lose your Administrator role on acme.shipping. To come back, you need a new invitation. Your unsaved changes on this page are lost.',
+    )
+    button('Leave project', dialog()!)!.click()
+
+    await eventually(() => expect(view.route().path).toBe('/orgs'))
+    expect(body()).not.toContain('Discard changes?')
   })
 
   it('names the long role as the badge does', async () => {
