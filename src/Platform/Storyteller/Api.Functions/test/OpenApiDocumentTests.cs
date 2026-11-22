@@ -163,6 +163,54 @@ public class OpenApiDocumentTests
         schemas["ConfigurationCompositionNode"].Properties["Depth"].Nullable.ShouldBeFalse();
     }
 
+    // The inbox of a view: the page, the item and the job an item refers to. The model is flat, as the composition's: the
+    // enums are written inline, the actor and the stamp are the shared schemas, and no schema refers to itself.
+    [Fact]
+    public void ViewInboxSchemas_ArePublished()
+    {
+        var helper = new DocumentHelper(new RouteConstraintFilter(), new OpenApiSchemaAcceptor());
+        var methods = typeof(ViewInboxHttp).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly).ToList();
+
+        var schemas = helper.GetOpenApiSchemas(methods, new DefaultNamingStrategy(), VisitorCollection.CreateInstance());
+
+        schemas.Keys.Where(key => key.Contains("Inbox", StringComparison.Ordinal)).ShouldBe(["ViewInboxResponse", "ViewInboxItem", "ViewInboxJob"], ignoreOrder: true);
+        schemas["ViewInboxResponse"].Properties.Keys.ShouldBe(["Items", "ContinuationToken", "Count", "OpenCount"], ignoreOrder: true);
+        schemas["ViewInboxItem"].Properties.Keys.ShouldBe(
+            ["Id", "Kind", "Topic", "Level", "Title", "Text", "MinimalRole", "State", "CreatedAt", "CreatedBy", "ExpiresAt", "Closed", "Action", "Job"],
+            ignoreOrder: true);
+        schemas["ViewInboxJob"].Properties.Keys.ShouldBe(["Kind", "Id", "FileName"], ignoreOrder: true);
+
+        var response = schemas["ViewInboxResponse"];
+        response.Properties["Items"].Type.ShouldBe("array");
+        response.Properties["Items"].Items.Reference.Id.ShouldBe("ViewInboxItem");
+        response.Properties["ContinuationToken"].Type.ShouldBe("string");
+        response.Properties["Count"].Type.ShouldBe("integer");
+        response.Properties["OpenCount"].Type.ShouldBe("integer");
+
+        var item = schemas["ViewInboxItem"];
+        item.Properties["Kind"].Enum.Select(Name).ShouldBe(["Notification", "Action", "Message"]);
+        item.Properties["State"].Enum.Select(Name).ShouldBe(["Open", "Accepted", "Dismissed"]);
+        item.Properties["Level"].Enum.Select(Name).ShouldBe(["Info", "Success", "Warning", "Error"]);
+        item.Properties["MinimalRole"].Enum.Select(Name).ShouldBe(["None", "Reader", "Contributor", "ContributorWithSecrets", "Administrator", "Owner"]);
+        item.Properties["CreatedAt"].Format.ShouldBe("date-time");
+        item.Properties["ExpiresAt"].Format.ShouldBe("date-time");
+        item.Properties["CreatedBy"].Reference.Id.ShouldBe("AuditActor");
+        item.Properties["Closed"].Reference.Id.ShouldBe("AuditStamp");
+        item.Properties["Job"].Reference.Id.ShouldBe("ViewInboxJob");
+
+        // what a client branches on besides the enums stays a plain string, so a new producer needs no new document
+        foreach (var name in new[] { "Id", "Topic", "Title", "Text", "Action" })
+        {
+            item.Properties[name].Type.ShouldBe("string", name);
+            item.Properties[name].Enum.ShouldBeEmpty(name);
+        }
+
+        var job = schemas["ViewInboxJob"];
+        job.Properties["Kind"].Enum.Select(Name).ShouldBe(["ViewExport", "ViewImport"]);
+        job.Properties["Id"].Type.ShouldBe("string");
+        job.Properties["FileName"].Type.ShouldBe("string");
+    }
+
     private static void ShouldBeAListOfKinds(OpenApiSchema include)
     {
         include.Type.ShouldBe("array");

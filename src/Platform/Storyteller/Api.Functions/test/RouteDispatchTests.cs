@@ -20,6 +20,9 @@ public class RouteDispatchTests
     private const string Scope = "v1/acme/billing/default";
     private const string Annotations = Scope + "/annotations";
 
+    // An id as the inbox issues it: the time of the item, then 32 hex characters.
+    private const string InboxItem = Scope + "/inbox/2026112209150000000000123456789abcdef0123456789abcdef";
+
     // The resolver of the host: AddRouting maps "regex" to the real constraint, a bare RouteOptions to a stub that throws.
     private static readonly IInlineConstraintResolver Resolver = new ServiceCollection()
         .AddRouting()
@@ -90,6 +93,14 @@ public class RouteDispatchTests
     [InlineData("POST", Scope + "/configuration-schema/type/rst/versions/3/restore", nameof(ConfigurationSchemaHttp.RestoreSchemaVersion))]
     [InlineData("POST", Scope + "/configuration-schema/rst.billing/versions/3/restore", nameof(ConfigurationSchemaHttp.RestoreAnnotationSchemaVersion))]
     [InlineData("POST", Scope + "/configuration-schema/sbt.northwind/type/usg/versions/3/restore", nameof(ConfigurationSchemaHttp.RestoreDescendantTypeSchemaVersion))]
+    [InlineData("GET", Scope + "/inbox", nameof(ViewInboxHttp.GetViewInbox))]
+    [InlineData("POST", InboxItem + "/accept", nameof(ViewInboxHttp.AcceptViewInboxItem))]
+    [InlineData("POST", InboxItem + "/dismiss", nameof(ViewInboxHttp.DismissViewInboxItem))]
+    [InlineData("GET", "v1/acme/billing/inbox/inbox", nameof(ViewInboxHttp.GetViewInbox))]
+    [InlineData("GET", "v1/acme/billing/key-values/inbox", nameof(ViewInboxHttp.GetViewInbox))]
+    [InlineData("GET", "v1/acme/billing/usage/inbox", nameof(ViewInboxHttp.GetViewInbox))]
+    [InlineData("POST", Scope + "/inbox/accept/accept", nameof(ViewInboxHttp.AcceptViewInboxItem))]
+    [InlineData("POST", Scope + "/inbox/accept/dismiss", nameof(ViewInboxHttp.DismissViewInboxItem))]
     public void Request_MatchesExactlyItsFunction(string method, string path, string function)
     {
         Match(method, path).ShouldBe([function]);
@@ -104,6 +115,20 @@ public class RouteDispatchTests
     [InlineData("GET", Annotations + "/sbt.northwind/bogus")]
     [InlineData("GET", Annotations + "/sbt.northwind/subjects")]
     public void Request_MatchesNoFunction(string method, string path)
+    {
+        Match(method, path).ShouldBeEmpty();
+    }
+
+    // An inbox item has no route of its own, only its two actions, which are POST, and the list is only read: no route
+    // takes these, so the host answers 404.
+    [Theory]
+    [InlineData("GET", InboxItem)]
+    [InlineData("DELETE", InboxItem)]
+    [InlineData("GET", InboxItem + "/accept")]
+    [InlineData("PUT", InboxItem + "/dismiss")]
+    [InlineData("POST", InboxItem + "/reopen")]
+    [InlineData("POST", Scope + "/inbox")]
+    public void InboxRequest_OutsideTheListAndTheTwoActions_MatchesNoFunction(string method, string path)
     {
         Match(method, path).ShouldBeEmpty();
     }
