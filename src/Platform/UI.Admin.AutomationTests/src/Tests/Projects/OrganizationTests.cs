@@ -6,10 +6,15 @@ using static Microsoft.Playwright.Assertions;
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Projects;
 
 // Organizations: the Organizations page (/orgs) and its New organization dialog, the cards with their role badges and
-// project links, the overview of a new organization, and the validation of the organization form.
+// project links, the overview of a new organization, the validation of the organization form, and the offer of the
+// exhibition with its join.
 [Area(Area.Projects)]
 public sealed partial class OrganizationTests : PlatformTest
 {
+    // The exhibition of the mock: the project exhibition/exhibition of Grace Hopper, with a small catalog, which any
+    // user may join as a Reader.
+    private static readonly AppRoutes Exhibition = AppRoutes.Parse("exhibition/exhibition");
+
     // ORG-ORG-01: New organization creates the organization with its first project and lists it.
     // Every user may create an organization. New organization on /orgs creates it with its first project and the
     // project's description and opens the project's empty annotations; /orgs then lists the organization and the
@@ -118,6 +123,81 @@ public sealed partial class OrganizationTests : PlatformTest
         await organizations.NewOrganizationCancelButton.ClickAsync();
         await Expect(organizations.NewOrganizationDialog).ToBeHiddenAsync();
         await Expect(organizations.Organization(organization)).ToHaveCountAsync(0);
+    }
+
+    // ORG-ORG-03: A user with an account joins the exhibition from the Organizations page and opens it as a Reader.
+    // In the mock's default scenario Ada Lovelace has an account and no role in the exhibition: the last card of /orgs
+    // offers it with the wizard's words and "Join the exhibition", a button, so no organization 'exhibition' is listed.
+    // The join opens the exhibition's annotations with a toast, where a Reader has no create action; /orgs then lists
+    // the exhibition's organization as a project member's with the project link 'exhibition Reader', and offers nothing.
+    [Test]
+    [TestCase(510)]
+    [MockOnly("the exhibition of the mock, which the default scenario's user is no member of")]
+    public async Task Organization_JoinExhibition_OpensItAsReader()
+    {
+        var organizations = new OrganizationsPage(App, Routes);
+        await organizations.OpenAsync();
+        await Expect(organizations.ExhibitionOfferHeading).ToBeVisibleAsync();
+        await Expect(organizations.ExhibitionOfferText(OnboardingPage.ExhibitionText)).ToBeVisibleAsync();
+        await Expect(organizations.ExhibitionOfferText(OnboardingPage.ExhibitionChoiceDescriptionText)).ToBeVisibleAsync();
+        await Expect(organizations.JoinExhibitionButton).ToBeVisibleAsync();
+
+        // The user's own organizations come first; the exhibition's is not one of them yet.
+        await Expect(organizations.Organization(Routes.Organization)).ToBeVisibleAsync();
+        await Expect(organizations.Organization(Exhibition.Organization)).ToHaveCountAsync(0);
+
+        await organizations.JoinExhibitionAsync();
+        await Expect(App.Toast(OrganizationsPage.JoinedExhibitionToast)).ToBeVisibleAsync();
+        await App.ExpectAtAsync(Exhibition.Annotations);
+
+        // A Reader browses the catalog and creates nothing; asserted once the catalog loaded.
+        var catalog = new AnnotationsPage(App, Exhibition);
+        await catalog.WaitForCatalogAsync();
+        await Expect(catalog.AnnotationRows.First).ToBeVisibleAsync();
+        await catalog.ExpectNoCreateActionsAsync();
+
+        // A new load of /orgs reads the account again. The membership is the project's only: no role in the
+        // organization of the exhibition.
+        await organizations.OpenAsync();
+        await Expect(organizations.OrganizationRoleBadge(Exhibition.Organization, "Project member")).ToBeVisibleAsync();
+        var exhibitionLink = organizations.Project(Exhibition.Organization, Exhibition.Project);
+        await Expect(exhibitionLink).ToHaveAccessibleNameAsync("exhibition Reader");
+        await Expect(exhibitionLink).ToHaveAttributeAsync("href", AppRoutes.HrefEndingWith(Exhibition.Annotations));
+        await Expect(organizations.JoinExhibitionButton).ToHaveCountAsync(0);
+        await Expect(organizations.ExhibitionOffer).ToHaveCountAsync(0);
+    }
+
+    // ORG-ORG-04: The Organizations page offers the exhibition only to a user who is not its member, on a deployment
+    // that has one.
+    // The page asks for the exhibition once per page load, so each change of the mock is followed by a new load of
+    // /orgs. Without an exhibition the page lists the user's organizations and offers nothing; with it again, the offer
+    // is back. After a join behind the page's back (the mock API, as from another tab) the user is a member: the page
+    // lists the project 'exhibition Reader' and offers nothing.
+    [Test]
+    [TestCase(511)]
+    [MockOnly("the hook that turns the exhibition of the mock off and on, and a join through the mock API")]
+    public async Task Organization_ExhibitionOffer_HiddenForMemberOrWithoutExhibition()
+    {
+        var organizations = new OrganizationsPage(App, Routes);
+        await organizations.OpenAsync();
+        await Expect(organizations.JoinExhibitionButton).ToBeVisibleAsync();
+
+        await MockApi.SetExhibitionAsync(null);
+        await organizations.OpenAsync();
+        await Expect(organizations.Organization(Routes.Organization)).ToBeVisibleAsync();
+        await Expect(organizations.ExhibitionOfferHeading).ToHaveCountAsync(0);
+        await Expect(organizations.JoinExhibitionButton).ToHaveCountAsync(0);
+
+        await MockApi.SetExhibitionAsync((Exhibition.Organization, Exhibition.Project));
+        await organizations.OpenAsync();
+        await Expect(organizations.JoinExhibitionButton).ToBeVisibleAsync();
+
+        var joined = await MockApi.JoinExhibitionAsync();
+        await Assert.That(joined.Status).IsEqualTo(200);
+        await organizations.OpenAsync();
+        await Expect(organizations.Project(Exhibition.Organization, Exhibition.Project)).ToHaveAccessibleNameAsync("exhibition Reader");
+        await Expect(organizations.ExhibitionOfferHeading).ToHaveCountAsync(0);
+        await Expect(organizations.JoinExhibitionButton).ToHaveCountAsync(0);
     }
 
     [GeneratedRegex("^Organization .+ created$")]
