@@ -742,11 +742,13 @@ public class ViewTransferHttpTests
                 ? "the read scope of every included kind (Annotation.Read for annotations, Configuration.Read for schemas, templates and configurations); reading an export needs the scopes of the kinds it includes."
                 : "the scopes of the direct writes of every included kind (Annotation.Write and Annotation.Manage for annotations, Configuration.Write and Schema.Write for schemas, Configuration.Write and Template.Write for templates and Configuration.Write for configurations); reading an import needs the scopes of the kinds it includes.";
 
+            // The starts of an export and an import are POSTs, which a client app that may only read is refused (424-302).
+            var isStart = operationId is Definitions.RouteIds.Transfers.StartViewExport or Definitions.RouteIds.Transfers.StartViewImport;
             var description = DescriptionOf(document, operationId, "403");
-            description.ShouldBe(expected, operationId);
+            description.ShouldBe(isStart ? OpenApiExportTests.WithReadOnlyRefusal(expected) : expected, operationId);
             description.ShouldStartWith("The user's role on the project is below Administrator, or a scope of the machine is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine needs no role but the scope Configuration.Transfer and ", Case.Sensitive, operationId);
             description.ShouldContain(kindScopes, Case.Sensitive, operationId);
-            description.ShouldEndWith("Users need no data scopes, only the Administrator role. The message names the missing role or scope.", Case.Sensitive, operationId);
+            expected.ShouldEndWith("Users need no data scopes, only the Administrator role. The message names the missing role or scope.", Case.Sensitive, operationId);
 
             // the scope strings of the removed presets are gone
             description.ShouldNotContain("Default.", Case.Sensitive, operationId);

@@ -43,6 +43,11 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
             ValidateAdditionalIssuers(options.AdditionalIssuers, userOptions, failures);
         }
 
+        if (options.DeniedClientIds.Any(string.IsNullOrWhiteSpace))
+        {
+            failures.Add($"{Section}:DeniedClientIds entries must not be blank.");
+        }
+
         if (options.TokenLifetimeMinutes is < TokenExchangeOptions.MinTokenLifetimeMinutes or > TokenExchangeOptions.MaxTokenLifetimeMinutes)
         {
             failures.Add($"{Section}:TokenLifetimeMinutes must be between {TokenExchangeOptions.MinTokenLifetimeMinutes} and {TokenExchangeOptions.MaxTokenLifetimeMinutes}.");
@@ -95,6 +100,11 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
             if (actor.AllowedClientIds.Any(string.IsNullOrWhiteSpace))
             {
                 failures.Add($"{path}:AllowedClientIds entries must not be blank.");
+            }
+
+            if (actor.TrustedClientIds.Any(string.IsNullOrWhiteSpace))
+            {
+                failures.Add($"{path}:TrustedClientIds entries must not be blank.");
             }
 
             ValidateScopes(actor, $"{path}:Scopes", failures);
@@ -206,8 +216,9 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
     }
 
     // One resource may have several actors (one per workload identity), but only with one policy: else a token issued for
-    // the restricted actor could be exchanged by the other, which would lift its restrictions. Compared as
-    // IsIssuedToAnActor compares audiences.
+    // the restricted actor could be exchanged by the other, which would lift its restrictions. The policy includes the
+    // client lists, which decide the restrictions per client; DeniedClientIds is exchange-wide and not part of it.
+    // Compared as IsIssuedToAnActor compares audiences.
     private static void ValidateSharedSubjectAudiences(
         List<TokenExchangeActorOptions> actors,
         int index,
@@ -234,7 +245,7 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
 
             if (!HasSamePolicy(actor, owner))
             {
-                failures.Add($"{path} names '{audience}', which {Section}:Actors:{ownerIndex} ('{owner.Id}') also lists with other Restrictions, AllowSecrets or Scopes; a token issued for one actor could be exchanged by the other.");
+                failures.Add($"{path} names '{audience}', which {Section}:Actors:{ownerIndex} ('{owner.Id}') also lists with other Restrictions, AllowSecrets, Scopes or client lists; a token issued for one actor could be exchanged by the other.");
             }
         }
     }
@@ -242,7 +253,19 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
     private static bool HasSamePolicy(TokenExchangeActorOptions actor, TokenExchangeActorOptions other)
     {
         return actor.GetRestrictions().ToHashSet(StringComparer.Ordinal).SetEquals(other.GetRestrictions())
-            && actor.GetScopes().ToHashSet(StringComparer.Ordinal).SetEquals(other.GetScopes());
+            && actor.GetScopes().ToHashSet(StringComparer.Ordinal).SetEquals(other.GetScopes())
+            && AsSet(actor.AllowedClientIds).SetEquals(AsSet(other.AllowedClientIds))
+            && AsSet(actor.TrustedClientIds).SetEquals(AsSet(other.TrustedClientIds))
+            && AsSet(actor.UntrustedClientRestrictions).SetEquals(AsSet(other.UntrustedClientRestrictions));
+    }
+
+    // The trimmed entries of a list without the blank ones, compared ordinally.
+    private static HashSet<string> AsSet(string[] entries)
+    {
+        return entries
+            .Where(entry => !string.IsNullOrWhiteSpace(entry))
+            .Select(entry => entry.Trim())
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static void ValidateScopes(TokenExchangeActorOptions actor, string path, List<string> failures)
@@ -269,6 +292,11 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
         foreach (var restriction in actor.Restrictions.Where(restriction => !ActorRestrictions.IsKnown(restriction)))
         {
             failures.Add($"{path}:Restrictions names '{restriction}', which is not one of {string.Join(", ", ActorRestrictions.All)}.");
+        }
+
+        foreach (var restriction in actor.UntrustedClientRestrictions.Where(restriction => !ActorRestrictions.IsKnown(restriction)))
+        {
+            failures.Add($"{path}:UntrustedClientRestrictions names '{restriction}', which is not one of {string.Join(", ", ActorRestrictions.All)}.");
         }
 
         if (actor.AllowSecrets && actor.Restrictions.Contains(ActorRestrictions.NoSecretReveal, StringComparer.Ordinal))

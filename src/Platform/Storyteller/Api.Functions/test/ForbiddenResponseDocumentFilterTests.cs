@@ -57,6 +57,79 @@ public class ForbiddenResponseDocumentFilterTests
         operation.Responses["403"].ShouldBeSameAs(existing);
     }
 
+    // Spec 424-302, 2.5: the 403 of a user operation that changes something ends with the refusal of ReadOnly, whether the
+    // filter adds the 403 or the operation declares its own.
+    [Theory]
+    [InlineData(OperationType.Post)]
+    [InlineData(OperationType.Put)]
+    [InlineData(OperationType.Patch)]
+    [InlineData(OperationType.Delete)]
+    public void Apply_UserOperationThatChanges_NamesActorReadOnlyInIts403(OperationType method)
+    {
+        var added = Operation(Definitions.SecuritySchemas.Manual);
+        var declared = Operation(Definitions.SecuritySchemas.Manual);
+        declared.Responses["403"] = new OpenApiResponse { Description = "custom" };
+
+        new ForbiddenResponseDocumentFilter().Apply(null!, Document(added, method));
+        new ForbiddenResponseDocumentFilter().Apply(null!, Document(declared, method));
+
+        added.Responses["403"].Description.ShouldBe($"{Definitions.Descriptions.ResponseForbidden} {Definitions.Descriptions.ForbiddenActorReadOnly}");
+        declared.Responses["403"].Description.ShouldBe($"custom {Definitions.Descriptions.ForbiddenActorReadOnly}");
+        Definitions.Descriptions.ForbiddenActorReadOnly.ShouldBe("Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly.");
+    }
+
+    // Once, also when a response object is shared or the filter runs again.
+    [Fact]
+    public void Apply_SharedForbidden_NamesActorReadOnlyOnce()
+    {
+        var shared = new OpenApiResponse { Description = "custom" };
+        var first = Operation(Definitions.SecuritySchemas.Manual);
+        var second = Operation(Definitions.SecuritySchemas.Manual);
+        first.Responses["403"] = shared;
+        second.Responses["403"] = shared;
+        var document = new OpenApiDocument
+        {
+            Paths = new OpenApiPaths
+            {
+                ["/v1/test"] = new OpenApiPathItem { Operations = { [OperationType.Put] = first, [OperationType.Delete] = second } },
+            },
+        };
+
+        new ForbiddenResponseDocumentFilter().Apply(null!, document);
+        new ForbiddenResponseDocumentFilter().Apply(null!, document);
+
+        shared.Description.ShouldBe($"custom {Definitions.Descriptions.ForbiddenActorReadOnly}");
+    }
+
+    // A GET, and a POST that only reads (ReadOnlyOperations), pass under ReadOnly.
+    [Theory]
+    [InlineData(OperationType.Get, "GetAnnotation")]
+    [InlineData(OperationType.Head, "GetAnnotation")]
+    [InlineData(OperationType.Post, nameof(AnnotationsHttp.FindDeletedAnnotations))]
+    [InlineData(OperationType.Post, nameof(KeyValuesHttp.ExportKeyValues))]
+    public void Apply_UserOperationThatReads_DoesNotNameActorReadOnly(OperationType method, string operationId)
+    {
+        var operation = Operation(Definitions.SecuritySchemas.Manual);
+        operation.OperationId = operationId;
+
+        new ForbiddenResponseDocumentFilter().Apply(null!, Document(operation, method));
+
+        operation.Responses["403"].Description.ShouldBe(Definitions.Descriptions.ResponseForbidden);
+    }
+
+    // No bearer token of a person reaches them: no 403 at all.
+    [Theory]
+    [InlineData(Definitions.SecuritySchemas.Mtls)]
+    [InlineData(null)]
+    public void Apply_MachineOrAnonymousOperationThatChanges_LeavesResponses(string? scheme)
+    {
+        var operation = Operation(scheme);
+
+        new ForbiddenResponseDocumentFilter().Apply(null!, Document(operation, OperationType.Post));
+
+        operation.Responses.ContainsKey("403").ShouldBeFalse();
+    }
+
     [Theory]
     [InlineData(typeof(ConfigurationHttp), nameof(ConfigurationHttp.SetConfiguration))]
     [InlineData(typeof(ConfigurationHttp), nameof(ConfigurationHttp.PatchConfiguration))]
@@ -88,7 +161,7 @@ public class ForbiddenResponseDocumentFilterTests
         return operation;
     }
 
-    private static OpenApiDocument Document(OpenApiOperation operation)
+    private static OpenApiDocument Document(OpenApiOperation operation, OperationType method = OperationType.Get)
     {
         return new OpenApiDocument
         {
@@ -96,7 +169,7 @@ public class ForbiddenResponseDocumentFilterTests
             {
                 ["/v1/test"] = new OpenApiPathItem
                 {
-                    Operations = { [OperationType.Get] = operation },
+                    Operations = { [method] = operation },
                 },
             },
         };

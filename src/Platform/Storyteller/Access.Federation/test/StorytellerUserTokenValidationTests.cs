@@ -223,6 +223,74 @@ public sealed class StorytellerUserTokenValidationTests
         result.ShouldNotBeNull().Delegation.ShouldNotBeNull().Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);
     }
 
+    // ReadOnly is a known restriction: a token that carries it is accepted, and the delegation keeps it.
+    [Fact]
+    public async Task UserToken_WithReadOnly_KeepsItInTheDelegation()
+    {
+        var issued = await _issuer.IssueUserAsync(UserRequest() with { Restrictions = [ActorRestrictions.NoSecretReveal, ActorRestrictions.ReadOnly] });
+
+        var result = await _validator.ValidateAsync(issued.AccessToken);
+
+        result.ShouldNotBeNull().Delegation.ShouldNotBeNull().Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal, ActorRestrictions.ReadOnly]);
+    }
+
+    // A client denied after its token was issued: refused like a token of a removed actor (401), and the log names it.
+    [Fact]
+    public async Task UserToken_OfAClientDeniedLater_IsRefused()
+    {
+        var issued = await _issuer.IssueUserAsync(UserRequest() with { SubjectClientId = "https://chatgpt.com/oauth/client.json" });
+        (await _validator.ValidateAsync(issued.AccessToken)).ShouldNotBeNull();
+
+        _exchangeOptions.DeniedClientIds = ["HTTPS://chatgpt.com/oauth/client.json"];
+
+        (await _validator.ValidateAsync(issued.AccessToken)).ShouldBeNull();
+        _logger.Entries.ShouldContain(entry => entry.Level == LogLevel.Information
+            && entry.Message == $"A Storyteller user token of the actor {ActorId} is refused: its client https://chatgpt.com/oauth/client.json is in Auth:TokenExchange:DeniedClientIds");
+    }
+
+    // A token without a client is never denied.
+    [Fact]
+    public async Task UserToken_WithoutAClient_IsNotDenied()
+    {
+        _exchangeOptions.DeniedClientIds = ["https://chatgpt.com/oauth/client.json"];
+        var issued = await _issuer.IssueUserAsync(UserRequest());
+
+        (await _validator.ValidateAsync(issued.AccessToken)).ShouldNotBeNull();
+    }
+
+    // A client taken out of TrustedClientIds gets UntrustedClientRestrictions on its live tokens, a trusted one keeps the
+    // actor's own.
+    [Fact]
+    public async Task UserToken_OfAClientNoLongerTrusted_GetsTheUntrustedClientRestrictions()
+    {
+        const string client = "https://claude.ai/oauth/mcp-oauth-client-metadata";
+        _exchangeOptions.Actors[0].TrustedClientIds = [client];
+        _exchangeOptions.Actors[0].UntrustedClientRestrictions = [ActorRestrictions.ReadOnly];
+        var issued = await _issuer.IssueUserAsync(UserRequest() with { SubjectClientId = client });
+
+        var trusted = await _validator.ValidateAsync(issued.AccessToken);
+        trusted.ShouldNotBeNull().Delegation.ShouldNotBeNull().Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);
+
+        _exchangeOptions.Actors[0].TrustedClientIds = [];
+
+        var untrusted = await _validator.ValidateAsync(issued.AccessToken);
+        var delegation = untrusted.ShouldNotBeNull().Delegation.ShouldNotBeNull();
+        delegation.Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal, ActorRestrictions.ReadOnly]);
+        delegation.ClientId.ShouldBe(client);
+    }
+
+    // A token issued before the claim, or for a subject token without a client, counts as untrusted.
+    [Fact]
+    public async Task UserToken_WithoutAClient_CountsAsUntrusted()
+    {
+        _exchangeOptions.Actors[0].TrustedClientIds = ["https://claude.ai/oauth/mcp-oauth-client-metadata"];
+        _exchangeOptions.Actors[0].UntrustedClientRestrictions = [ActorRestrictions.ReadOnly];
+
+        var result = await _validator.ValidateAsync(await SignAsync(UserPayload()));
+
+        result.ShouldNotBeNull().Delegation.ShouldNotBeNull().Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal, ActorRestrictions.ReadOnly]);
+    }
+
     // The payload the negative cases change, signed by the key: accepted as it is.
     [Fact]
     public async Task SignedUserPayload_IsAccepted()

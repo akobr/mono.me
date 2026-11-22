@@ -561,6 +561,10 @@ public static class Definitions
 
         public const string ResponseForbidden = "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).";
 
+        // The last sentence of the 403 of every user operation that is not a GET and not in ReadOnlyOperations
+        // (ForbiddenResponseDocumentFilter): the restriction ReadOnly refuses it before any role check.
+        public const string ForbiddenActorReadOnly = "Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly.";
+
         // The 403 of the routes machines call: a machine needs the scopes of the operation, stored on it and carried by
         // its credentials, a management operation its runtime scope and its management scope; users need only the role.
         public const string ResponseForbiddenAnnotationRead = ResponseForbidden + MachineNeedsScope + Scopes.Annotation.Read + MachineDenied;

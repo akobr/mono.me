@@ -10,8 +10,9 @@ namespace _42.Platform.Storyteller;
 // The RFC 8693 exchange of a person's token for a Storyteller user token, by an actor of Auth:TokenExchange:Actors.
 // The checks run in the order of the spec, and only an authenticated actor gets the subject token validated: the form,
 // the actor and its proof, the subject token (the provider's rules, the actor's audiences and clients, a client id that can
-// be recorded), the account, the replay limit, then the scope. The issued token names the subject token's client
-// (subject_client_id). Separate from FederatedTokenExchangeService, which exchanges machine tokens.
+// be recorded, a client that is not denied), the account, the replay limit, then the scope. The issued token names the
+// subject token's client (subject_client_id) and carries the actor's restrictions for that client. Separate from
+// FederatedTokenExchangeService, which exchanges machine tokens.
 public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
 {
     // Subject tokens recorded at once for the replay limit, each for a minute; more are refused.
@@ -125,6 +126,18 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
 
         // From here on every log line names the client (shortened), so each step of a client's exchange can be told apart.
         var clientId = ForLog(subject.ClientId);
+
+        // A client blocked for every actor, even one that allows or trusts it. Before the account is read, so a blocked
+        // client learns nothing about the account.
+        if (exchangeOptions.IsDeniedClient(subject.ClientId))
+        {
+            _logger.LogInformation(
+                "A user token exchange by the actor {ActorId} is refused: the client {ClientId} is in Auth:TokenExchange:DeniedClientIds",
+                actor.Id,
+                clientId);
+            return UserTokenExchangeResult.Failure(OAuthTokenExchange.Errors.InvalidGrant, UserTokenExchangeResult.ClientBlockedDescription);
+        }
+
         var now = _timeProvider.GetUtcNow();
 
         if (subject.ExpiresAt - now < MinSubjectTokenLifetime)
@@ -201,8 +214,9 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
             return UserTokenExchangeResult.Failure(OAuthTokenExchange.Errors.InvalidScope, UserTokenExchangeResult.ScopeNotGrantedDescription);
         }
 
-        // 7. The Storyteller user token.
-        var restrictions = actor.GetRestrictions();
+        // 7. The Storyteller user token, with the actor's restrictions for the client: UntrustedClientRestrictions too
+        // unless the client is in TrustedClientIds.
+        var restrictions = actor.GetRestrictions(subject.ClientId);
         StorytellerToken issued;
 
         try

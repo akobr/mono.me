@@ -14,6 +14,10 @@ public sealed record UserTokenExchangeResult
     // reached Auth:TokenExchange:MaxExchangesPerSubjectTokenPerMinute.
     public const string SubjectNotAcceptedDescription = "The subject token is not accepted for this actor.";
 
+    // invalid_grant: the subject token's client is in Auth:TokenExchange:DeniedClientIds. Refused before the account is
+    // read, so a blocked client learns nothing about it.
+    public const string ClientBlockedDescription = "The client app the person signed in with is blocked for this deployment. Use another app, sform or the admin UI.";
+
     // invalid_grant: the exchange never creates accounts.
     public const string NoAccountDescription = "No Storyteller account exists for this sign-in. Register once with sform or the admin UI.";
 
@@ -41,8 +45,9 @@ public sealed record UserTokenExchangeResult
     // The granted scopes, space separated.
     public string? Scope { get; private init; }
 
-    // The actor's restrictions (ActorRestrictions), which the token carries too; a non-standard member of the answer,
-    // so the actor can adapt (the MCP server hides its secret tools under NoSecretReveal).
+    // The restrictions of the actor for the subject token's client (ActorRestrictions), which the token carries too; a
+    // non-standard member of the answer, so the actor can adapt (the MCP server hides its secret tools under
+    // NoSecretReveal).
     public IReadOnlyList<string> Restrictions { get; private init; } = [];
 
     // An OAuthTokenExchange.Errors value.

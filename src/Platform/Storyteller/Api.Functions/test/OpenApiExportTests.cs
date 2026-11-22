@@ -458,14 +458,14 @@ public class OpenApiExportTests
         using var document = JsonDocument.Parse(json);
         var operations = document.RootElement.GetProperty("paths").EnumerateObject()
             .SelectMany(path => path.Value.EnumerateObject())
-            .Select(operation => (Id: operation.Value.GetProperty("operationId").GetString()!, Responses: operation.Value.GetProperty("responses")))
+            .Select(operation => (Id: operation.Value.GetProperty("operationId").GetString()!, Method: operation.Name, Responses: operation.Value.GetProperty("responses")))
             .ToList();
         var machineOperations = MachineOperations();
 
         operations.Select(operation => operation.Id).Distinct()
             .ShouldBe([.. machineOperations.Keys, .. UserOnlyOperations, .. AnonymousOperations], ignoreOrder: true);
 
-        foreach (var (id, responses) in operations)
+        foreach (var (id, method, responses) in operations)
         {
             var unauthorized = responses.TryGetProperty("401", out var response401) ? response401.GetProperty("description").GetString()! : string.Empty;
             NamedScopes(unauthorized).ShouldBeEmpty(id);
@@ -474,7 +474,7 @@ public class OpenApiExportTests
             {
                 var forbidden = responses.GetProperty("403");
                 var description = forbidden.GetProperty("description").GetString()!;
-                description.ShouldBe(expected.Forbidden, id);
+                description.ShouldBe(ForbiddenOf(expected.Forbidden, method, id), id);
                 NamedScopes(description).ShouldBe(expected.Scopes, ignoreOrder: true, customMessage: id);
                 forbidden.GetProperty("content").GetProperty(Definitions.ContentTypes.Json).GetProperty("schema").GetProperty("$ref").GetString()
                     .ShouldBe("#/components/schemas/ErrorResponse", id);
@@ -594,7 +594,7 @@ public class OpenApiExportTests
         foreach (var routeId in new[] { Definitions.RouteIds.Access.CreateMachineAccess, Definitions.RouteIds.Access.ResetMachineAccess, Definitions.RouteIds.Access.SetMachineFederationRules, Definitions.RouteIds.Access.DeleteMachineAccess })
         {
             Operation(document, routeId).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
-                .ShouldBe(Definitions.Descriptions.ResponseForbiddenMachineScopes, routeId);
+                .ShouldBe(WithReadOnlyRefusal(Definitions.Descriptions.ResponseForbiddenMachineScopes), routeId);
         }
 
         Definitions.Descriptions.ResponseForbiddenMachineScopes.ShouldBe(
@@ -640,9 +640,9 @@ public class OpenApiExportTests
         using var document = JsonDocument.Parse(json);
 
         Operation(document, Definitions.RouteIds.Access.SetFederatedIssuer).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
-            .ShouldBe(Definitions.Descriptions.ResponseForbiddenFederatedIssuerReplace);
+            .ShouldBe(WithReadOnlyRefusal(Definitions.Descriptions.ResponseForbiddenFederatedIssuerReplace));
         Operation(document, Definitions.RouteIds.Access.DeleteFederatedIssuer).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
-            .ShouldBe(Definitions.Descriptions.ResponseForbiddenUserOnly);
+            .ShouldBe(WithReadOnlyRefusal(Definitions.Descriptions.ResponseForbiddenUserOnly));
 
         Definitions.Descriptions.ResponseForbiddenFederatedIssuerReplace.ShouldBe(
             Definitions.Descriptions.ResponseForbiddenUserOnly
@@ -660,11 +660,11 @@ public class OpenApiExportTests
         foreach (var routeId in new[] { Definitions.RouteIds.Access.GrantUserAccess, Definitions.RouteIds.Access.SetMemberRole, Definitions.RouteIds.Access.CreateInvitation })
         {
             Operation(document, routeId).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
-                .ShouldBe(Definitions.Descriptions.ResponseForbiddenRoleGrant, routeId);
+                .ShouldBe(WithReadOnlyRefusal(Definitions.Descriptions.ResponseForbiddenRoleGrant), routeId);
         }
 
         Operation(document, Definitions.RouteIds.Access.RevokeUserAccess).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
-            .ShouldBe(Definitions.Descriptions.ResponseForbiddenUserOnly);
+            .ShouldBe(WithReadOnlyRefusal(Definitions.Descriptions.ResponseForbiddenUserOnly));
 
         Definitions.Descriptions.ResponseForbiddenRoleGrant.ShouldBe(
             Definitions.Descriptions.ResponseForbiddenUserOnly
@@ -738,6 +738,47 @@ public class OpenApiExportTests
             "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).");
     }
 
+    // Spec 424-302, 2.5: the 403 of every user operation that is not a GET and not in ReadOnlyOperations ends with the
+    // refusal of ReadOnly (ActorReadOnly), once; no other operation names it, and the anonymous ones have no 403.
+    [Fact]
+    public async Task Document_UserOperationsThatChange_NameActorReadOnlyInTheir403()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        var operations = document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject())
+            .Select(operation => (Id: operation.Value.GetProperty("operationId").GetString()!, Method: operation.Name, Operation: operation.Value))
+            .ToList();
+        var named = new List<string>();
+
+        foreach (var (id, method, operation) in operations)
+        {
+            if (!operation.GetProperty("responses").TryGetProperty("403", out var forbidden))
+            {
+                AnonymousOperations.ShouldContain(id);
+                continue;
+            }
+
+            var description = forbidden.GetProperty("description").GetString()!;
+            var refused = IsRefusedUnderReadOnly(method, id);
+            description.EndsWith($" {Definitions.Descriptions.ForbiddenActorReadOnly}", StringComparison.Ordinal).ShouldBe(refused, $"{method} {id}");
+            description.Split(ErrorCodes.ActorReadOnly).Length.ShouldBe(refused ? 2 : 1, $"{method} {id}");
+
+            if (refused)
+            {
+                named.Add(id);
+            }
+        }
+
+        named.Count.ShouldBeGreaterThan(60);
+        named.ShouldContain(Definitions.RouteIds.Access.CreateAccount);
+        named.ShouldContain(Definitions.RouteIds.Access.JoinExhibition);
+        named.ShouldContain(Definitions.RouteIds.Transfers.StartViewExport);
+        named.ShouldNotContain(Definitions.RouteIds.Annotations.FindDeletedAnnotations);
+        named.ShouldNotContain(Definitions.RouteIds.KeyValues.ExportKeyValues);
+        ReadOnlyOperations.All.ShouldBeSubsetOf(operations.Where(operation => operation.Method == "post").Select(operation => operation.Id));
+    }
+
     // The description of a project (424-78): its update and the caller's projects, under the Access tag, for users, with
     // the 403 of the document filter. The list carries the key, the role and the description, not the members.
     [Fact]
@@ -758,11 +799,12 @@ public class OpenApiExportTests
             ],
             ignoreOrder: true);
 
-        foreach (var (_, _, operation) in operations)
+        foreach (var (_, method, operation) in operations)
         {
             operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access]);
             operation.GetProperty("security").GetArrayLength().ShouldBeGreaterThan(0);
-            operation.GetProperty("responses").GetProperty("403").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseForbiddenUserOnly);
+            operation.GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
+                .ShouldBe(ForbiddenOf(Definitions.Descriptions.ResponseForbiddenUserOnly, method, operation.GetProperty("operationId").GetString()!));
         }
 
         var update = Operation(document, Definitions.RouteIds.Access.UpdateAccessPoint);
@@ -807,14 +849,15 @@ public class OpenApiExportTests
             ],
             ignoreOrder: true);
 
-        foreach (var (_, _, operation) in operations)
+        foreach (var (_, method, operation) in operations)
         {
             operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access]);
             operation.GetProperty("security").GetArrayLength().ShouldBeGreaterThan(0);
             operation.TryGetProperty("requestBody", out _).ShouldBeFalse();
             operation.TryGetProperty("parameters", out _).ShouldBeFalse();
             operation.GetProperty("responses").GetProperty("401").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseUnauthorizedUserOnly);
-            operation.GetProperty("responses").GetProperty("403").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseForbiddenUserOnly);
+            operation.GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
+                .ShouldBe(ForbiddenOf(Definitions.Descriptions.ResponseForbiddenUserOnly, method, operation.GetProperty("operationId").GetString()!));
             operation.GetProperty("responses").GetProperty("404").TryGetProperty("content", out _).ShouldBeFalse("the 404 has no body");
         }
 
@@ -996,6 +1039,24 @@ public class OpenApiExportTests
             .ApplyDocumentFilters(context.GetDocumentFilterCollection());
 
         return await document.RenderAsync(OpenApiSpecVersion.OpenApi3_0, OpenApiFormat.Json);
+    }
+
+    // The 403 of a user operation that changes something: its description and the refusal of ReadOnly (spec 424-302).
+    internal static string WithReadOnlyRefusal(string description)
+    {
+        return $"{description} {Definitions.Descriptions.ForbiddenActorReadOnly}";
+    }
+
+    // The 403 description of an operation, by its method as the document names it ("get", "post") and its operation id.
+    internal static string ForbiddenOf(string description, string method, string operationId)
+    {
+        return IsRefusedUnderReadOnly(method, operationId) ? WithReadOnlyRefusal(description) : description;
+    }
+
+    // As ActorRestrictionMiddleware decides: every method but GET, HEAD and OPTIONS, unless the operation only reads.
+    internal static bool IsRefusedUnderReadOnly(string method, string operationId)
+    {
+        return method is not ("get" or "head" or "options") && !ReadOnlyOperations.All.Contains(operationId);
     }
 
     private static List<string> PropertyNames(JsonElement schemas, string schema)

@@ -295,11 +295,13 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
 
     // A user token of the user token exchange (StorytellerTokenIssuer.IssueUserAsync): the account and its scope, nothing
     // of a machine, the actor of an entry of Auth:TokenExchange:Actors while the exchange is enabled (so turning it off or
-    // removing the actor ends its tokens at once), and known restrictions only. The restrictions enforced are the token's
-    // plus those of the actor's settings of now, so adding a restriction or turning AllowSecrets off applies to its tokens
-    // at once too, and none is ever dropped here. The scopes become scp claims, which the API reads, and so does auth_time;
-    // the actor, the restrictions and the client of the subject token (subject_client_id) go into the Delegation, never
-    // into claims.
+    // removing the actor ends its tokens at once), a client that is not in Auth:TokenExchange:DeniedClientIds, and known
+    // restrictions only. The restrictions enforced are the token's plus those of the actor's settings of now for the
+    // token's client (GetRestrictions(clientId); a token without a client counts as untrusted), so adding a restriction,
+    // turning AllowSecrets off or taking a client out of TrustedClientIds applies to its tokens at once too, and none is
+    // ever dropped here. "Now" is the settings the API started with. AllowedClientIds is checked at the exchange only. The
+    // scopes become scp claims, which the API reads, and so does auth_time; the actor, the restrictions and the client of
+    // the subject token (subject_client_id) go into the Delegation, never into claims.
     private BearerValidationResult? ValidateUser(JsonElement payload)
     {
         var accountId = GetString(payload, JwtRegisteredClaimNames.Sub);
@@ -347,9 +349,19 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
             return RefuseUser($"its {StorytellerTokenClaims.SubjectClientId} is not a client id");
         }
 
-        // The token's restrictions and those the actor has now: tightening an actor reaches its tokens at once, loosening it
-        // waits for new ones.
-        var enforced = restrictions.Union(actor.GetRestrictions(), StringComparer.Ordinal).ToArray();
+        // A client denied since the token was issued: 401, as for a removed actor.
+        if (exchange.IsDeniedClient(clientId))
+        {
+            _logger.LogInformation(
+                "A Storyteller user token of the actor {ActorId} is refused: its client {ClientId} is in Auth:TokenExchange:DeniedClientIds",
+                actorId,
+                clientId);
+            return null;
+        }
+
+        // The token's restrictions and those the actor has now for its client: tightening an actor or taking a client out
+        // of TrustedClientIds reaches its tokens at once, loosening it waits for new ones.
+        var enforced = restrictions.Union(actor.GetRestrictions(clientId), StringComparer.Ordinal).ToArray();
         var claims = new List<Claim> { new("sub", accountId) };
 
         // Likewise the token's scopes within those the actor may carry now: a scope taken from the actor leaves its tokens

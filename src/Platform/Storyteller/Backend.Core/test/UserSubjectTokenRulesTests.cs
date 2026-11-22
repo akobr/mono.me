@@ -165,9 +165,13 @@ public class UserSubjectTokenRulesTests
     [Fact]
     public void ActorRestrictions_AreAClosedList()
     {
-        ActorRestrictions.All.ShouldBe([ActorRestrictions.NoSecretReveal]);
+        ActorRestrictions.All.ShouldBe([ActorRestrictions.NoSecretReveal, ActorRestrictions.ReadOnly]);
+        ActorRestrictions.NoSecretReveal.ShouldBe("NoSecretReveal");
+        ActorRestrictions.ReadOnly.ShouldBe("ReadOnly");
         ActorRestrictions.IsKnown("NoSecretReveal").ShouldBeTrue();
+        ActorRestrictions.IsKnown("ReadOnly").ShouldBeTrue();
         ActorRestrictions.IsKnown("nosecretreveal").ShouldBeFalse();
+        ActorRestrictions.IsKnown("readonly").ShouldBeFalse();
         ActorRestrictions.IsKnown(null).ShouldBeFalse();
     }
 

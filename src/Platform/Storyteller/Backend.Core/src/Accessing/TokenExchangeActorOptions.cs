@@ -15,8 +15,17 @@ public class TokenExchangeActorOptions
     // token a person gave another app cannot be exchanged by this actor.
     public string[] SubjectAudiences { get; set; } = [];
 
-    // The clients (azp, appid or client_id) the subject token may be issued to. Empty: any client.
+    // The clients (azp, appid or client_id) the subject token may be issued to. Empty: any client. With entries, every
+    // other client is refused at the exchange, a subject token without a client too; checked at the exchange only.
     public string[] AllowedClientIds { get; set; } = [];
+
+    // The clients that act with the actor's own policy only (IsTrustedClient, exact); every other client also gets
+    // UntrustedClientRestrictions. Trust never removes a restriction of the actor itself.
+    public string[] TrustedClientIds { get; set; } = [];
+
+    // ActorRestrictions values added for every client outside TrustedClientIds, including a subject token that names no
+    // client (GetRestrictions(clientId)).
+    public string[] UntrustedClientRestrictions { get; set; } = [];
 
     // The most an issued token may carry; it must contain User.Impersonation. Empty: User.Impersonation (GetScopes).
     // Defaults stay out of the bound arrays, because binding appends to them.
@@ -39,5 +48,23 @@ public class TokenExchangeActorOptions
     {
         IEnumerable<string> restrictions = AllowSecrets ? Restrictions : [ActorRestrictions.NoSecretReveal, .. Restrictions];
         return restrictions.Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    // The restrictions of a token for the client: GetRestrictions(), plus UntrustedClientRestrictions unless the client is
+    // trusted; distinct, in this order.
+    public IReadOnlyList<string> GetRestrictions(string? clientId)
+    {
+        var restrictions = GetRestrictions();
+        return IsTrustedClient(clientId)
+            ? restrictions
+            : restrictions.Concat(UntrustedClientRestrictions).Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    // False for null (a subject token that names no client). Entries are trimmed and compared ordinally: a trust list must
+    // not widen, as a registrant may pick a case variant of a trusted id (Keycloak) and URL paths are case-sensitive.
+    public bool IsTrustedClient(string? clientId)
+    {
+        return clientId is not null
+            && TrustedClientIds.Any(trusted => !string.IsNullOrWhiteSpace(trusted) && string.Equals(trusted.Trim(), clientId, StringComparison.Ordinal));
     }
 }
