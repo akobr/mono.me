@@ -96,7 +96,7 @@ An invalid token gets **401**. If the JWKS cannot be fetched, the response is **
 
 Supporting impersonation would be a decision of its own. It would need `act.sub` as the `Via` of the [audit stamps](audit-stamps.md#the-actor), no secret read or write for the session (as the [restrictions of actors](#restrictions-of-actors) withhold them), and a log of every request. Until then, keep impersonation off in the WorkOS dashboard (see [AuthKit dashboard setup](#authkit-dashboard-setup)).
 
-Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens), of federated machines and of the [user token exchange](#user-token-exchange), are the exception: their signature, issuer, audience and lifetime are always checked, and so are the actor and the restrictions of a user token. A provider token issued to an actor of the exchange is refused in every build too (see [Storyteller user tokens](#storyteller-user-tokens)). For users, Debug builds also skip the `User.Impersonation` check and the project role check, so they also serve requests without an identity, which become `System`. The view transfer routes are the exception: they answer `401` to a request without credentials in every build. The checks of machines (the machine document, the credential policy, the annotation restriction and the [scopes](#scopes-of-machines), stored and carried), including the per-call checks of federated machines, run in every build, and so do the refusal of machines on the routes for users only and the [restrictions of actors](#restrictions-of-actors). The [step-up](#recent-sign-in-step-up) is off in Debug builds unless `Auth:StepUp:Enabled` is set; set, it decides in every build.
+Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens), of federated machines and of the [user token exchange](#user-token-exchange), are the exception: their signature, issuer, audience and lifetime are always checked, and so are the actor, the client app and the restrictions of a user token. A provider token issued to an actor of the exchange is refused in every build too (see [Storyteller user tokens](#storyteller-user-tokens)). For users, Debug builds also skip the `User.Impersonation` check and the project role check, so they also serve requests without an identity, which become `System`. The view transfer routes are the exception: they answer `401` to a request without credentials in every build. The checks of machines (the machine document, the credential policy, the annotation restriction and the [scopes](#scopes-of-machines), stored and carried), including the per-call checks of federated machines, run in every build, and so do the refusal of machines on the routes for users only and the [restrictions of actors](#restrictions-of-actors). The [step-up](#recent-sign-in-step-up) is off in Debug builds unless `Auth:StepUp:Enabled` is set; set, it decides in every build.
 
 ## How Keycloak tokens are checked
 
@@ -629,10 +629,11 @@ spec:
 
 The [MCP server](mcp.md) acts for the person signed in to an AI assistant, under any of the three providers. The person signs in to the MCP server with the deployment's provider, and the MCP server validates that token for itself. It never forwards the token to the API: that would be the token passthrough the MCP authorization specification forbids, and the API refuses such a token (see [Storyteller user tokens](#storyteller-user-tokens)). Instead, the MCP server exchanges it at the API's [user token exchange](#user-token-exchange) for a short-lived Storyteller user token that names the person and the MCP server as its actor, and calls the API with that token.
 
-- The API treats the call as the person's: their account, their roles, `User.Impersonation`. The [audit actor](audit-stamps.md#the-actor) is the account, with its name and the actor id in `Via`: a change Ada makes through the MCP server records Ada, via `mcp`.
+- The API treats the call as the person's: their account, their roles, `User.Impersonation`. The [audit actor](audit-stamps.md#the-actor) is the account, with its name, the actor id in `Via` and the person's client app in `ViaClient`: a change Ada makes through the MCP server from Claude records Ada, via `mcp`, with Claude's client id.
 - The person needs a Storyteller account first: a sign-in without an account is refused with "No Storyteller account exists for this sign-in. Register once with sform or the admin UI."
 - The API trusts the MCP server only as an actor of `Auth:TokenExchange:Actors`, and only with tokens issued to it: their `aud` must be one of the actor's `SubjectAudiences`. The MCP server logs the values to list once at start: "The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: …".
 - An actor gets `NoSecretReveal` unless it sets `AllowSecrets`, so by default the API refuses every secret read through the MCP server, whatever the person's role, and the MCP server hides its secret tools (see [Restrictions of actors](#restrictions-of-actors)).
+- A client app outside the actor's `TrustedClientIds` also gets the actor's `UntrustedClientRestrictions`; production gives every such app `ReadOnly` and `NoSecretReveal`, so it reads only, and the MCP server hides its write tools (see [Client apps of the exchange](#client-apps-of-the-exchange)).
 - The Storyteller user token carries the time of the person's sign-in at the MCP client, so the [step-up](#recent-sign-in-step-up) judges it as for a direct call: once the window has passed, secret writes and machine credentials through the MCP server answer `401 StepUpRequired`.
 - `Mcp:Provider` names the same provider as `Auth:Provider`.
 
@@ -640,7 +641,7 @@ The [MCP server](mcp.md) acts for the person signed in to an AI assistant, under
 | --- | --- | --- |
 | `EntraId` | The MCP server's app registration in the tenant `Mcp:Authentication:TenantId` | Both audiences of the MCP server in the actor's `SubjectAudiences`, and an `Auth:TenantId` that admits its tenant; see below. |
 | `AuthKit` | The AuthKit domain | The AuthKit domain issues the tokens. Unless it is `Auth:AuthKit:Issuer`, list it in `Auth:TokenExchange:AdditionalIssuers` with the key set `{AuthKitDomain}/oauth2/jwks`. |
-| `Keycloak` | The realm `Auth:Keycloak:Issuer` | The MCP clients' tokens need an audience mapper that adds the audience the MCP server accepts. The actor's `AllowedClientIds`, not `Auth:Keycloak:AllowedClientIds`, decides which clients may sign in to it; empty, any client of the realm. |
+| `Keycloak` | The realm `Auth:Keycloak:Issuer` | The MCP clients' tokens need an audience mapper that adds the audience the MCP server accepts. The actor's `AllowedClientIds`, not `Auth:Keycloak:AllowedClientIds`, decides which clients may sign in to it; empty, any client of the realm, under the actor's [client policy](#client-apps-of-the-exchange). |
 
 Under Entra ID:
 
@@ -692,7 +693,7 @@ The order of the checks:
 - **What a new sign-in cannot fix comes first:** a machine on a route for users only, the role checks of the route, the [restriction of the actor](#restrictions-of-actors), a bad body, and what the handler has already read: a machine that does not exist (`404`, for a reset and new federation rules) or is not `Federated` (`400 MachineNotFederated`), a changed `Issuer` of a trusted issuer (`400 InvalidFederation`), and a shared certificate of a project that does not enable `CertificateAndApiKey` (`400 MachineAccessNotSupported`). So a person without the role gets `403`, as before.
 - **The role checks inside the service come after it.** Grant, revoke, a member's role change, the removal of a member and a new invitation check the role in the service, and a new invitation also its email, role and validity there, so a person without the role (or with such a bad invitation) whose sign-in is old gets `401` first, and `403` (or `400`) after signing in again. The admin UI offers these actions only to the roles that may use them, and asks for the sign-in before their dialogs open.
 - **Secret rights are withheld only where the role gives them.** A user below `ContributorWithSecrets` gets `403 AccessDenied` and no header, whatever the time of the sign-in.
-- **The actor wins for reads.** Through an actor under `NoSecretReveal`, a secret read answers `403 ActorRestricted` and a resolved configuration `actor-restricted`, because a new sign-in would not lift the restriction. Writes through the actor are judged by the step-up.
+- **The actor wins for reads.** Through an actor under `NoSecretReveal`, a secret read answers `403 ActorRestricted` and a resolved configuration `actor-restricted`, because a new sign-in would not lift the restriction. Writes through the actor are judged by the step-up, unless the token is `ReadOnly`: then every write answers `403 ActorReadOnly` before the role checks and the step-up.
 
 ### The step-up answer
 
@@ -718,7 +719,7 @@ Content-Type: application/json; charset=utf-8
 
 - **The window.** A sign-in counts when `auth_time` is at most `MaxAge` old and at most 5 minutes in the future, the clock skew allowed to the provider. A missing or unreadable `auth_time`, or one further in the future, is no recent sign-in.
 - **Impersonation.** A token with an `act` claim, a WorkOS impersonation, is never recent, whatever its `auth_time`: the sign-in is the impersonator's.
-- **Actors.** A Storyteller user token carries the person's `auth_time` from its subject token, so a call through the MCP server is judged by the person's sign-in at the MCP client. Its actor stays in the delegation, never in the claims.
+- **Actors.** A Storyteller user token carries the person's `auth_time` from its subject token, so a call through the MCP server is judged by the person's sign-in at the MCP client. Its actor and client app stay in the delegation, never in the claims.
 - **Machines** are never judged: API keys, certificates, client credentials and federated tokens have no sign-in. Their secret rights follow their scopes and the mTLS rule only.
 - **Delegated tokens of another application.** Under Entra ID, a token of a person issued to another client application (its `azp` is not `Auth:ClientId`, for example an on-behalf-of token) is a machine with that application's id, not the person (see [Entra ID settings](#entra-id-settings)). It is not judged either, and it gets no right of the person's role: only what a registered machine of that id has, and nothing without one.
 
@@ -754,15 +755,16 @@ MFA is required in the production WorkOS environment for every sign-in without S
 
 ## User token exchange
 
-An **actor**, such as the [MCP server](mcp.md), exchanges a person's token of the deployment's identity provider for a short-lived **Storyteller user token** ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)). The token names the person (`sub`, the [account id](#account-ids)) and the actor (`act`). The API treats a call with it as the person's, acting through the actor: the person's role decides, the actor's [restrictions](#restrictions-of-actors) narrow it, and the audit names both.
+An **actor**, such as the [MCP server](mcp.md), exchanges a person's token of the deployment's identity provider for a short-lived **Storyteller user token** ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)). The token names the person (`sub`, the [account id](#account-ids)), the actor (`act`) and the client app the person signed in to the actor with (`subject_client_id`). The API treats a call with it as the person's, acting through the actor: the person's role decides, the [restrictions](#restrictions-of-actors) of the actor and of the [client app](#client-apps-of-the-exchange) narrow it, and the audit names all three.
 
 ```
-person ──(1) signs in to the actor with the deployment's provider──▶ actor
+person ──(1) signs in to the actor with the deployment's provider, in a client app──▶ actor
 actor ──(2) subject_token (issued to the actor), client_id and the actor's proof──▶ POST v1/access/token
                                                                                     │ the actor and its proof
                                                                                     │ the subject token: the provider's rules, aud = one of the actor's SubjectAudiences
+                                                                                    │ the client app: AllowedClientIds, DeniedClientIds
                                                                                     │ the person's account
-actor ◀─(3) Storyteller user token (at+jwt, at most 15 min, act, restrictions)──────┘
+actor ◀─(3) Storyteller user token (at+jwt, act, subject_client_id, restrictions)───┘
 actor ──(4) Authorization: Bearer <storyteller user token>──▶ the API, as the person
 ```
 
@@ -834,13 +836,14 @@ The checks run in this order, and only an authenticated actor gets its subject t
 2. The exchange must be on (`Auth:TokenExchange:Enabled`).
 3. The parameters: `grant_type`, `subject_token` and its type, `requested_token_type`, `audience` and `resource`, and the syntax of `scope`.
 4. The actor and its [proof](#actors-and-their-proof).
-5. The subject token: at most `MaxSubjectTokenBytes`, a valid user token of the deployment's provider ([Subject tokens](#subject-tokens)) whose `aud` is one of the actor's `SubjectAudiences`, issued to one of its `AllowedClientIds`, without `act`, and not expiring within 5 seconds.
-6. The account: the [account id](#account-ids) of the subject token must name an existing account. The exchange never creates one.
-7. The replay limit: at most `MaxExchangesPerSubjectTokenPerMinute` exchanges of the subject token by the actor. A sign-in without an account is not counted.
-8. The scope.
-9. A [Storyteller user token](#storyteller-user-tokens) is issued. An exchange writes nothing.
+5. The subject token: at most `MaxSubjectTokenBytes`, a valid user token of the deployment's provider ([Subject tokens](#subject-tokens)) whose `aud` is one of the actor's `SubjectAudiences`, issued to one of its `AllowedClientIds`, without `act`, and not expiring within 5 seconds. Its client id, when it names one, must be 1 to 256 printable ASCII characters.
+6. The client app: not in `DeniedClientIds` ([Client apps of the exchange](#client-apps-of-the-exchange)). The check comes before the account, so a blocked client learns nothing about it.
+7. The account: the [account id](#account-ids) of the subject token must name an existing account. The exchange never creates one.
+8. The replay limit: at most `MaxExchangesPerSubjectTokenPerMinute` exchanges of the subject token by the actor. A sign-in without an account is not counted.
+9. The scope.
+10. A [Storyteller user token](#storyteller-user-tokens) is issued, with the restrictions of the actor and, for a client app outside its `TrustedClientIds`, its `UntrustedClientRestrictions`. An exchange writes nothing.
 
-Each refusal has a fixed `error_description`, and the reason is logged without tokens. Responses carry `Content-Type: application/json; charset=utf-8`, `Cache-Control: no-store` and `Pragma: no-cache`. Property names are the snake_case names of OAuth, and errors are OAuth error bodies, not `ErrorResponse`. `restrictions` is not an RFC 8693 member: it lists the restrictions the token carries, an empty array when there are none, so the actor can adapt (the MCP server hides its secret tools under `NoSecretReveal`).
+Each refusal has a fixed `error_description`, and the reason is logged without tokens. Responses carry `Content-Type: application/json; charset=utf-8`, `Cache-Control: no-store` and `Pragma: no-cache`. Property names are the snake_case names of OAuth, and errors are OAuth error bodies, not `ErrorResponse`. `restrictions` is not an RFC 8693 member: it lists the restrictions the token carries, `ReadOnly` included, an empty array when there are none, so the actor can adapt (the MCP server hides its secret tools under `NoSecretReveal` and its write tools under `ReadOnly`).
 
 ```json
 200 { "access_token": "eyJ…", "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
@@ -853,7 +856,7 @@ Each refusal has a fixed `error_description`, and the reason is logged without t
 | --- | --- | --- |
 | `400` | `invalid_request` | A malformed request: an `Authorization` header, another content type, a body over 64 KiB, a parameter given twice, a missing `grant_type`, `subject_token`, `subject_token_type` or `client_id`, an unsupported `subject_token_type` or `requested_token_type`, or a malformed proof. The description names the problem, for example "The parameter subject_token is missing." |
 | `400` | `invalid_client` | "The actor is not known or its proof is not valid.": no actor has the `client_id`, the request carries no proof or another one than the actor's, or the proof fails its checks. |
-| `400` | `invalid_grant` | "The subject token is not accepted for this actor.": the subject token is over `MaxSubjectTokenBytes`, fails the [provider's rules](#subject-tokens), was not issued to the actor or to one of its clients, carries `act`, expires within 5 seconds, or reached the replay limit. "No Storyteller account exists for this sign-in. Register once with sform or the admin UI.": the person has no account. |
+| `400` | `invalid_grant` | "The subject token is not accepted for this actor.": the subject token is over `MaxSubjectTokenBytes`, fails the [provider's rules](#subject-tokens), was not issued to the actor or to one of its clients, names a client id that is not 1 to 256 printable ASCII characters, carries `act`, expires within 5 seconds, or reached the replay limit. "The client app the person signed in with is blocked for this deployment. Use another app, sform or the admin UI.": the subject token's client is in `DeniedClientIds`. "No Storyteller account exists for this sign-in. Register once with sform or the admin UI.": the person has no account. |
 | `400` | `unsupported_grant_type` | "The exchange of user tokens is not enabled.", while `Auth:TokenExchange:Enabled` is `false`; "Only the token exchange grant type is supported.", for another `grant_type`. |
 | `400` | `invalid_target` | "The audience or resource is not this API.": an `audience` or `resource` other than `MachineAuth:Federation:Audience`. |
 | `400` | `invalid_scope` | "The parameter scope is malformed.", checked before the actor; "The requested scope is not granted to the actor; it must include User.Impersonation.", when the granted scope would lack it. |
@@ -897,7 +900,7 @@ Under Entra ID, `Auth:TenantId` decides which tenant a subject token may come fr
 - `common` accepts the token's own tenant. `organizations` does too, but refuses personal Microsoft accounts (the tenant `9188040d-6c67-4c5b-b112-36a304b66dad`).
 - Another name, such as a verified domain, is pinned to the tenant of its metadata issuer (`https://login.microsoftonline.com/{tenant GUID}/v2.0`). When that issuer names no tenant, every token is refused.
 
-For every provider, `aud` must be one of the actor's `SubjectAudiences`, `exp` is required, the token must not carry `act` (chained delegation is not exchanged; under AuthKit a top-level `act` of any value counts, even `[]`, as on [API routes](#how-authkit-tokens-are-checked)), and its client must be one of the actor's `AllowedClientIds` when the list names any. AuthKit and Keycloak ask for a refresh of their keys on an unknown `kid` and refuse that token, as on API routes. When the provider's keys cannot be fetched, the exchange answers `503`.
+For every provider, `aud` must be one of the actor's `SubjectAudiences`, `exp` is required, the token must not carry `act` (chained delegation is not exchanged; under AuthKit a top-level `act` of any value counts, even `[]`, as on [API routes](#how-authkit-tokens-are-checked)), and its client must be one of the actor's `AllowedClientIds` when the list names any. A client id, when the token names one, must be 1 to 256 printable ASCII characters (`!` to `~`, U+0021 to U+007E), which every real id is: Entra ID GUIDs, AuthKit `client_…` ids and HTTPS URLs, and Keycloak names. Another value is refused, not cut or cleaned, so a stamp, a log line or the admin UI never shows an id that looks like another. AuthKit and Keycloak ask for a refresh of their keys on an unknown `kid` and refuse that token, as on API routes. When the provider's keys cannot be fetched, the exchange answers `503`.
 
 ### Storyteller user tokens
 
@@ -912,8 +915,9 @@ An issued user token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) ac
 | `token_use` | `user`. Machine tokens have no `token_use`. |
 | `scope` | The granted scopes, separated by spaces, always with `User.Impersonation`. |
 | `act` | `{ "sub": "<actor id>" }` ([RFC 8693 §4.1](https://www.rfc-editor.org/rfc/rfc8693#section-4.1)): delegation, not impersonation. Never nested. |
-| `client_id` | The actor id. |
-| `restrictions` | The actor's [restrictions](#restrictions-of-actors), an array of strings, empty when it has none. |
+| `client_id` | The actor id: the party that requested the token ([RFC 9068](https://www.rfc-editor.org/rfc/rfc9068), [RFC 8693 §4.3](https://www.rfc-editor.org/rfc/rfc8693#section-4.3)). |
+| `subject_client_id` | The client app the subject token was issued to (its `azp`, `appid` or `client_id`), 1 to 256 printable ASCII characters; left out when the subject token names none. A private top-level claim, not a nested `act`, which RFC 8693 makes informational only: the [client lists](#client-apps-of-the-exchange) are access control. |
+| `restrictions` | The [restrictions](#restrictions-of-actors) of the actor and, for a client app outside its `TrustedClientIds`, its `UntrustedClientRestrictions`: an array of strings, empty when there are none. |
 | `auth_time` | When the person signed in, when the subject token says so. The API reads it on its routes for the [step-up](#recent-sign-in-step-up). |
 | `iat`, `nbf`, `exp` | The time of the exchange, and at most `TokenLifetimeMinutes` (10) later, never after the subject token's `exp`. |
 | `jti` | A GUID. |
@@ -926,15 +930,16 @@ The token carries no name or email: the API reads them from the account.
 - `token_use` `user`, a string `sub` and `scope`, and no `organization`, `project` or `annotation_key`;
 - `act`, one object with a string `sub` and no nested `act`;
 - `Auth:TokenExchange:Enabled` on, and `act.sub` the `Id` of an actor of `Auth:TokenExchange:Actors`, compared exactly;
+- `subject_client_id`, when present, a string of 1 to 256 printable ASCII characters ("its subject_client_id is not a client id" otherwise), and not a client of `Auth:TokenExchange:DeniedClientIds` now; a token without it names no client;
 - `restrictions`, an array of known restrictions. An unknown one refuses the token, because the API cannot enforce it.
 
-The middleware then reads the account once per call (a point read) and takes `name` and `preferred_username` from its `Name` and `UserName`; when the account no longer exists, the call gets `401`. The result is a user, not a machine: `sub` is the account id, and each scope of the token that the actor's `Scopes` still hold becomes an `scp` claim; the others are dropped. A non-negative integer `auth_time` becomes the claim `auth_time`, so the [step-up](#recent-sign-in-step-up) judges the person's sign-in as for a provider token; a token without it, or with another value, has no sign-in time and never counts as recent. The actor and the restrictions are kept for the request from the validated token, never from claims. From there it is a user token like any other: it needs `User.Impersonation`, the role decides, and the routes for users only accept it. The [audit actor](audit-stamps.md#the-actor) is the account, with `Via` set to the actor id.
+The restrictions enforced are those of the token together with those the actor gives the token's client app now (see [Client apps of the exchange](#client-apps-of-the-exchange)). The middleware then reads the account once per call (a point read) and takes `name` and `preferred_username` from its `Name` and `UserName`; when the account no longer exists, the call gets `401`. The result is a user, not a machine: `sub` is the account id, and each scope of the token that the actor's `Scopes` still hold becomes an `scp` claim; the others are dropped. A non-negative integer `auth_time` becomes the claim `auth_time`, so the [step-up](#recent-sign-in-step-up) judges the person's sign-in as for a provider token; a token without it, or with another value, has no sign-in time and never counts as recent. The actor, the client app and the restrictions are kept for the request from the validated token (the delegation), never from claims. From there it is a user token like any other: it needs `User.Impersonation`, the role decides, and the routes for users only accept it. The [audit actor](audit-stamps.md#the-actor) is the account, with `Via` set to the actor id and `ViaClient` to the client app.
 
 **Tokens issued to an actor.** A provider token whose `aud` is one of an actor's `SubjectAudiences` was issued to the actor, for the exchange only. As a bearer token on API routes it gets `401`, in every build and whether the exchange is on or not, even when its provider accepts it. A token of an `AdditionalIssuers` entry never passes on API routes either.
 
 **Invitations.** Through an actor the person's email is never verified: `preferred_username` comes from the stored account, not from the provider. So `GET v1/access/invitations/mine` returns an empty list, and accepting or declining an invitation is refused with `403` (`EmailMismatch` or `EmailNotVerified`). People answer invitations with the provider's own sign-in.
 
-**Revocation.** Every call reads the account and checks the actor, so these changes reach tokens already issued:
+**Revocation.** Every call reads the account and checks the actor and the client app, so these changes reach tokens already issued:
 
 | Change | Takes effect |
 | --- | --- |
@@ -942,12 +947,15 @@ The middleware then reads the account once per call (a point read) and takes `na
 | Removing the actor from `Auth:TokenExchange:Actors`, or turning `Enabled` off | Its tokens get `401` once the API runs with the new settings: every call checks the actor. |
 | Adding a restriction to the actor, or turning `AllowSecrets` off | Once the API runs with the new settings: every call enforces the token's restrictions and those the actor has now. Removing a restriction or setting `AllowSecrets` reaches only tokens issued after. |
 | Removing a scope from the actor's `Scopes` | Once the API runs with the new settings: every call keeps only the token's scopes that the actor has now. Without `User.Impersonation` the token no longer acts for the person, and the routes answer `401`. Adding a scope reaches only tokens issued after. |
+| Adding a client app to `Auth:TokenExchange:DeniedClientIds` (one client) | Its tokens get `401` once the API runs with the new settings, through every actor, and its exchanges `invalid_grant`. The cut for an app with a stable id; a dynamically registered app registers again under a new id. A token that names no client is never denied. |
+| Listing client apps in the actor's `AllowedClientIds` (every unlisted client) | The exchanges of every other app, and of a token without a client, are refused once the API runs with the new settings. Their tokens stay valid until they expire, at most `TokenLifetimeMinutes`: `AllowedClientIds` is checked at the exchange only. For an immediate cut of an app with a stable id, deny it too. |
+| Removing a client app from the actor's `TrustedClientIds`, or adding to its `UntrustedClientRestrictions` | Once the API runs with the new settings: the app's tokens get the untrusted restrictions. A token that names no client, such as one issued before the API recorded the client, counts as untrusted. Trusting an app, or removing an untrusted restriction, reaches only tokens issued after. |
 
-Otherwise an issued token stays valid until it expires (`TokenLifetimeMinutes` at most, plus `ClockSkewSeconds`). There is no revocation list.
+"Once the API runs with the new settings" means after a restart: the settings are read at start, and on Azure a change of the app settings restarts the Function App, within minutes. Otherwise an issued token stays valid until it expires (`TokenLifetimeMinutes` at most, plus `ClockSkewSeconds`). There is no revocation list.
 
 ### Restrictions of actors
 
-An actor's restrictions narrow what a person may do through it, whatever the person's role, in every build, `DEV_AUTH` included. The list is closed and holds one value, `NoSecretReveal`: a setting or a token that names another is refused.
+An actor's restrictions narrow what a person may do through it, whatever the person's role, in every build, `DEV_AUTH` included. The list is closed and holds two values, `NoSecretReveal` and `ReadOnly`: a setting or a token that names another is refused. A token gets the restrictions of its actor and, for a client app the actor does not trust, the actor's `UntrustedClientRestrictions` (see [Client apps of the exchange](#client-apps-of-the-exchange)).
 
 **`NoSecretReveal`** is the default of every actor; `AllowSecrets: true` removes it. A secret read through an assistant enters the model's context, the client's transcript and the model provider's logs, and prompt injection in content the model reads can ask for one. The API refusal holds whatever the model is persuaded to do.
 
@@ -962,7 +970,65 @@ An actor's restrictions narrow what a person may do through it, whatever the per
 | Granting `ContributorWithSecrets`, `Administrator` or `Owner`: a grant, a member's role change or an invitation | `403 ActorRestricted`, before the service checks the caller's role: the role reads secrets, and the person who gets it may be the one acting through the assistant. `Reader` and `Contributor` are allowed. |
 | Writes of secrets (set, protect, import, delete) and deleting a machine | Allowed: they return no value |
 
-The refusal is `403` with `ErrorCode` `ActorRestricted` and "The token acts for the person through an actor that may not reveal secrets.". It comes after the role check, so a person without the role the operation needs (`ContributorWithSecrets` for a secret read) gets `403 AccessDenied`, as without the actor; only a grant of a role that reads secrets is refused before the role check. Debug builds give every user the role, so they answer `ActorRestricted` there. The restriction leaves the rest of the person's rights alone: an Administrator acting through the actor still grants `Reader` and `Contributor`, invites people with those roles, revokes roles and deletes machines. See [Secret delivery](key-values.md#secret-delivery) for secret reads in general. For reads the restriction comes before the [step-up](#recent-sign-in-step-up), as a new sign-in does not lift it; the writes and grants the restriction allows still need a recent sign-in of the person.
+The refusal of `NoSecretReveal` is `403` with `ErrorCode` `ActorRestricted` and "The token acts for the person through an actor that may not reveal secrets.". It comes after the role check, so a person without the role the operation needs (`ContributorWithSecrets` for a secret read) gets `403 AccessDenied`, as without the actor; only a grant of a role that reads secrets is refused before the role check. Debug builds give every user the role, so they answer `ActorRestricted` there. The restriction leaves the rest of the person's rights alone: an Administrator acting through the actor still grants `Reader` and `Contributor`, invites people with those roles, revokes roles and deletes machines. See [Secret delivery](key-values.md#secret-delivery) for secret reads in general. For reads the restriction comes before the [step-up](#recent-sign-in-step-up), as a new sign-in does not lift it; the writes and grants the restriction allows still need a recent sign-in of the person.
+
+**`ReadOnly`** takes every change away: the token may only read. An actor names it in `Restrictions`, for all its tokens, or in `UntrustedClientRestrictions`, for the client apps it does not trust; production gives it to every MCP client app that is not trusted.
+
+- **The rule.** `ActorRestrictionMiddleware` enforces it, registered right after `BearerAuthenticationMiddleware`, inside `ExceptionHandlingMiddleware`. For a request whose delegation carries `ReadOnly`, it lets `GET`, `HEAD` and `OPTIONS` pass, and the two operations that only read although they are a `POST` (`ReadOnlyOperations.All`): `FindDeletedAnnotations` (`POST v1/{organization}/{project}/{view}/annotations/deleted/lookup`) and `ExportKeyValues` (`POST v1/{organization}/{project}/{view}/key-values/export`). It refuses every other request. Machines, users who call directly, anonymous endpoints and timers pass unchanged.
+- **The refusal** is `403` with `ErrorCode` `ActorReadOnly` and "The token acts for the person through a client app that may only read; the change is refused.". Before it throws, the middleware logs a warning with the actor, the client app, the function and the method: a refused write leaves no audit record, so this line is its trace.
+- **Before the role checks.** Unlike `NoSecretReveal`, the refusal comes before the role checks and the [step-up](#recent-sign-in-step-up): a method rule refuses uniformly and tells nothing about roles, and no new sign-in or role lifts it, so a `401` for a step-up would mislead. It also covers the writes that need no role (registering an account, a new organization, joining the [exhibition](access.md#exhibition), leaving a project) and those whose role only the service checks, and it holds in `DEV_AUTH` builds, which skip the role checks of users.
+- **What it refuses besides.** View exports, dry runs of imports and the verification of a customer key (BYOK): they create a job or record state. Every HTTP trigger declares its methods and no middleware overrides them, and the function name comes from the host, so neither can be spoofed.
+- **Reads keep their side effects:** the audit of reveals and binding reads, and the usage metering. `ReadOnly` says nothing about secrets, as a reveal and a resolved read are `GET`s; `NoSecretReveal` governs them. So the production default for untrusted client apps names both.
+- **New routes are refused by default.** A test walks every HTTP function (`FunctionTransactionNames.All`): each one that accepts a method other than `GET`, `HEAD` or `OPTIONS` must be refused under `ReadOnly`, unless it is in `ReadOnlyOperations.All`, which lists only functions that exist and only read. The OpenAPI document adds "Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly." to the `403` of every user operation that is not a `GET` and not in that list.
+
+### Client apps of the exchange
+
+The subject token names the client app the person signed in to the actor with: its `azp`, else `appid`, else `client_id` (`UserSubjectTokenRules.GetClientId`). Under AuthKit a dynamically registered client (DCR) has an id like `client_01…`, new for each registration, and a client of a client ID metadata document (CIMD) is expected to have the HTTPS URL of its document; under Entra ID the id is the app's client id, a GUID, and under Keycloak the client's name. The exchange checks it (1 to 256 printable ASCII characters, see [Subject tokens](#subject-tokens)), writes it into the token as `subject_client_id`, and every call through the token applies the client lists to it.
+
+**The lists** are arrays, never dictionaries keyed by client id: a CIMD id contains `:`, which is the path separator of the configuration.
+
+| Setting | Scope | Compared | Meaning |
+| --- | --- | --- | --- |
+| `AllowedClientIds:*` | the actor | per provider: ignoring case under Entra ID, exactly under AuthKit and Keycloak | The hard gate: with entries, every other client app is refused at the exchange, and so is a token that names no client. |
+| `Auth:TokenExchange:DeniedClientIds:*` | every actor | trimmed, ignoring case | Client apps refused even when an actor allows or trusts them. |
+| `TrustedClientIds:*` | the actor | trimmed, exactly | Client apps that act with the actor's own restrictions only. |
+| `UntrustedClientRestrictions:*` | the actor | | Restrictions added for every client app outside `TrustedClientIds`, a token without a client included. |
+
+They combine in this order:
+
+1. `AllowedClientIds`, when it has entries, refuses every app it does not list. Listing only the trusted apps there refuses every dynamically registered one: that is the switch for a hostile DCR client.
+2. A client app of `DeniedClientIds` is refused.
+3. A client app of `TrustedClientIds` gets the actor's own restrictions: `NoSecretReveal` unless `AllowSecrets`, and its `Restrictions`.
+4. Every other client app gets them plus `UntrustedClientRestrictions`.
+
+Trust never removes a restriction of the actor itself. A wider match is safe only for refusing, so the deny list ignores case and the trust list does not: Keycloak's dynamic registration lets a registrant pick a case variant of a trusted id, and URL paths are case-sensitive. Entra ID tokens carry lower-case GUIDs, so write Entra ID apps in lower case in `TrustedClientIds`. `DeniedClientIds` holds for the whole exchange, so an emergency entry never makes two actors that share a subject audience differ in policy.
+
+**At the exchange** a client app of `DeniedClientIds` is refused with `invalid_grant` and "The client app the person signed in with is blocked for this deployment. Use another app, sform or the admin UI.", before the account is read, and the API logs at `Information` "A user token exchange by the actor {ActorId} is refused: the client {ClientId} is in Auth:TokenExchange:DeniedClientIds". The issued token carries the restrictions the client gets, and the answer lists them, so the actor knows them: the MCP server hides its write tools under `ReadOnly`.
+
+**On API routes** every call applies the current lists to the token's client: a client app of `DeniedClientIds` gets `401`, like a token of a removed actor, and the log names the client; the restrictions enforced are the token's and those the actor gives the client now. A token without `subject_client_id`, such as one exchanged by an older API, counts as untrusted. `AllowedClientIds` is checked at the exchange only, so an app removed from it keeps its live tokens until they expire. See **Revocation** in [Storyteller user tokens](#storyteller-user-tokens).
+
+**Attribution.** The client app reaches the [audit actor](audit-stamps.md#the-actor) as `ViaClient`, next to `Via`: every stamp, the annotation audit, the key/value audit with its `BindingRead` counts (per client app), the [access audit](access-audit.md) and the view exports. The manifests of resolved reads are kept per client app too, so one app's manifest never answers another app's read, and every app's binding reads are audited ([The dependency manifest](inheritance.md#the-dependency-manifest)).
+
+**Logs.** For a request through an actor, `BearerAuthenticationMiddleware` opens a logging scope `{ DelegatedActor: <actor id>, DelegatedClient: <client id or "(none)"> }` around the rest of the request, so the handlers' logs carry both (Application Insights shows scopes as custom dimensions). After the request it writes one `Information` line, for reads too, so every request of a client app is in the logs: "A request {FunctionName} {Method} of the account {AccountId} via {ActorId} (client {ClientId}) answered {StatusCode}". A request that throws gets no such line: `ExceptionHandlingMiddleware`, which sits outside the bearer middleware, logs its refusal or error and opens the same scope for it. The exchange names the client, cut to 64 characters, in every line it writes after the subject token is accepted, such as the missing account, the replay limit, the dropped scopes and the issued token; a client id it refuses as not recordable is not logged.
+
+**The start notice.** While the exchange is on, `TokenExchangeActorNotice` logs once at start:
+
+| Level | When | Text |
+| --- | --- | --- |
+| Warning | An actor has neither `AllowedClientIds` nor `UntrustedClientRestrictions` | "The actor {ActorId} of Auth:TokenExchange:Actors has no AllowedClientIds: a token any client got for its SubjectAudiences ({SubjectAudiences}) is accepted for the exchange. List the clients to narrow it, or set UntrustedClientRestrictions (for example ReadOnly and NoSecretReveal) for the clients outside TrustedClientIds." |
+| Information | An actor has no `AllowedClientIds` but `UntrustedClientRestrictions` | "The actor {ActorId} of Auth:TokenExchange:Actors accepts a token of any client for {SubjectAudiences}; the clients outside its {TrustedCount} TrustedClientIds get {UntrustedClientRestrictions}." |
+| Warning | An actor with `AllowSecrets` has no `AllowedClientIds`, and its `UntrustedClientRestrictions` lack `NoSecretReveal` | Names the actor and ends "every client may read the person's secrets through it; add NoSecretReveal to UntrustedClientRestrictions." |
+| Warning | An actor has `TrustedClientIds` but no `UntrustedClientRestrictions` | Names the actor and ends "TrustedClientIds has no effect without UntrustedClientRestrictions." |
+| Warning | An id of `DeniedClientIds` is also in an actor's `TrustedClientIds` or `AllowedClientIds` | Names the id and the actor and ends "it is denied." |
+| Information | `DeniedClientIds` has entries | The number of denied clients; the ids are in the settings. |
+
+Overlaps and lists without effect are warnings, not failures: a failed start takes down the whole API, the admin UI and `sform` with it, and the deny list must work in a hurry.
+
+**Limits.**
+
+- A dynamically registered app is attributed per registration, not per app, and cannot be trusted by id: its id is new with every registration, and anyone can register a client with the same name. A denied one registers again under a new id; `AllowedClientIds`, or turning dynamic registration off at the identity provider, holds against it.
+- Never trust a CIMD client whose document lists only loopback redirects: any local process can present its URL.
+- Every change of the lists needs the API to restart with the new settings, which takes minutes. A deny list without a restart is not offered.
 
 ### Configuration of the exchange
 
@@ -972,6 +1038,7 @@ The settings live under `Auth:TokenExchange` and are validated at startup, also 
 | --- | --- | --- |
 | `Enabled` | `false` | Off: `POST v1/access/token` answers `unsupported_grant_type`, and Storyteller user tokens get `401`. On: at least one actor is required. |
 | `Actors:*` | none | The actors, see below. |
+| `DeniedClientIds:*` | none | [Client apps](#client-apps-of-the-exchange) (`azp`, `appid` or `client_id` of the subject token) refused for every actor: their exchanges with `invalid_grant`, their live tokens with `401`. Compared trimmed and ignoring case. The kill switch for apps with stable ids (CIMD URLs, Entra ID apps, Keycloak clients), not for dynamically registered ones, which register again under a new id; the actor's `AllowedClientIds` cuts those off. No blank entries. |
 | `AdditionalIssuers:*:Issuer`, `AdditionalIssuers:*:JwksUri` | none | AuthKit only: further issuers of the deployment's WorkOS environment whose user tokens may be exchanged, such as the AuthKit domain that issues the tokens MCP clients sign in with, each with the HTTPS URL of its key set. Accepted for the exchange only, never as bearer tokens on API routes. Refused under Entra ID and Keycloak, when equal to `Auth:AuthKit:Issuer` (its tokens already pass on API routes), and when listed twice. |
 | `TokenLifetimeMinutes` | `10` | The longest lifetime of an issued token, 5 to 15. Never longer than the subject token's `exp`. |
 | `MaxExchangesPerSubjectTokenPerMinute` | `10` | The replay limit: exchanges of one subject token by one actor per minute and instance, 1 to 60. |
@@ -986,17 +1053,20 @@ An actor, `Auth:TokenExchange:Actors:{n}`:
 | `Authentication:ClientAssertion:JwksUri` | one proof | | A [client assertion](#actors-and-their-proof). An HTTPS URL; needs `MachineAuth:Federation:PublicBaseUrl`. |
 | `Authentication:ClientSecretHash` | one proof | | A [client secret](#actors-and-their-proof): the hex SHA-256 hash of the secret, 64 digits. `Development` only. |
 | `SubjectAudiences:*` | yes | | The audiences of the tokens issued to the actor: the subject token's `aud` must be one of them. At least one and none blank. None may be the API's own audience (`api://{Auth:ClientId}`, `{Auth:ClientId}`, any of `Auth:AuthKit:Audiences`, `Auth:AuthKit:Audience` even while `Audiences` overrides it, or `Auth:Keycloak:Audience`, compared ignoring case and a trailing `/`): a token issued for the API would become exchangeable, and the API would refuse its own users' tokens. |
-| `AllowedClientIds:*` | no | none | The clients the subject token may be issued to (`azp`, `appid` or `client_id`). Empty: any client, and while the exchange is on the API logs a warning at start that names the actor and its `SubjectAudiences`. No blank entries. |
+| `AllowedClientIds:*` | no | none | The clients the subject token may be issued to (`azp`, `appid` or `client_id`), the hard gate: with entries, every other client app is refused, and so is a token that names none. Empty: any client; with no `UntrustedClientRestrictions` either, the API logs a warning at start while the exchange is on (see **The start notice** in [Client apps of the exchange](#client-apps-of-the-exchange)). No blank entries. |
+| `TrustedClientIds:*` | no | none | Client apps that act with the actor's own restrictions only. Compared trimmed and exactly; write Entra ID apps in lower case. No effect without `UntrustedClientRestrictions`. No blank entries. |
+| `UntrustedClientRestrictions:*` | no | none | [Restrictions](#restrictions-of-actors) added for every client app outside `TrustedClientIds`, a token without a client included. Known values only: `NoSecretReveal`, `ReadOnly`. |
 | `Scopes:*` | no | `User.Impersonation` | The most an issued token carries. Storyteller scopes only, and it must contain `User.Impersonation`. |
-| `Restrictions:*` | no | none | [Restrictions](#restrictions-of-actors) on top of the default. Known values only. |
-| `AllowSecrets` | no | `false` | `true` removes `NoSecretReveal` from the defaults. Refused together with `NoSecretReveal` in `Restrictions`. |
+| `Restrictions:*` | no | none | [Restrictions](#restrictions-of-actors) on top of the default, for every client app. Known values only: `NoSecretReveal`, `ReadOnly`. |
+| `AllowSecrets` | no | `false` | `true` removes `NoSecretReveal` from the defaults. Refused together with `NoSecretReveal` in `Restrictions`. It does not remove `NoSecretReveal` of `UntrustedClientRestrictions`, so with both an untrusted client app still reads no secret. |
 
-Exactly one proof must be set. Actors may share a `SubjectAudiences` entry, one per workload identity of a resource, only with the same restrictions and scopes (as `Restrictions`, `AllowSecrets` and `Scopes` give them); otherwise a token issued for the restricted actor could be exchanged by the other. The replay limit counts per actor.
+Exactly one proof must be set. Actors may share a `SubjectAudiences` entry, one per workload identity of a resource, only with the same policy: the same restrictions and scopes (as `Restrictions`, `AllowSecrets` and `Scopes` give them), and the same `AllowedClientIds`, `TrustedClientIds` and `UntrustedClientRestrictions`, compared as sets of trimmed entries; otherwise a token issued for the restricted actor could be exchanged by the other. `DeniedClientIds` holds for the whole exchange, so it is no part of a policy. The replay limit counts per actor.
 
 ```jsonc
 "Auth": {
   "TokenExchange": {
     "Enabled": true,
+    "DeniedClientIds": [ "https://blocked.example.com/client.json" ],  // refused for every actor
     "Actors": [
       {
         "Id": "mcp",
@@ -1009,14 +1079,16 @@ Exactly one proof must be set. Actors may share a `SubjectAudiences` entry, one 
           }
         },
         "SubjectAudiences": [ "https://mcp.example.com/mcp" ],  // the values the MCP server logs at start
-        "AllowSecrets": false                                    // NoSecretReveal
+        "AllowSecrets": false,                                   // NoSecretReveal
+        "TrustedClientIds": [ "https://client.example.com/oauth/client-metadata.json" ],  // its own restrictions only
+        "UntrustedClientRestrictions": [ "ReadOnly", "NoSecretReveal" ]                  // every other client app
       }
     ]
   }
 }
 ```
 
-In `local.settings.json` and the app settings, the keys are flat, for example `Auth:TokenExchange:Actors:0:SubjectAudiences:0` (`Auth__TokenExchange__Actors__0__SubjectAudiences__0`).
+In `local.settings.json` and the app settings, the keys are flat, for example `Auth:TokenExchange:Actors:0:SubjectAudiences:0` (`Auth__TokenExchange__Actors__0__SubjectAudiences__0`) and `Auth:TokenExchange:DeniedClientIds:0` (`Auth__TokenExchange__DeniedClientIds__0`).
 
 ### Discovery of the issuer
 
@@ -1057,7 +1129,8 @@ The SDKs read both with `GetAuthorizationServerMetadataAsync` and `GetJsonWebKey
 - **Short lives and replay.** An issued token lives at most 15 minutes and never past the subject token's `exp`. The replay limit bounds how often a stolen subject token is exchanged per instance and minute, and a client assertion is accepted once per instance.
 - **No leaks in refusals.** A refused actor or subject token gets one fixed text; the reasons go to the logs, never with tokens. An unknown actor and a bad proof answer alike.
 - **Who adds trust.** Actors and additional issuers are deployment settings, so only operators add them. Projects keep their own [trusted issuers](#trusted-issuers), for machines only, and Storyteller's own issuer cannot be one of them.
-- **Restrictions** run in every build, and tightening an actor reaches the tokens already issued (see **Revocation** in [Storyteller user tokens](#storyteller-user-tokens)).
+- **Restrictions** run in every build, and tightening an actor, denying a client app or taking it out of `TrustedClientIds` reaches the tokens already issued (see **Revocation** in [Storyteller user tokens](#storyteller-user-tokens)).
+- **Client apps.** The client app of the subject token is recorded on every change, logged with every request, and decides the restrictions: a client app the actor does not trust gets `UntrustedClientRestrictions` (see [Client apps of the exchange](#client-apps-of-the-exchange)). The id is checked, never cut or cleaned.
 - **No equality oracle under `NoSecretReveal`.** A caller who may write secrets but not read them, such as a person through the actor, never has a secret compared with the stored value: a set of the same secret writes a new version, and an import, also as a dry run, reports such an item as `Update`, never `Unchanged`. Public values keep the comparison.
 
 ## Machine authentication policy
@@ -1998,10 +2071,11 @@ The two status codes mean different things, so a client knows whether signing in
 | `401` | A user token that the provider's validator refuses under the Storyteller rules: an Entra ID token without a GUID `tid` and `oid` (see [Account ids](#account-ids)), a Keycloak token of a client outside `Auth:Keycloak:AllowedClientIds` (see [How Keycloak tokens are checked](#how-keycloak-tokens-are-checked)), or an AuthKit user token with `act`, the token of a WorkOS impersonation (see [How AuthKit tokens are checked](#how-authkit-tokens-are-checked); Debug builds do not check it). | none |
 | `401` | A provider token issued to an actor of the user token exchange: its `aud` is one of an actor's `SubjectAudiences`. This applies in every build, even when its provider accepts the token (see [Storyteller user tokens](#storyteller-user-tokens)). | none |
 | `401` | Machine credentials that fail their checks: a machine the project does not know or whose kind it does not enable, an API key or a certificate whose record has no scopes, or a Storyteller machine token whose machine is gone or no longer `Federated`, or whose project is not the route's. | none |
-| `401` | A [Storyteller user token](#storyteller-user-tokens) whose account is gone, whose actor is no longer configured, or which names an unknown restriction, and every Storyteller user token while the exchange is off. | none |
+| `401` | A [Storyteller user token](#storyteller-user-tokens) whose account is gone, whose actor is no longer configured, whose client app is in `Auth:TokenExchange:DeniedClientIds`, or which names an unknown restriction or a `subject_client_id` that is not a client id, and every Storyteller user token while the exchange is off. | none |
 | `401` | A user whose sign-in is older than `Auth:StepUp:MaxAge` called an operation that needs a [recent sign-in](#recent-sign-in-step-up): secret values, roles and members, machine credentials. "This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes." Signing in again helps; a refresh of the token does not. | `ErrorResponse` with `ErrorCode` `StepUpRequired` and `Details.MaxAge` in seconds, and the header `WWW-Authenticate: Bearer error="insufficient_user_authentication", error_description="A recent sign-in is required", max_age="600"` |
 | `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 | `403` | The user acts through an actor whose [restrictions](#restrictions-of-actors) forbid the operation, in any build; the role check comes first. "The token acts for the person through an actor that may not reveal secrets." | `ErrorResponse` with `ErrorCode` `ActorRestricted` |
+| `403` | The user acts through an actor with a client app that may only read (`ReadOnly`), and the request is not a `GET`, `HEAD` or `OPTIONS` nor one of the operations that only read, in any build; it comes before the role checks. "The token acts for the person through a client app that may only read; the change is refused." | `ErrorResponse` with `ErrorCode` `ActorReadOnly` |
 | `403` | A machine called a route for users only, in any build and whatever its credentials carry: "Only users may call this operation; machines cannot.", or the route's own message (see [Scopes of machines](#scopes-of-machines)). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 | `403` | A machine restricted to an annotation addressed another annotation, or an operation of the whole project (see [Annotation restriction of machines](#annotation-restriction-of-machines)). | `ErrorResponse` with `ErrorCode` `AnnotationRestricted` |
 | `403` | A machine called an operation without one of its scopes: the machine was not created with it ("This operation needs the scope Schema.Write, which the machine was not created with."), or its credentials do not carry it ("…, which the credentials of the machine do not carry."). See [Scopes of machines](#scopes-of-machines). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
@@ -2026,6 +2100,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `400` | `NotInRenewalWindow` | A certificate renewal before its window opens (see [The `MachineAccess` object](#the-machineaccess-object)); the message names when it opens. |
 | `401` | `StepUpRequired` | A grant, a revoke, a member's role change or removal, an invitation, a new or reset machine, new federation rules, a replaced trusted issuer or a shared certificate by a user whose sign-in is not [recent](#recent-sign-in-step-up), with `Details.MaxAge` and `WWW-Authenticate`. |
 | `403` | `ActorRestricted` | Through an actor under `NoSecretReveal`, an operation that gives out credentials that read secrets (see [Restrictions of actors](#restrictions-of-actors)). |
+| `403` | `ActorReadOnly` | Through an actor under `ReadOnly`, every change of access: grants, members, invitations, machines, policies, issuers and certificates (see [Restrictions of actors](#restrictions-of-actors)). |
 | `404` | `NotFound` | The target account, the access point or the machine access does not exist, the machine was deleted during its reset, or it has no API key to reset (it is being deleted, or its creation failed). A certificate renewal with a certificate that is not the machine's current one, or of a machine without the expiry of its certificate. `GET` and `DELETE` of a machine or a trusted issuer that does not exist answer `404` without a body. |
 | `409` | `AccountExists`, `AccessPointExists` | The account or project already exists. |
 | `409` | `FederatedIssuerInUse` | Creating a trusted issuer whose name rules of machines still reference. |

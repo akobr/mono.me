@@ -1,6 +1,6 @@
 # Access Audit
 
-Every change of who can access what writes an **access audit record**: who changed it (an [`AuditActor`](audit-stamps.md#the-actor), with `Via` when an [actor](access.md#actors) such as the MCP server acted for the person), when, what, on which organization or project, to whom, the value before and after, and the correlation id of the request. The record is written in the same Cosmos DB transaction as the change, and nothing updates or deletes it; it expires after the retention. The design and its alternatives are in [the spec](specs/2026-11-15%20Append-Only%20Access%20Audit%20Trail.md).
+Every change of who can access what writes an **access audit record**: who changed it (an [`AuditActor`](audit-stamps.md#the-actor), with `Via` when an [actor](access.md#actors) such as the MCP server acted for the person, and `ViaClient`, the client app the person used with it), when, what, on which organization or project, to whom, the value before and after, and the correlation id of the request. The record is written in the same Cosmos DB transaction as the change, and nothing updates or deletes it; it expires after the retention. The design and its alternatives are in [the spec](specs/2026-11-15%20Append-Only%20Access%20Audit%20Trail.md).
 
 ## What is recorded
 
@@ -68,7 +68,9 @@ The partitions that hold records also hold what the API lists, so the lists skip
 - `400` with `ErrorCode` `InvalidQuery` for a filter that does not parse, a project that is not the key's, a `from` later than `to`, and a continuation token that is not one of this trail. `403` (`AccessDenied`) for a machine and for every role below `Administrator`.
 - `IAccessAuditLog.QueryAsync` (`CosmosAccessAuditLog`) runs one query per source, `core` (partition `access`, filtered on `c.Organization`) and `organizations` (the organization as the key prefix, filtered on `c.Organization`), each `TOP` one more than the page and ordered by id, and merges them. There is no update or delete route, nor a service method that changes a record.
 
-The SDKs have it as `GetAccessAuditAsync` (`IAccessApiClient`, NSwag) and `getAccessAudit` / `useGetAccessAudit` (TypeScript). The admin UI shows the trail of an organization on its **Audit** page.
+The SDKs have it as `GetAccessAuditAsync` (`IAccessApiClient`, NSwag) and `getAccessAudit` / `useGetAccessAudit` (TypeScript). The admin UI shows the trail of an organization on its **Audit** page, with "via mcp (client …)" after the person when an actor acted for them through a client app.
+
+A client app under `ReadOnly`, in production every app of the MCP server the deployment does not trust, changes nothing recorded here: the API refuses its writes with `403 ActorReadOnly` before anything is written, so a refused change leaves no record. The API's log has a warning with the actor and the client app for each such refusal (see [Restrictions of actors](authentication.md#restrictions-of-actors)).
 
 ## Retention
 

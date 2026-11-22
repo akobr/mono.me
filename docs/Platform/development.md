@@ -64,7 +64,7 @@ The same keys also work in the `Values` of `local.settings.json`; a user secret 
 
 - An actor without `ClientSecretHash` (or another proof) and `SubjectAudiences` stops the API at start.
 - Do not add `Auth:TokenExchange:AdditionalIssuers` for the AuthKit domain: `Auth:AuthKit:Issuer` already is that domain, and listing it again stops the API at start.
-- A start warning that actor `mcp` has no `AllowedClientIds` is expected: dynamically registered clients have unknown ids.
+- A start warning is expected: *"The actor mcp of Auth:TokenExchange:Actors has no AllowedClientIds: a token any client got for its SubjectAudiences (https://localhost:7180/mcp) is accepted for the exchange. List the clients to narrow it, or set UntrustedClientRestrictions (for example ReadOnly and NoSecretReveal) for the clients outside TrustedClientIds."* Dynamically registered clients have unknown ids. To run as production does, where every client app reads only until it is trusted, also set `Auth:TokenExchange:Actors:0:UntrustedClientRestrictions:0` to `ReadOnly` and `Auth:TokenExchange:Actors:0:UntrustedClientRestrictions:1` to `NoSecretReveal`; the start log then has the notice *"The actor mcp of Auth:TokenExchange:Actors accepts a token of any client for https://localhost:7180/mcp; the clients outside its 0 TrustedClientIds get ReadOnly, NoSecretReveal."* instead (see [Client apps of the exchange](Storyteller/authentication.md#client-apps-of-the-exchange)).
 
 Create the secret and its hash once:
 
@@ -161,9 +161,11 @@ Streamable HTTP, URL `https://localhost:7180/mcp`, **Connect**, sign in at AuthK
 What to try:
 
 - `get_my_account`, `list_projects`: your account (`user_…`) and projects.
-- `set_annotation`, then `get_annotation_history`: you, with `Via: "mcp"`.
+- `set_annotation`, then `get_annotation_history`: you, with `Via: "mcp"` and `ViaClient`, the id of the client app the API recorded (`client_01…` for a client that registered itself at AuthKit). The API's log has a line per request, with the actor and the client.
 - A WorkOS user without a local account: *"No Storyteller account exists for this sign-in. Register once with sform or the admin UI."*
 - `Mcp:SecretTools:Enabled=true`: the secret tools stay hidden under the default `NoSecretReveal`; `"Auth:TokenExchange:Actors:0:AllowSecrets": true` on the API (restart, sign in again) shows them.
+- `"Auth:TokenExchange:Actors:0:UntrustedClientRestrictions:0": "ReadOnly"` on the API (restart, sign in again): `tools/list` lists only the read tools, and a write answers *"The 2S API lets this client app only read for you, so the change was not made. …"* (`ActorReadOnly`). Adding the recorded `ViaClient` to `Auth:TokenExchange:Actors:0:TrustedClientIds:0` lifts it again.
+- The recorded `ViaClient` in `Auth:TokenExchange:DeniedClientIds:0` (restart): the next tool call is refused, and the one after it says *"The client app the person signed in with is blocked for this deployment. Use another app, sform or the admin UI."*
 - The MCP sign-in token sent straight to the API (`curl -H "Authorization: Bearer <token>" http://localhost:7071/api/v1/access/account`) answers `401`.
 
 ## 8. Troubleshooting
