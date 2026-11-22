@@ -36,10 +36,10 @@ While you are no member of the platform's exhibition, **Organizations** ends wit
 
 - the filter, the open annotation or configuration, and its tab;
 - on Annotations, the grid or tree mode, the expanded branches, the selected rows, the sort and the scroll position;
-- on Configurations, the scroll position;
+- on Configurations, the selected rows and the scroll position;
 - on Graph, the layout, the focus, the hidden types, the dragged nodes, and the zoom and pan.
 
-**Modeling** remembers, per view, its last tab, the open template or schema, and the query of the tab: **Show cascaded** on **Deleted**, the compared key and view on **Compare views**, and the **Edit** or **Versions** tab of the open template or schema. Its sidebar entry and its entry in the command palette bring you back there. The switcher keeps the tab you are on, and the tab entries of the command palette and `G` then `T`, `S` or `E` open the tab they name.
+**Modeling** remembers, per view, its last tab, the open template or schema, and the query of the tab: **Show cascaded** on **Deleted**, the compared key and view on **Compare views**, and the **Edit** or **Versions** tab of the open template or schema. It also returns to the comparison of a selection, with its keys and its target view (see [Working with several views](#working-with-several-views)). Its sidebar entry and its entry in the command palette bring you back there. The switcher keeps the tab you are on, and the tab entries of the command palette and `G` then `T`, `S` or `E` open the tab they name.
 
 Selecting the screen you are already on in the sidebar goes back to its start: the filter, the open annotation or configuration, the mode, the layout and the focus start over, and **Modeling** opens **Schemas**. The other things above stay as they were. The memory lasts until you reload the page or sign out. An address you type or open from a bookmark is shown as it is.
 
@@ -83,6 +83,16 @@ So an annotation with two parents appears under both of them, for example an exe
 
 The **Type** column, here and on **Configurations**, shows the full name of each type, with its icon and color, including the names from **Settings** and your Preferences. On a phone the list shows only the icon, to keep room for the name and key.
 
+The rows of the grid and of the tree have checkboxes. With rows selected, Contributors and the roles above get the bulk bar above the list. It shows how many rows are selected, with these actions:
+
+- **Enable** and **Disable**;
+- **Label**, which adds a label to the selected annotations or removes it;
+- **Compare with view** and **Copy to view**, which work with another view of the project and keep the selection (see [Working with several views](#working-with-several-views));
+- **Delete** (see [Deleting and restoring](#deleting-and-restoring));
+- **Clear selection**.
+
+The list on a phone has no checkboxes, so it has no bulk actions.
+
 Selecting a row opens its detail from the right, over the list. The list keeps its scroll position, selection and filter, and the part you can still see stays usable: selecting another row switches the detail. Two buttons in the detail header change how it opens:
 
 - **Pin** docks the detail beside the list. Drag the border between them to resize it, or focus the border and use `←` / `→`; a double-click restores the default width.
@@ -125,6 +135,8 @@ The header links to the configuration, drawn by where the configuration comes fr
 
 The configuration itself is edited on its own page (see Configuration). The header also shows when the annotation was created and last updated, and by whom.
 
+**More actions** (**…**) in the header has **Show in graph** (on **Graph**, **Show in list**), **Copy link** and **Copy key**. Contributors and the roles above also get **Compare with view** and **Copy to view** (see [Working with several views](#working-with-several-views)), and **Delete**. A deleted annotation has none of these three.
+
 The breadcrumb and **Lineage** show its ancestors in merge order.
 
 **New** creates an annotation from its type and names. Its time zone (the zone of **Valid from** and **Expires**) starts as the project's default time zone from **Settings**, the same for everyone in the project when their browser knows that zone (a browser that does not starts in `UTC`), and the dialog lets you pick another one. Missing ancestors created with it get the same zone. **New** and **Bulk create** are on **Graph** too.
@@ -157,6 +169,8 @@ The command palette (`Ctrl K` / `⌘ K`) finds annotations, pages, projects and 
 
 **New** on the **Configurations** page (Contributor or a higher role) starts a configuration. It lists the annotations of the view without their own configuration, so without a row on the page; pick one, and **Open editor** opens its configuration. There, **Create empty** creates it from an empty document and **Start from template** from the template of its type, as from the configuration link in the header of the annotation.
 
+The rows of **Configurations** have checkboxes, as on **Annotations**. A click on a checkbox does not open the detail. The checkbox in the header selects the rows that the filter shows, and the rows that another filter hides stay selected. With rows selected, Contributors and the roles above get the bulk bar above the list, with the number of selected rows, **Compare with view**, **Copy to view** and **Clear selection** (see [Working with several views](#working-with-several-views)). The list on a phone has no checkboxes, so it has no bulk bar.
+
 A configuration is edited:
 
 - as a **form**, generated from the JSON Schema that applies to the annotation (a property's `description` is the field's help, in Markdown);
@@ -172,7 +186,7 @@ The JSON and YAML editors help with bindings too:
 - Inside `@config("…")` the list offers the paths of this configuration; inside `@annotation("…")` the fields of the annotation's values, or of the ancestor named by the second argument; the second argument offers the ancestor types.
 - Hovering a binding explains it, the same way as the line under a form field.
 
-The header has the breadcrumb of the annotation detail, always by subject: the parents of the annotation up to its subject. **Lineage**, at its right, lists every ancestor in merge order, the order in which their configuration is inherited. Each ancestor, in the breadcrumb or in **Lineage**, opens its own configuration. **Annotation**, above the name, opens the annotation of this configuration. It does not keep the list filter.
+The header has the breadcrumb of the annotation detail, always by subject: the parents of the annotation up to its subject. **Lineage**, at its right, lists every ancestor in merge order, the order in which their configuration is inherited. Each ancestor, in the breadcrumb or in **Lineage**, opens its own configuration. **Annotation**, above the name, opens the annotation of this configuration. It does not keep the list filter. **More actions** (**…**) has **Copy link** and **Copy key**, and for Contributors and the roles above **Compare with view** and **Copy to view** (see [Working with several views](#working-with-several-views)).
 
 **Effective** shows the merged document: the ancestors, the template of the type and the own document, read-only, as JSON or YAML. Its **Composition** view explains it like a blame view. The list above the document has every merge in the order applied: each ancestor's template and configuration, indented by its depth and listed before the ancestor that inherits it (marked `via <key>` when that is not the annotation itself), with its version and the number of values it set. A shared ancestor, such as the subject of an execution, appears once per branch and is marked **Applied again**. The gutter of the document shows, on each line, the step that set it, and hovering it names the document. Selecting a step highlights its lines; its paths are listed under it too. An ancestor opens its own configuration, a deleted one is marked **Deleted**, and a template opens in **Modeling**, for every role. A value that a later document repeats keeps the document that set it first. The view loads when you open it, and its address keeps it (`?show=composition`). When the effective document and the composition were read at different moments, a warning offers **Refresh**.
 
@@ -188,11 +202,123 @@ When the API does not answer a save in time, the editor reads the configuration 
 
 The editor shows its toast as soon as the save is stored; the version badge and the list follow a moment later.
 
-**Versions** lists the history of a configuration, a template or a schema, also after it was deleted. Any two versions can be compared side by side, or in one column on small screens. Contributors and the roles above can restore a version that is not the current one and has not expired: **Restore** on its row, or **Restore this version** while it is open. After you confirm, its content is stored again as the newest version, so a bad change or a deleted document can be undone, and every version stays in the history. A restored version names the version it came from, and the annotation's **History** records the restore of a configuration version. Restoring a version whose content the current version already has changes nothing, and the toast says so. When the version fails the schema check (a configuration that violates its schema, or a schema that stored configurations would not comply with), the page lists the problems and offers **Restore anyway**. The configuration of a deleted annotation cannot be restored until the annotation is. **Compare views**, a tab of **Modeling**, shows the same key in two views. When the project has only one other view, it is already selected. When it has no other view, the tab is disabled, and the page says so when a link opens it. A view is never compared with itself. **Compare** on the **Views** page, shown to every role, opens **Compare views** of the default view with the view of its row. On the row of the default view, it is disabled, and its tooltip says why: the other views are compared with this one, or the project has no other view.
+**Versions** lists the history of a configuration, a template or a schema, also after it was deleted. Any two versions can be compared side by side, or in one column on small screens. Contributors and the roles above can restore a version that is not the current one and has not expired: **Restore** on its row, or **Restore this version** while it is open. After you confirm, its content is stored again as the newest version, so a bad change or a deleted document can be undone, and every version stays in the history. A restored version names the version it came from, and the annotation's **History** records the restore of a configuration version. Restoring a version whose content the current version already has changes nothing, and the toast says so. When the version fails the schema check (a configuration that violates its schema, or a schema that stored configurations would not comply with), the page lists the problems and offers **Restore anyway**. The configuration of a deleted annotation cannot be restored until the annotation is. **Compare views**, a tab of **Modeling**, shows the same key in two views. When the project has only one other view, it is already selected. When it has no other view, the tab is disabled, and the page says so when a link opens it. A view is never compared with itself. **Compare** on the **Views** page, shown to every role, opens **Compare views** of the default view with the view of its row. On the row of the default view, it is disabled, and its tooltip says why: the other views are compared with this one, or the project has no other view. **Compare views** compares the effective configuration of one key; to compare several keys at once, or annotations, and to copy them, see [Working with several views](#working-with-several-views).
 
 **Templates** and **Schemas** are tabs of **Modeling** too. Templates hold the defaults per annotation type. Schemas define the form and the validation, for a type, for an annotation, or for the descendants of an annotation. A schema shows a form preview, and before you save a change it lists the configurations that the change would break. A schema that does not exist yet opens with a starter document and **Create**; the starter document is not an unsaved change until you edit it. Deleting a schema returns its editor to the starter document, and deleting a template shows that the type has no template, with **Create template**.
 
 A Reader sees the templates and the schemas read-only, with their form previews and their versions: the editor has the badge **Read-only**, there is no **New schema**, **Create template**, **Create**, **Save**, **Revert**, **Delete** or **Restore**, and `Ctrl S` saves nothing. A schema that does not exist shows a Reader **No schema**, "This schema does not exist in this view, so it validates nothing.", instead of the starter document.
+
+## Working with several views
+
+A project has views: variants of its annotations and their configurations, such as `default`, the production view, and `staging`. Two actions bring a change from the view you are in to another view of the project: **Compare with view** shows what differs, and **Copy to view** copies it. Both are in four places:
+
+- the bulk bar of **Annotations** and the bulk bar of **Configurations**, for the selected rows;
+- **More actions** (**…**) of the annotation detail, also on **Graph**, and of the configuration detail, for that one key.
+
+The view you are in is the **source**, and the other view is the **target**. Both actions follow the same rules:
+
+- They need the Contributor role or a higher one. **Export & Import** moves a whole view as one zip and needs an Administrator (see [Export and import](#export-and-import)).
+- They take at most 100 keys at once. With more rows selected, the bulk bar disables them and says "Select up to 100 to compare or copy them at once".
+- In a project without another view they are disabled, with "The project has no other view".
+- They keep the selection of the list, because they change no row of the view you are in.
+
+### Comparing a selection
+
+**Compare with view** opens the comparison of the selected keys, a page below the **Compare views** tab of **Modeling**:
+
+```text
+/{organization}/{project}/{view}/modeling/compare/selection?kind=configurations&to=staging&key=sbt.contoso&key=usg.northwind.invoicing
+```
+
+The page only reads: nothing changes in either view until you copy. It differs from **Compare views**:
+
+| | Compare views | Comparison of a selection |
+| --- | --- | --- |
+| Keys | One, picked on the page | Up to 100: the selected rows, or the key of a detail |
+| Documents | The effective configuration | Annotations, or configurations, own or effective |
+| Left side | The view you are in | The target |
+| Changed lines | Counted by the API, with buttons that jump from change to change | Counted in the browser, for every key |
+
+The page reads like a pull request from the source into the target, with one section per key, in key order. Its title names the keys and the direction, for example "3 configurations: default → staging", with a link back to the list.
+
+- **Sides:** the target is the old side (left, red, **−**, "now") and the source is the new side (right, green, **+**, "after a copy"). The page is where a copy starts, and a copy goes from the source to the target, so the green lines are what a copy brings to the target.
+- **Target view** lists the other views, with the **prod** badge when `default` is chosen. The only other view is preselected. With several, it is the view you last picked there or copied to in the project, until you reload the page.
+- **Swap views** opens the same comparison from the target, with the view you were in as its target. The view switcher does not turn a comparison around: it keeps only the tab, so it opens **Compare views** of the view you switch to.
+- **Own** and **Effective** (configurations only): **Own**, the default, compares the documents stored for the keys themselves, which is what a copy moves. **Effective** compares the merged documents, which is what the two views read.
+- **Auto**, **Split** and **Unified** set the layout of every diff. **Auto** shows the two sides next to each other from 1024 px and in one column below. **Expand all** and **Collapse all** open and close the sections.
+
+The heading of a section shows the type, the key, the state and the changed lines (`+3 −1`). A click on it opens or closes the diff. Sections whose documents differ, or exist in one view only, start open. Beside the heading are **Open in {view}** for each view that has the document, and **Copy to {target}** when a copy would change the target.
+
+The chips above the sections count the keys per state and filter the sections. A second click on the chosen chip shows every key again, and a state that no key has gets no chip.
+
+| State | Meaning |
+| --- | --- |
+| **Different** | Both views have the document, and its content differs. |
+| **Only in {source}** | Only the source has it. A copy creates it in the target. |
+| **Only in {target}** | Only the target has it. A copy leaves it there. |
+| **Identical** | Both views have it with the same content. |
+| **Not in either view** | Neither view has it. |
+| **Deleted in {target}** | The key is deleted in the target. **Deleted**, beside the heading, opens the **Deleted** tab of the target view. The key has no copy button: restore it there first. |
+| **Effective differs** | With **Own**: the own configurations are the same, or neither view has one, and the effective documents still differ. It shows beside the state of the key. |
+| **Failed** | A document could not be read. The section shows the error with **Retry**. |
+
+With **Own**, three states name the own configuration: **Own configuration only in {source}**, **Own configuration only in {target}** and **No own configuration**. Such a key can still have its annotation and inherited values in that view.
+
+What counts as the same content:
+
+- **Annotations** are compared by what you can edit: the title, description, documentation link, labels, values, the disabled state, the validity with its time zone, and for a unit its type and definition. The order of the labels and the offset a date is written with are no difference. A field that is empty in one view and not set in the other is no difference either; inside the values, an empty value is a value. The key, the names and the stamps are not compared.
+- **Configurations** are compared as documents. The order of the members is no difference. The order of the items of an array is a difference.
+
+A section can have notes under its heading:
+
+- "The annotation is not in {view}": that view has no annotation for the key of the configuration.
+- "The own configurations are the same. The difference is inherited (ancestors, the template, key values), and a copy does not change it.": shown with **Effective**, for a key that **Own** marks **Effective differs**.
+- "It holds a number beyond 2^53, which the browser cannot compare exactly.": the browser rounds such an integer, so the documents never count as **Identical**.
+
+The address holds the kind, the target and the keys, and `content=effective` for **Effective**. You can reload it, bookmark it or send it to someone with the Contributor role. Two limits apply:
+
+- **100 keys:** an address with more keys compares the first 100 and says "Only the first 100 keys are compared."
+- **A long selection:** keys that do not fit in an address (more than about 1,500 characters, some 40 keys of executions) stay in the browser tab, and the address carries only their id (`set=…`). It still works after a reload of that tab. In another tab or browser, or after you sign out, the page says "The selection is gone. A comparison of many rows opens only in the browser tab that started it." A tab keeps its eight latest long selections.
+
+### Copying to another view
+
+**Copy to view** opens a dialog. On the comparison page, **Copy {n} to {target}** opens it for the documents that the chosen chip shows and that a copy would change, and **Copy to {target}** of a section opens it for that one key. The target is then the compared view. When a copy would change none of the shown documents, the button is disabled and says "Nothing to copy".
+
+- **Copy to** picks the target. The only other view is preselected. With several, it is the view you last picked for a comparison or a copy in the project, but never `default`: you pick the production view yourself.
+- **When {target} already has it:** **Overwrite**, the default, replaces its content with the content of the source. **Skip** leaves it as it is. A document with the same content is left alone either way.
+- **Copy missing annotations too** (configurations only, checked): a configuration needs its annotation. When the target does not have it, the annotation is copied first. Without the box, such a configuration is skipped.
+- **Check** runs the copy without writing anything and lists what it would do with every document: **To create**, **To update**, **Unchanged**, **To skip** or **Fails**, with the reason. **Copy** then names what it writes, for example **Copy 5 to staging**, or says **Nothing to copy**. A change of the target or of an option discards the check.
+- **Copy** copies the keys one after another, ancestors before their descendants.
+
+What a copy moves:
+
+| Selection | Copied | Not copied |
+| --- | --- | --- |
+| Annotations | The title, description, documentation link, labels, values, the enabled or disabled state and the validity with its time zone; for a unit, its type and definition. | Their configurations. |
+| Configurations | The own configuration, as it is stored. | Inherited values, templates and schemas: they stay those of the target. |
+
+An annotation that the target lacks is created with the ancestors that the target lacks too. They are copied from the source first, each as a row of its own in the result ("Missing ancestor of {key}."), so the target gets the ancestors of the source as they are. The annotation that a configuration needs is copied the same way ("Needed by its configuration."). A copy of configurations never changes an annotation that the target already has.
+
+The production view takes one more step. With `default` as the target, the dialog warns "default is the production view" ("The copy changes what production reads."), and **Copy** stays disabled until a **Check** has shown what would change: "Check first: default is the production view."
+
+While a check or a copy runs, the dialog stays open and says how far it is ("Copied 3 of 12…"). **Stop** ends it after the key that is under way. A stopped copy lists the keys it did not reach as **Skipped** ("Not copied, the copy was stopped.") and offers **Try again**, which returns to the options. A stopped check is discarded. The browser asks before you close or reload the tab during a copy.
+
+The result, "Copied to {target}", counts the documents ("2 created, 1 updated, 5 unchanged, 1 skipped, 1 failed") and lists every one with its kind, key, outcome and reason. The key of a created or updated document opens it in the target view. **Compare with {target}** opens the comparison of the same keys, and **Done** closes the dialog. On the comparison page the dialog has no **Compare with {target}**: the page reads the target again, so what was copied shows as **Identical**.
+
+What a copy does and does not do:
+
+- **It never deletes.** An annotation or a configuration that only the target has stays, and no configuration is emptied. **Overwrite** replaces a document that both views have as a whole, so a value that only the target's document had goes with it.
+- **It copies what is saved.** Unsaved changes in an open form or editor are not part of it.
+- **It copies own configurations only.** A key without an own configuration in the source is skipped: "{source} has no own configuration for it."
+- **It goes only to a registered view of the project,** so it never creates a view. The comparison page also compares with a view that exists only in data, but then it offers no copy: "{view} is not a view of this project".
+- **Deleted keys are skipped.** A key that is deleted in the target, or below a deleted ancestor, is not written, because a write would re-create it with an empty configuration: "{key} is deleted in {target}. Restore it there first."
+- **Schemas are those of the target.** A configuration that does not satisfy them fails: "It does not satisfy the schema of {target}: …", with the first problem. The copy has no **Save anyway**; the editor in the target view has it.
+- **Numbers beyond 2^53 are not copied.** The browser rounds such an integer, so the document fails: "It holds a number beyond 2^53. Copy it with Export & Import or sform."
+- **Directives are not copied.** A configuration with a root member named `$remove` or `$patch` fails, because the first write to the target would run it as a directive.
+- **One failed document does not stop the others.** No annotation is created below one that was not copied, though: "Its ancestor {key} was not copied." A failure that every key would meet, such as a sign-in that ended, ends the copy: the dialog shows the error above the documents handled so far, with **Try again**.
+- **The target may change meanwhile.** From the comparison page, a document that changed in the target since the page read it is skipped: "It changed in {target} since it was compared." When it holds the content of the source by then, it is **Unchanged** instead. Either way its section reads the target again. A copy that finds the target changed between its read and its write fails that document: "It changed in {target} meanwhile. Copy it again."
+- **The dialog belongs to the view you are in.** When the view changes under it, by the browser's **Back** or by a link of the result that opens a document in the target view, the dialog closes: its check and its result were those of the other view.
+- **Copying again is safe.** What was already copied is not written again: it comes back **Unchanged**.
 
 ## Graph
 
@@ -214,7 +340,9 @@ A Reader sees the templates and the schemas read-only, with their form previews 
 
 **Modeling**, in the sidebar of the view after **Graph**, has five tabs: **Schemas**, **Templates**, **Export & Import**, **Deleted** and **Compare views**. **Export & Import** is a tab of Administrators and Owners only, so Readers and Contributors get the other four. Each tab is a page of its own, at `/{organization}/{project}/{view}/modeling/{tab}`. The sidebar entry returns to the tab you left in the view, with its open template or schema and its query. Modeling opens **Schemas** the first time, when you select its entry while it is open, and from an address `…/modeling` you type or open from a bookmark. The browser's **Back** returns to the previous tab, and an unsaved template or schema asks before you leave it. **Compare views** is disabled when the project has no other view.
 
-The switcher keeps the tab when it changes the view or the project. The command palette lists the tabs of your role after **Modeling**, and `G` then `T`, `S` or `E` opens **Templates**, **Schemas** or **Export & Import**. Links to the old addresses of the five pages still work: `…/{view}/schemas/type/exe`, for example, opens `…/{view}/modeling/schemas/type/exe`, and the query and the hash stay.
+The comparison of a selection is a page below **Compare views**, at `…/modeling/compare/selection` (see [Working with several views](#working-with-several-views)). The **Compare views** tab is selected there, and a click on it opens **Compare views** itself. The sidebar entry returns to the comparison too, when it is the page of Modeling you left last.
+
+The switcher keeps the tab when it changes the view or the project. From the comparison of a selection it opens **Compare views**. The command palette lists the tabs of your role after **Modeling**, and `G` then `T`, `S` or `E` opens **Templates**, **Schemas** or **Export & Import**. Links to the old addresses of the five pages still work: `…/{view}/schemas/type/exe`, for example, opens `…/{view}/modeling/schemas/type/exe`, and the query and the hash stay.
 
 A Reader browses Modeling read-only: the schemas, the templates and their versions, the deleted annotations and the comparison of views, without the actions that create, edit, delete or restore them. The entry shows the lock of the other read-only screens, such as **Annotations**, and in the collapsed sidebar its tooltip says "Read-only for your role". The **Views** page shows **Compare** to every role, and the schema layers on the **Schema** tab of a configuration link to their schemas. These are the rules of the API and `sform` too: a Reader reads all of this, a change needs the Contributor role, and **Delete permanently**, the export and the import need the Administrator role (see [Export and import](#export-and-import)).
 
