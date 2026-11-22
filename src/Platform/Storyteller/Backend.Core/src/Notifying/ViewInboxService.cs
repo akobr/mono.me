@@ -139,11 +139,14 @@ public sealed class ViewInboxService : IViewInboxService
                 ErrorCodes.InboxActionNotAvailable);
         }
 
-        // claimed before the work starts, so two people cannot start it twice
-        var claimed = await CloseAsync(record, ViewInboxItemState.Accepted, role, actor, cancellationToken);
+        // The claim is the point of no return, and it starts with its write: a write that reaches the store while its
+        // caller goes away would leave an accepted item without its work. So a call that is already cancelled starts
+        // nothing, and from the claim on nothing listens to the caller's token.
+        cancellationToken.ThrowIfCancellationRequested();
 
-        // The claim is the point of no return: from here on nothing listens to the caller's token, so a caller that goes
-        // away leaves no accepted item without its work.
+        // claimed before the work starts, so two people cannot start it twice
+        var claimed = await CloseAsync(record, ViewInboxItemState.Accepted, role, actor, CancellationToken.None);
+
         ViewInboxActionResult? result;
 
         try

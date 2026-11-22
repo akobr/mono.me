@@ -583,12 +583,29 @@ public class ViewInboxServiceTests
     }
 
     [Fact]
+    public async Task Accept_WithATokenCancelledWhileTheClaimIsWritten_StillRunsTheHandler()
+    {
+        var item = await PushAsync();
+        using var caller = new CancellationTokenSource();
+
+        // the caller goes away while the claim is on its way to the store, which saves it all the same
+        _store.Replacing = _ => caller.Cancel();
+
+        var accepted = await AcceptAsync(item.Id, cancellationToken: caller.Token);
+
+        caller.IsCancellationRequested.ShouldBeTrue();
+        accepted.State.ShouldBe(ViewInboxItemState.Accepted);
+        _handler.Runs.ShouldHaveSingleItem().CancellationToken.CanBeCanceled.ShouldBeFalse();
+        _store.Stored(item.Id).ShouldBe(accepted);
+    }
+
+    [Fact]
     public async Task Accept_WithATokenCancelledBeforeTheClaim_StartsNothing()
     {
         var item = await PushAsync();
         using var caller = new CancellationTokenSource();
 
-        // the caller goes away once the item is read: the claim still listens to the token
+        // the caller goes away once the item is read: nothing is claimed for a caller that is gone
         _store.Reading = _ => caller.Cancel();
 
         await Should.ThrowAsync<OperationCanceledException>(() => AcceptAsync(item.Id, cancellationToken: caller.Token));

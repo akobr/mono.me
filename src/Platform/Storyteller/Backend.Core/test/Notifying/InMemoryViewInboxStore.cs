@@ -92,7 +92,11 @@ internal sealed class InMemoryViewInboxStore : IViewInboxStore
 
         var key = Key(record.Organization, record.Project, record.View, record.Item.Id);
         var isCurrent = !_hidden.Contains(key) && _records.TryGetValue(key, out var stored) && stored.ETag == record.ETag;
-        return Task.FromResult(isCurrent ? Store(key, record, timeToLive) : null);
+        var saved = isCurrent ? Store(key, record, timeToLive) : null;
+
+        // as a store over the network: a write that reached it stays, also when its caller went away before the answer
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(saved);
     }
 
     public Task<IReadOnlyList<ViewInboxRecord>> QueryAsync(
