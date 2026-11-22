@@ -14,7 +14,7 @@ public sealed partial class ViewInboxPublisher : IViewInboxPublisher
     private static readonly TimeSpan MaxLifetime = TimeSpan.FromDays(365);
 
     private readonly IViewInboxStore _store;
-    private readonly ViewInboxOptions _options;
+    private readonly IOptions<ViewInboxOptions> _options;
     private readonly TimeProvider _time;
     private readonly ILogger<ViewInboxPublisher> _logger;
 
@@ -25,7 +25,10 @@ public sealed partial class ViewInboxPublisher : IViewInboxPublisher
         ILogger<ViewInboxPublisher> logger)
     {
         _store = store;
-        _options = options.Value;
+
+        // Kept unread: a setting outside its range throws when it is read, and a producer that takes the publisher
+        // must still be built. The push that needs the retention fails instead.
+        _options = options;
         _time = time;
         _logger = logger;
     }
@@ -54,7 +57,7 @@ public sealed partial class ViewInboxPublisher : IViewInboxPublisher
                 State = ViewInboxItemState.Open,
                 CreatedAt = createdAt,
                 CreatedBy = push.CreatedBy,
-                ExpiresAt = Limit(push.ExpiresAt ?? now + _options.Retention, now),
+                ExpiresAt = Limit(push.ExpiresAt ?? now + _options.Value.Retention, now),
                 Action = push.Action,
                 Job = push.Job,
             },
