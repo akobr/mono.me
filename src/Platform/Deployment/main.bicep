@@ -159,7 +159,12 @@ param mcpCustomDomain bool = false
 @description('The scope MCP clients request (Mcp:Authentication:Scope): openid, since dynamically registered clients get no WorkOS permission; the API is the gate.')
 param mcpScope string = 'openid'
 
-@description('The most replicas of the MCP server (a cap on cost); it scales to zero without calls.')
+@description('The fewest replicas of the MCP server: 0 (the default) scales it to zero without calls, inside the free grant, with a cold start of a few seconds on the next call; 1 keeps one replica, billed at the idle rate between calls (about 4-5 USD a month).')
+@minValue(0)
+@maxValue(10)
+param mcpMinReplicas int = 0
+
+@description('The most replicas of the MCP server (a cap on cost).')
 @minValue(1)
 @maxValue(10)
 param mcpMaxReplicas int = 3
@@ -347,6 +352,7 @@ module mcp 'modules/mcp.bicep' = if (mcpEnabled) {
     actorId: mcpActorId
     exchangeAudience: mcpExchangeAudience
     apiBaseUrl: 'https://${apiHostName}/api'
+    minReplicas: mcpMinReplicas > mcpMaxReplicas ? fail('mcpMinReplicas must not exceed mcpMaxReplicas.') : mcpMinReplicas
     maxReplicas: mcpMaxReplicas
   }
 }

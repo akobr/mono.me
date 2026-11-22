@@ -58,6 +58,11 @@ param exchangeAudience string
 @description('Storyteller:BaseUrl: the API with /api, e.g. https://api.2s.42for.net/api.')
 param apiBaseUrl string
 
+@description('0 scales to zero without calls; 1 or more keeps that many replicas, billed at the idle rate between calls.')
+@minValue(0)
+@maxValue(10)
+param minReplicas int
+
 @minValue(1)
 @maxValue(10)
 param maxReplicas int
@@ -224,10 +229,10 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
           ]
         }
       ]
-      // Zero replicas without calls (about 5 minutes after the last one); a call starts one, a cold start of a few
-      // seconds, and every 20 concurrent calls one more.
+      // With minReplicas 0, zero replicas without calls (about 5 minutes after the last one), and a call starts one, a
+      // cold start of a few seconds; with 1, one replica always runs. Every 20 concurrent calls one more.
       scale: {
-        minReplicas: 0
+        minReplicas: minReplicas
         maxReplicas: maxReplicas
         rules: [
           {
