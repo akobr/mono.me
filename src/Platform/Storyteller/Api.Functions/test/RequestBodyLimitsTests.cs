@@ -1,4 +1,5 @@
 using System.Text;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Federation;
 using _42.Platform.Storyteller.Api.V1;
 using _42.Platform.Storyteller.KeyValues;
@@ -112,7 +113,8 @@ public class RequestBodyLimitsTests
     }
 
     // Every type with a label and a plural at their limit, the longest color and icon, the longest time zone and date
-    // format, and the Version and Modified of a read sent back as it is (an actor name of 200 characters).
+    // format, and the Version and Modified of a read sent back as it is (an actor name of 200 characters, and a client
+    // app of the longest client id a subject token may name).
     [Fact]
     public void ProjectSettings_HoldsEveryTypeAtItsLimits()
     {
@@ -131,7 +133,14 @@ public class RequestBodyLimitsTests
             DateFormat = catalog.DateFormats.MaxBy(format => format.Length),
             Version = long.MaxValue,
             Modified = AuditStamp.Of(
-                new AuditActor { Kind = AuditActorKind.Account, Id = new string('"', 200), Name = new string('"', 200), Via = new string('"', 200) },
+                new AuditActor
+                {
+                    Kind = AuditActorKind.Account,
+                    Id = new string('"', 200),
+                    Name = new string('"', 200),
+                    Via = new string('"', 200),
+                    ViaClient = new string('"', UserSubjectTokenRules.MaxClientIdLength),
+                },
                 DateTimeOffset.MaxValue),
         };
 

@@ -6,19 +6,22 @@ using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api;
 using _42.Platform.Storyteller.Api.Security;
 
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // Storyteller user tokens on API routes: only the Storyteller token validator (IUserTokenIssuerValidator) may return a
-// user, with the actor that acts for it. The middleware stores the user as a user (no machine identity) with the actor
-// and its restrictions as items, and names it from its account; a token whose account is gone is 401. Tokens a provider
-// issued to an actor (its SubjectAudiences) are refused on API routes, validated or decoded.
+// user, with the actor that acts for it. The middleware stores the user as a user (no machine identity) with the actor,
+// its restrictions and the client app as items, names it from its account, and logs the request with the actor and the
+// client; a token whose account is gone is 401. Tokens a provider issued to an actor (its SubjectAudiences) are refused on
+// API routes, validated or decoded.
 // BearerValidationMode.DecodeWithoutValidation is static: the classes that switch it never run in parallel.
 [Collection(nameof(BearerValidationMode))]
 public class StorytellerUserTokenAuthenticationTests
@@ -28,6 +31,7 @@ public class StorytellerUserTokenAuthenticationTests
     private const string ProviderIssuer = "https://login.microsoftonline.com/8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d/v2.0";
     private const string AccountId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d:3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d";
     private const string ActorId = "mcp";
+    private const string ClientId = "https://claude.ai/oauth/mcp-oauth-client-metadata";
     private const string McpResource = "https://mcp.example/mcp";
 
     private readonly RecordingMiddleware _middleware = new();
@@ -87,6 +91,116 @@ public class StorytellerUserTokenAuthenticationTests
             actorId.ShouldBe(ActorId);
             request.HasActorRestriction(ActorRestrictions.NoSecretReveal).ShouldBeTrue();
             request.GetAuditActor().ShouldBe(AuditActor.Account(AccountId, "Ada Lovelace") with { Via = ActorId });
+            context.Items.ContainsKey(FunctionContextItemKeys.DelegatedClient).ShouldBeFalse();
+        });
+    }
+
+    // The client app of the delegation is stored next to the actor, and the audit actor names it.
+    [Fact]
+    public async Task UserTokenWithAClient_IsStoredWithTheClient()
+    {
+        await WithValidationAsync(async () =>
+        {
+            var storyteller = new RecordingUserTokenIssuerValidator(StorytellerIssuer) { Result = UserResult(ClientId) };
+            var (context, request) = CreateRequest(new RecordingBearerTokenValidator(), StorytellerToken(), storyteller);
+
+            (await InvokeAsync(context)).ShouldBeTrue();
+
+            context.Items[FunctionContextItemKeys.DelegatedClient].ShouldBe(ClientId);
+            request.TryGetDelegatedClient(out var clientId).ShouldBeTrue();
+            clientId.ShouldBe(ClientId);
+            request.GetAuditActor().ShouldBe(AuditActor.Account(AccountId, "Ada Lovelace") with { Via = ActorId, ViaClient = ClientId });
+        });
+    }
+
+    // Every request through an actor: the handlers' logs carry the actor and the client (a scope around them), and one
+    // line names the function, the method, the account, the actor, the client and the answer.
+    [Theory]
+    [InlineData("ok", 200)]
+    [InlineData("not found", 404)]
+    [InlineData("not modified", 304)]
+    [InlineData("object", 200)]
+    [InlineData("response", 201)]
+    public async Task RequestThroughAnActor_IsLoggedWithTheActorAndTheClient(string answer, int statusCode)
+    {
+        await WithValidationAsync(async () =>
+        {
+            var logger = new CapturingLogger<BearerAuthenticationMiddleware>();
+            var middleware = new RecordingMiddleware(logger);
+            var storyteller = new RecordingUserTokenIssuerValidator(StorytellerIssuer) { Result = UserResult(ClientId) };
+            var (context, _) = CreateRequest(new RecordingBearerTokenValidator(), StorytellerToken(), storyteller, method: "POST");
+
+            await middleware.Invoke(context, invoked =>
+            {
+                logger.LogInformation("The handler writes");
+                invoked.GetInvocationResult().Value = answer switch
+                {
+                    "ok" => new OkObjectResult("value"),
+                    "not found" => new NotFoundResult(),
+                    "not modified" => new StatusCodeResult(304),
+                    "object" => new ObjectResult("value"),
+                    _ => new TestHttpResponseData(invoked) { StatusCode = HttpStatusCode.Created },
+                };
+                return Task.CompletedTask;
+            });
+
+            var entries = logger.Entries.ToList();
+            entries.Count.ShouldBe(2);
+            var scope = new Dictionary<string, object?> { ["DelegatedActor"] = ActorId, ["DelegatedClient"] = ClientId };
+            entries[0].Message.ShouldBe("The handler writes");
+            entries[0].ScopeValues().ShouldBe(scope);
+            entries[1].Level.ShouldBe(LogLevel.Information);
+            entries[1].Message.ShouldBe($"A request SetAnnotation POST of the account {AccountId} via {ActorId} (client {ClientId}) answered {statusCode}");
+            entries[1].Values.ShouldContain(new KeyValuePair<string, object?>("ClientId", ClientId));
+            entries[1].ScopeValues().ShouldBe(scope);
+
+            // The scope ends with the request.
+            logger.LogInformation("After the request");
+            logger.Entries.Last().ScopeValues().ShouldBeEmpty();
+        });
+    }
+
+    // A token whose subject token named no client: the scope and the line say so.
+    [Fact]
+    public async Task RequestThroughAnActorWithoutAClient_IsLoggedWithNoClient()
+    {
+        await WithValidationAsync(async () =>
+        {
+            var logger = new CapturingLogger<BearerAuthenticationMiddleware>();
+            var middleware = new RecordingMiddleware(logger);
+            var storyteller = new RecordingUserTokenIssuerValidator(StorytellerIssuer) { Result = UserResult() };
+            var (context, _) = CreateRequest(new RecordingBearerTokenValidator(), StorytellerToken(), storyteller);
+
+            await middleware.Invoke(context, invoked =>
+            {
+                invoked.GetInvocationResult().Value = new OkResult();
+                return Task.CompletedTask;
+            });
+
+            var entry = logger.Entries.ShouldHaveSingleItem();
+            entry.Message.ShouldBe($"A request SetAnnotation GET of the account {AccountId} via {ActorId} (client (none)) answered 200");
+            entry.ScopeValues().ShouldBe(new Dictionary<string, object?> { ["DelegatedActor"] = ActorId, ["DelegatedClient"] = "(none)" });
+        });
+    }
+
+    // A direct call has no actor: no scope and no line.
+    [Fact]
+    public async Task RequestWithoutAnActor_IsNotLogged()
+    {
+        await WithValidationAsync(async () =>
+        {
+            var logger = new CapturingLogger<BearerAuthenticationMiddleware>();
+            var middleware = new RecordingMiddleware(logger);
+            var user = new RecordingBearerTokenValidator { Result = new BearerValidationResult([new Claim("sub", AccountId)], false, null) };
+            var (context, _) = CreateRequest(user, ProviderToken("\"api://client-id\""));
+
+            await middleware.Invoke(context, _ =>
+            {
+                logger.LogInformation("The handler writes");
+                return Task.CompletedTask;
+            });
+
+            logger.Entries.ShouldHaveSingleItem().ScopeValues().ShouldBeEmpty();
         });
     }
 
@@ -347,8 +461,9 @@ public class StorytellerUserTokenAuthenticationTests
         });
     }
 
-    // End to end: a token of the issuer passes the validator and the middleware as the user, acting through the actor,
-    // the user checks (User.Impersonation in scp, no machine identity) hold, and its NoSecretReveal withholds secret reads.
+    // End to end: a token of the issuer passes the validator and the middleware as the user, acting through the actor and
+    // the client app of its subject token, the user checks (User.Impersonation in scp, no machine identity) hold, and its
+    // NoSecretReveal withholds secret reads.
     [Fact]
     public async Task IssuedUserToken_PassesTheStorytellerValidatorAndTheMiddleware()
     {
@@ -361,18 +476,21 @@ public class StorytellerUserTokenAuthenticationTests
                 ActorId = ActorId,
                 Scopes = [UserScopes.Impersonation],
                 Restrictions = [ActorRestrictions.NoSecretReveal],
+                SubjectClientId = ClientId,
                 MaxLifetime = TimeSpan.FromMinutes(10),
                 NotAfter = DateTimeOffset.UtcNow.AddHours(1),
             });
-            var (context, request) = FunctionTestDoubles.CreateRequest(services, new Dictionary<string, string> { ["Authorization"] = $"Bearer {issued.AccessToken}" });
+            var (context, request) = CreateRequest(services, issued.AccessToken);
 
             var called = await InvokeAsync(context);
 
             called.ShouldBeTrue();
             context.Items[FunctionContextItemKeys.DelegatedActor].ShouldBe(ActorId);
+            context.Items[FunctionContextItemKeys.DelegatedClient].ShouldBe(ClientId);
             request.HasActorRestriction(ActorRestrictions.NoSecretReveal).ShouldBeTrue();
             request.GetIdentityUniqueId().ShouldBe(AccountId);
-            request.GetAuditActor().ShouldBe(AuditActor.Account(AccountId, "Ada Lovelace") with { Via = ActorId });
+            request.GetAuditActor().ShouldBe(AuditActor.Account(AccountId, "Ada Lovelace") with { Via = ActorId, ViaClient = ClientId });
+            request.GetClaims().ShouldNotContain(claim => claim.Value == ClientId);
             Should.NotThrow(() => request.EnsureUser());
 
             // the restriction of the token reaches the secret rights: the role reads secrets, the actor withholds them
@@ -390,6 +508,12 @@ public class StorytellerUserTokenAuthenticationTests
             false,
             null,
             Delegation: new BearerDelegation(ActorId, [ActorRestrictions.NoSecretReveal]));
+    }
+
+    // The result of a token whose subject token named the client.
+    private static BearerValidationResult UserResult(string clientId)
+    {
+        return UserResult() with { Delegation = new BearerDelegation(ActorId, [ActorRestrictions.NoSecretReveal], clientId) };
     }
 
     private static string StorytellerToken()
@@ -433,15 +557,25 @@ public class StorytellerUserTokenAuthenticationTests
         }
     }
 
+    // A request of the function SetAnnotation, with the worker's invocation result.
+    private static (TestFunctionContext Context, TestHttpRequestData Request) CreateRequest(IServiceProvider services, string token, string method = "GET")
+    {
+        var (context, request) = FunctionTestDoubles.CreateRequest(services, new Dictionary<string, string> { ["Authorization"] = $"Bearer {token}" }, method);
+        context.Definition = new NamedFunctionDefinition("SetAnnotation");
+        ((TestInvocationFeatures)context.Features).Set(ExceptionHandlingMiddlewareTests.BindingsFeature.FeatureType, ExceptionHandlingMiddlewareTests.BindingsFeature.Create());
+        return (context, request);
+    }
+
     private (TestFunctionContext Context, TestHttpRequestData Request) CreateRequest(
         RecordingBearerTokenValidator user,
         string token,
-        params IMachineTokenValidator[] machines)
+        IMachineTokenValidator? machine = null,
+        string method = "GET")
     {
-        var services = FunctionTestDoubles.CreateServiceCollection(user, null, machines);
+        var services = FunctionTestDoubles.CreateServiceCollection(user, null, machine is null ? [] : [machine]);
         services.AddSingleton<IAccessService>(_access);
         services.AddSingleton(Options.Create(_exchangeOptions));
-        return FunctionTestDoubles.CreateRequest(services.BuildServiceProvider(), new Dictionary<string, string> { ["Authorization"] = $"Bearer {token}" });
+        return CreateRequest(services.BuildServiceProvider(), token, method);
     }
 
     // The registration of Program.cs for the Storyteller issuer, with the account and the actor of these tests.
@@ -475,8 +609,8 @@ public class StorytellerUserTokenAuthenticationTests
 
     private sealed class RecordingMiddleware : BearerAuthenticationMiddleware
     {
-        public RecordingMiddleware()
-            : base(NullLogger<BearerAuthenticationMiddleware>.Instance)
+        public RecordingMiddleware(ILogger<BearerAuthenticationMiddleware>? logger = null)
+            : base(logger ?? NullLogger<BearerAuthenticationMiddleware>.Instance)
         {
         }
 

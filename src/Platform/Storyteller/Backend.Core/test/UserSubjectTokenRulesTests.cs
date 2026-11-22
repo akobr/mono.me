@@ -51,6 +51,45 @@ public class UserSubjectTokenRulesTests
         UserSubjectTokenRules.GetClientId([new Claim("sub", "user_01")]).ShouldBeNull();
     }
 
+    // The ids of every provider: Entra ID GUIDs, AuthKit DCR ids, CIMD URLs and Keycloak names; and no client at all.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11")]
+    [InlineData("client_01JDQ8Z7Y4K3M2N1P0R9S8T7V6")]
+    [InlineData("https://claude.ai/oauth/mcp-oauth-client-metadata")]
+    [InlineData("vscode")]
+    [InlineData("!~")]
+    public void IsRecordableClientId_TakesPrintableAscii(string? clientId)
+    {
+        UserSubjectTokenRules.IsRecordableClientId(clientId).ShouldBeTrue();
+    }
+
+    // Anything that could look like another id, or flood a stamp or a log line, is refused rather than cut or cleaned.
+    [Theory]
+    [InlineData("")]
+    [InlineData(" vscode")]
+    [InlineData("vscode ")]
+    [InlineData("vs code")]
+    [InlineData("vscode\n")]
+    [InlineData("vs\u0000code")]
+    [InlineData("vscode‮")]
+    [InlineData("vs​code")]
+    [InlineData("vscоde")]
+    [InlineData("vs code")]
+    [InlineData("vscodé")]
+    public void IsRecordableClientId_RefusesEverythingElse(string clientId)
+    {
+        UserSubjectTokenRules.IsRecordableClientId(clientId).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsRecordableClientId_TakesAtMost256Characters()
+    {
+        UserSubjectTokenRules.MaxClientIdLength.ShouldBe(256);
+        UserSubjectTokenRules.IsRecordableClientId(new string('a', 256)).ShouldBeTrue();
+        UserSubjectTokenRules.IsRecordableClientId(new string('a', 257)).ShouldBeFalse();
+    }
+
     [Fact]
     public void IsAllowedClient_AnEmptyListAllowsAnyClient()
     {

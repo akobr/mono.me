@@ -1,5 +1,6 @@
 using System.Net;
 using _42.Platform.Storyteller.Api.Models;
+using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Binding;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -18,6 +19,9 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    // The logging scope of the bearer middleware (DelegationLogScope) has ended when an exception reaches this middleware,
+    // which sits outside it: each catch block opens it again, so a refusal or an error of a request through an actor
+    // names the actor and the client app too.
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
         try
@@ -26,18 +30,23 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         }
         catch (SecurityTokenException exception)
         {
+            using var scope = DelegationLogScope.Begin(_logger, context);
             await ProcessSecurityExceptionAsync(context, exception);
         }
         catch (BindingEvaluationException exception)
         {
+            using var scope = DelegationLogScope.Begin(_logger, context);
             await ProcessBindingEvaluationExceptionAsync(context, exception);
         }
         catch (Exception exception) when (ErrorResponseMapping.TryMap(exception, out var statusCode, out var errorResponse))
         {
+            using var scope = DelegationLogScope.Begin(_logger, context);
             await ProcessClientErrorAsync(context, exception, statusCode, errorResponse);
         }
         catch (Exception exception)
         {
+            using var scope = DelegationLogScope.Begin(_logger, context);
+
             if (exception is OperationCanceledException && context.CancellationToken.IsCancellationRequested)
             {
                 // The invocation's token: the caller went away, the host drains the instance, or the host's functionTimeout

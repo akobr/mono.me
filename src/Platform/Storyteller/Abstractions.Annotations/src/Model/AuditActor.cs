@@ -26,6 +26,11 @@ public record class AuditActor
     // reads "Ada via mcp". Null for a direct call, and then left out of stored and returned documents.
     public string? Via { get; init; }
 
+    // The client app the person used with the actor (the subject token's azp, appid or client_id). Set only together with
+    // Via; null for a direct call and for a token exchanged before the client was recorded, and then left out of stored
+    // and returned documents.
+    public string? ViaClient { get; init; }
+
     public static AuditActor System { get; } = new() { Kind = AuditActorKind.System, Id = "system" };
 
     public static AuditActor Account(string id, string? name = null) => new() { Kind = AuditActorKind.Account, Id = id, Name = name };

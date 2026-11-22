@@ -9,8 +9,9 @@ namespace _42.Platform.Storyteller;
 
 // The RFC 8693 exchange of a person's token for a Storyteller user token, by an actor of Auth:TokenExchange:Actors.
 // The checks run in the order of the spec, and only an authenticated actor gets the subject token validated: the form,
-// the actor and its proof, the subject token (the provider's rules, the actor's audiences and clients), the account, the
-// replay limit, then the scope. Separate from FederatedTokenExchangeService, which exchanges machine tokens.
+// the actor and its proof, the subject token (the provider's rules, the actor's audiences and clients, a client id that can
+// be recorded), the account, the replay limit, then the scope. The issued token names the subject token's client
+// (subject_client_id). Separate from FederatedTokenExchangeService, which exchanges machine tokens.
 public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
 {
     // Subject tokens recorded at once for the replay limit, each for a minute; more are refused.
@@ -115,11 +116,20 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
             return RefuseSubject(actor, subject.RefusalReason);
         }
 
+        // The subject token's client goes into the issued token, the audit actor (ViaClient) and the logs: only an id that
+        // cannot look like another. Refused, never cut or cleaned, and the value is not logged.
+        if (!UserSubjectTokenRules.IsRecordableClientId(subject.ClientId))
+        {
+            return RefuseSubject(actor, $"the subject token's client id is not 1 to {UserSubjectTokenRules.MaxClientIdLength} printable ASCII characters");
+        }
+
+        // From here on every log line names the client (shortened), so each step of a client's exchange can be told apart.
+        var clientId = ForLog(subject.ClientId);
         var now = _timeProvider.GetUtcNow();
 
         if (subject.ExpiresAt - now < MinSubjectTokenLifetime)
         {
-            return RefuseSubject(actor, $"the subject token expires within {MinSubjectTokenLifetime.TotalSeconds} seconds");
+            return RefuseSubject(actor, $"the subject token of the client {clientId} expires within {MinSubjectTokenLifetime.TotalSeconds} seconds");
         }
 
         // 4. The account, which the exchange never creates. Before the replay limit, so a sign-in without an account
@@ -129,8 +139,9 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
         if (account is null)
         {
             _logger.LogInformation(
-                "A user token exchange by the actor {ActorId} is refused: no account {AccountId} exists",
+                "A user token exchange by the actor {ActorId} (client {ClientId}) is refused: no account {AccountId} exists",
                 actor.Id,
+                clientId,
                 subject.AccountId);
             return UserTokenExchangeResult.Failure(OAuthTokenExchange.Errors.InvalidGrant, UserTokenExchangeResult.NoAccountDescription);
         }
@@ -145,13 +156,17 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
         {
             if (_exchanges.IsFull)
             {
-                _logger.LogWarning("A user token exchange by the actor {ActorId} is refused: too many subject tokens are recorded for the replay limit", actor.Id);
+                _logger.LogWarning(
+                    "A user token exchange by the actor {ActorId} (client {ClientId}) is refused: too many subject tokens are recorded for the replay limit",
+                    actor.Id,
+                    clientId);
             }
             else
             {
                 _logger.LogInformation(
-                    "A user token exchange by the actor {ActorId} is refused: the subject token was exchanged {Max} times within a minute",
+                    "A user token exchange by the actor {ActorId} (client {ClientId}) is refused: the subject token was exchanged {Max} times within a minute",
                     actor.Id,
+                    clientId,
                     exchangeOptions.MaxExchangesPerSubjectTokenPerMinute);
             }
 
@@ -170,16 +185,18 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
         if (requested.Count > scopes.Count)
         {
             _logger.LogInformation(
-                "A user token exchange by the actor {ActorId} drops the requested scopes {DroppedScopes}: they are not in the actor's Scopes",
+                "A user token exchange by the actor {ActorId} (client {ClientId}) drops the requested scopes {DroppedScopes}: they are not in the actor's Scopes",
                 actor.Id,
+                clientId,
                 string.Join(' ', requested.Except(scopes, StringComparer.Ordinal)));
         }
 
         if (!scopes.Contains(UserScopes.Impersonation, StringComparer.Ordinal))
         {
             _logger.LogInformation(
-                "A user token exchange by the actor {ActorId} is refused: the granted scope would not contain {Scope}",
+                "A user token exchange by the actor {ActorId} (client {ClientId}) is refused: the granted scope would not contain {Scope}",
                 actor.Id,
+                clientId,
                 UserScopes.Impersonation);
             return UserTokenExchangeResult.Failure(OAuthTokenExchange.Errors.InvalidScope, UserTokenExchangeResult.ScopeNotGrantedDescription);
         }
@@ -197,13 +214,14 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
                 Scopes = scopes,
                 Restrictions = restrictions,
                 AuthTime = subject.AuthTime,
+                SubjectClientId = subject.ClientId,
                 MaxLifetime = TimeSpan.FromMinutes(exchangeOptions.TokenLifetimeMinutes),
                 NotAfter = subject.ExpiresAt,
             });
         }
         catch (TokenSigningKeyUnavailableException exception)
         {
-            _logger.LogError(exception, "No Storyteller user token can be issued");
+            _logger.LogError(exception, "No Storyteller user token can be issued by the actor {ActorId} (client {ClientId})", actor.Id, clientId);
             return UserTokenExchangeResult.Unavailable(UserTokenExchangeResult.SigningKeyUnavailableDescription);
         }
 
@@ -211,7 +229,7 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
             "The actor {ActorId} exchanged a user token of the account {AccountId} (client {ClientId}) for {ExpiresIn} seconds",
             actor.Id,
             subject.AccountId,
-            ForLog(subject.ClientId),
+            clientId,
             issued.ExpiresIn);
 
         return UserTokenExchangeResult.Success(issued.AccessToken, issued.ExpiresIn, string.Join(' ', scopes), restrictions);

@@ -1,4 +1,6 @@
+using System.Buffers.Text;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Binding;
@@ -39,13 +41,20 @@ public sealed class DependencyManifests : IDisposable
     }
 
     // The actor and the channel of a read: the audit trail of the binding reads (BindingRead) tells callers apart by them,
-    // also a user acting through an actor (Via) from the same user calling directly, whatever the actor's restrictions.
-    // Via goes with the kind: neither has a ':' (actor ids are URL-safe), so the parts stay apart.
+    // also a user acting through an actor (Via) from the same user calling directly, whatever the actor's restrictions,
+    // and one client app of the actor (ViaClient) from another. Via goes with the kind: neither has a ':' (actor ids are
+    // URL-safe), so the parts stay apart. The client follows after an '@' as base64url without padding, as a client id may
+    // hold a ':' (a URL); neither an actor id nor base64url has an '@'. Without a client the key is as before.
     public static string CallerOf(SecretRights rights)
     {
-        var caller = rights.Caller;
-        var kind = caller.Actor.Via is { } via ? $"{caller.Actor.Kind}.{via}" : caller.Actor.Kind.ToString();
-        return $"{kind}:{caller.Actor.Id}:{caller.Channel}";
+        var actor = rights.Caller.Actor;
+        var kind = actor.Via switch
+        {
+            { } via when actor.ViaClient is { } client => $"{actor.Kind}.{via}@{Base64Url.EncodeToString(Encoding.UTF8.GetBytes(client))}",
+            { } via => $"{actor.Kind}.{via}",
+            _ => actor.Kind.ToString(),
+        };
+        return $"{kind}:{actor.Id}:{rights.Caller.Channel}";
     }
 
     public string GetRuntimeVersion()

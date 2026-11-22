@@ -23,6 +23,10 @@ public class FunctionContextItemKeys
     public const string DelegatedActor = nameof(DelegatedActor);
     public const string DelegatedRestrictions = nameof(DelegatedRestrictions);
 
+    // The client app the person used with the actor (the token's subject_client_id, a string), set only when the
+    // Delegation names one; the same source as DelegatedActor.
+    public const string DelegatedClient = nameof(DelegatedClient);
+
     // How recent the sign-in of a user is (a SignInRecency), judged by the bearer middleware against Auth:StepUp for every
     // user it stores, never for a machine.
     public const string SignInRecency = nameof(SignInRecency);

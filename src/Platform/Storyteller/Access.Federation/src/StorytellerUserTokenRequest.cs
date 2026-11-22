@@ -18,6 +18,10 @@ public sealed record StorytellerUserTokenRequest
 
     public DateTimeOffset? AuthTime { get; init; }
 
+    // The client the subject token was issued to (UserSubjectTokenResult.ClientId), its subject_client_id; null when it
+    // named none, and then the token carries no such claim.
+    public string? SubjectClientId { get; init; }
+
     // Auth:TokenExchange:TokenLifetimeMinutes, at most TokenExchangeOptions.MaxTokenLifetimeMinutes.
     public required TimeSpan MaxLifetime { get; init; }
 
