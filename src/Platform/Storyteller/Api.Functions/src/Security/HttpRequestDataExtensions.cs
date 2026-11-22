@@ -350,6 +350,29 @@ public static class HttpRequestDataExtensions
         await CheckUserAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole);
     }
 
+    // A route for users only whose answer depends on the role: EnsureUser, the minimal role (403), and the role itself.
+    // Where the role check is skipped (Debug builds, DEV_AUTH), the caller counts as Owner: that is asked before the
+    // identity is read, as in CheckUserAccessAsync, so a Debug build still serves a request without an identity.
+    public static async Task<AccountRole> GetUserRoleInProjectAsync(
+        this HttpRequestData @this,
+        IAccessService accessService,
+        string organization,
+        string project,
+        AccountRole minimalRole)
+    {
+        @this.EnsureUser();
+
+        if (UserRoleChecks.AreSkipped)
+        {
+            return AccountRole.Owner;
+        }
+
+        var accessPointKey = $"{organization}.{project}";
+        var accessRole = await accessService.GetAccountRoleAsync(@this.GetIdentityUniqueId(), accessPointKey);
+        EnsureRole(accessRole, minimalRole, accessPointKey);
+        return accessRole;
+    }
+
     // An operation of the whole project (lists, key/values, templates, type-level schemas, transfers). A machine
     // restricted to an annotation is refused. A machine needs every scope, in the order given: the runtime scope
     // first, then the management scope of a management operation. Users need the role, never a scope.

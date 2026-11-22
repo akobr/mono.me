@@ -83,6 +83,9 @@ public class OpenApiExportTests
         Definitions.RouteIds.KeyValues.RemoveRecipient,
         Definitions.RouteIds.KeyValues.GetKeyValueAudit,
         Definitions.RouteIds.KeyValues.GetKeyValueUsage,
+        Definitions.RouteIds.Inbox.GetViewInbox,
+        Definitions.RouteIds.Inbox.AcceptViewInboxItem,
+        Definitions.RouteIds.Inbox.DismissViewInboxItem,
     ];
 
     // Without a bearer token: the token exchanges, the discovery of the Storyteller issuer, the public CA certificate and
@@ -200,6 +203,128 @@ public class OpenApiExportTests
 
         schemas.GetProperty("ViewImport").GetProperty("properties").GetProperty("Existing").GetProperty("$ref").GetString()
             .ShouldBe("#/components/schemas/ViewImportExisting");
+    }
+
+    // The inbox of a view: three operations below the view under a tag of their own, so each SDK has an inbox client; no
+    // route for one item. For users only, with the 403 that names the Contributor role, and the two actions without a
+    // request body. Each operation documents the statuses its route answers, so the SDKs model them.
+    [Fact]
+    public async Task Document_HasTheViewInboxOperations_UnderTheInboxTag()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var paths = document.RootElement.GetProperty("paths").EnumerateObject().ToList();
+        var operations = paths
+            .SelectMany(path => path.Value.EnumerateObject().Select(operation => (Path: path.Name, Method: operation.Name, Operation: operation.Value)))
+            .Where(operation => operation.Operation.GetProperty("tags").EnumerateArray().Any(tag => tag.GetString() == Definitions.Tags.Inbox))
+            .ToList();
+
+        operations.Select(operation => $"{operation.Method.ToUpperInvariant()} {operation.Path} {operation.Operation.GetProperty("operationId").GetString()}").ShouldBe(
+            [
+                "GET /v1/{organization}/{project}/{view}/inbox GetViewInbox",
+                "POST /v1/{organization}/{project}/{view}/inbox/{id}/accept AcceptViewInboxItem",
+                "POST /v1/{organization}/{project}/{view}/inbox/{id}/dismiss DismissViewInboxItem",
+            ],
+            ignoreOrder: true);
+        paths.Where(path => path.Name.Contains("/inbox", StringComparison.Ordinal)).SelectMany(path => path.Value.EnumerateObject()).Count()
+            .ShouldBe(3, "every inbox path is one of the three operations");
+
+        foreach (var (_, _, operation) in operations)
+        {
+            var id = operation.GetProperty("operationId").GetString()!;
+            var responses = operation.GetProperty("responses");
+
+            operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Inbox], id);
+            operation.GetProperty("security").GetArrayLength().ShouldBeGreaterThan(0, id);
+            operation.TryGetProperty("requestBody", out _).ShouldBeFalse(id);
+            operation.GetProperty("description").GetString()!.ShouldContain("Users only, with the Contributor role", Case.Sensitive, id);
+
+            responses.GetProperty("401").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseUnauthorizedUserOnly, id);
+            responses.GetProperty("401").TryGetProperty("content", out _).ShouldBeFalse(id);
+            responses.GetProperty("403").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseForbiddenViewInbox, id);
+            Reference(operation, "403").ShouldBe("#/components/schemas/ErrorResponse", id);
+            Reference(operation, "500").ShouldBe("#/components/schemas/ErrorResponse", id);
+        }
+
+        Definitions.Descriptions.ResponseForbiddenViewInbox.ShouldBe(
+            Definitions.Descriptions.ResponseForbiddenUserOnly + " The inbox needs the Contributor role. An item above the caller's role is not found (404).");
+
+        // the list: the state as a plain string, as the state of the key/values, and the 400 of a filter that does not parse
+        var list = Operation(document, Definitions.RouteIds.Inbox.GetViewInbox);
+        ResponseNames(list).ShouldBe(["200", "400", "401", "403", "500"], ignoreOrder: true);
+        Reference(list, "200").ShouldBe("#/components/schemas/ViewInboxResponse");
+        Reference(list, "400").ShouldBe("#/components/schemas/ErrorResponse");
+        list.GetProperty("responses").GetProperty("400").GetProperty("description").GetString()!.ShouldContain(ErrorCodes.InvalidQuery, Case.Sensitive);
+        ParameterNames(list, "path").ShouldBe(["organization", "project", "view"]);
+        ParameterNames(list, "query").ShouldBe(["state", "continuationToken"]);
+
+        var state = list.GetProperty("parameters").EnumerateArray().Single(parameter => parameter.GetProperty("name").GetString() == "state");
+        JsonSerializer.Serialize(state.GetProperty("schema")).ShouldBe("""{"type":"string"}""");
+        state.TryGetProperty("required", out _).ShouldBeFalse();
+        state.GetProperty("description").GetString()!.ShouldStartWith("Open (default), or Done", Case.Sensitive);
+
+        // accept: an item that is no action or is closed, a lost race and a handler's own refusal are 409; an action
+        // nothing runs is 501
+        var accept = Operation(document, Definitions.RouteIds.Inbox.AcceptViewInboxItem);
+        ResponseNames(accept).ShouldBe(["200", "401", "403", "404", "409", "500", "501"], ignoreOrder: true);
+        Reference(accept, "200").ShouldBe("#/components/schemas/ViewInboxItem");
+        Reference(accept, "409").ShouldBe("#/components/schemas/ErrorResponse");
+        Reference(accept, "501").ShouldBe("#/components/schemas/ErrorResponse");
+        var acceptConflict = accept.GetProperty("responses").GetProperty("409").GetProperty("description").GetString()!;
+        acceptConflict.ShouldContain($"(ErrorCode {ErrorCodes.InboxItemNotAction})", Case.Sensitive);
+        acceptConflict.ShouldContain($"(ErrorCode {ErrorCodes.InboxItemClosed})", Case.Sensitive);
+        acceptConflict.ShouldContain($"(ErrorCode {ErrorCodes.Conflict})", Case.Sensitive);
+        acceptConflict.ShouldContain(ErrorCodes.TransferLimit, Case.Sensitive);
+        accept.GetProperty("responses").GetProperty("501").GetProperty("description").GetString()!
+            .ShouldContain($"(ErrorCode {ErrorCodes.InboxActionNotAvailable})", Case.Sensitive);
+
+        // dismiss: every kind, so no InboxItemNotAction and no 501
+        var dismiss = Operation(document, Definitions.RouteIds.Inbox.DismissViewInboxItem);
+        ResponseNames(dismiss).ShouldBe(["200", "401", "403", "404", "409", "500"], ignoreOrder: true);
+        Reference(dismiss, "200").ShouldBe("#/components/schemas/ViewInboxItem");
+        Reference(dismiss, "409").ShouldBe("#/components/schemas/ErrorResponse");
+        var dismissConflict = dismiss.GetProperty("responses").GetProperty("409").GetProperty("description").GetString()!;
+        dismissConflict.ShouldContain($"(ErrorCode {ErrorCodes.InboxItemClosed})", Case.Sensitive);
+        dismissConflict.ShouldContain($"(ErrorCode {ErrorCodes.Conflict})", Case.Sensitive);
+        dismissConflict.ShouldNotContain(ErrorCodes.InboxItemNotAction, Case.Sensitive);
+
+        foreach (var operation in new[] { accept, dismiss })
+        {
+            var id = operation.GetProperty("operationId").GetString()!;
+
+            // an item above the caller's role answers as an unknown id does
+            operation.GetProperty("responses").GetProperty("404").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseNotFoundInboxItem, id);
+            Reference(operation, "404").ShouldBe("#/components/schemas/ErrorResponse", id);
+            ParameterNames(operation, "path").ShouldBe(["organization", "project", "view", "id"], id);
+            ParameterNames(operation, "query").ShouldBeEmpty(id);
+        }
+
+        // the schemas of the answers, each published once, and the item's parts as references
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        schemas.EnumerateObject().Select(schema => schema.Name).Where(name => name.Contains("Inbox", StringComparison.Ordinal))
+            .ShouldBe(["ViewInboxResponse", "ViewInboxItem", "ViewInboxJob"], ignoreOrder: true);
+
+        // every member is optional in the generated types, as in AccessAuditEntry and ViewExport: the model has the C#
+        // keyword required and no [JsonProperty(Required = ...)], which alone puts a member on the list of its schema
+        foreach (var name in new[] { "ViewInboxResponse", "ViewInboxItem", "ViewInboxJob" })
+        {
+            schemas.GetProperty(name).TryGetProperty("required", out _).ShouldBeFalse(name);
+        }
+
+        schemas.GetProperty("ViewInboxResponse").GetProperty("properties").GetProperty("Items").GetProperty("items").GetProperty("$ref").GetString()
+            .ShouldBe("#/components/schemas/ViewInboxItem");
+        var item = schemas.GetProperty("ViewInboxItem").GetProperty("properties");
+        item.GetProperty("Job").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ViewInboxJob");
+        item.GetProperty("CreatedBy").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/AuditActor");
+        item.GetProperty("Closed").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/AuditStamp");
+
+        static List<string?> ResponseNames(JsonElement operation) => operation.GetProperty("responses").EnumerateObject().Select(response => (string?)response.Name).ToList();
+
+        static List<string?> ParameterNames(JsonElement operation, string location) => operation.GetProperty("parameters").EnumerateArray()
+            .Where(parameter => parameter.GetProperty("in").GetString() == location)
+            .Select(parameter => parameter.GetProperty("name").GetString())
+            .ToList();
     }
 
     // The token endpoint speaks OAuth: a form body and snake_case JSON, named the same in the document and on the wire.

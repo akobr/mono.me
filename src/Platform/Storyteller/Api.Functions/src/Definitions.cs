@@ -181,6 +181,18 @@ public static class Definitions
             }
         }
 
+        public static class Inbox
+        {
+            public static class V1
+            {
+                // A literal segment after the view, as the transfers have; no other route below a view has it. An item has
+                // no route of its own, only its two actions, so no literal ever stands beside {id}.
+                public const string Inbox = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/inbox";
+                public const string ItemAccept = $"{Inbox}/{{{Parameters.Id}}}/accept";
+                public const string ItemDismiss = $"{Inbox}/{{{Parameters.Id}}}/dismiss";
+            }
+        }
+
         public static class ConfigurationSchema
         {
             public static class V1
@@ -398,6 +410,13 @@ public static class Definitions
             public const string GetViewImport = nameof(GetViewImport);
         }
 
+        public static class Inbox
+        {
+            public const string GetViewInbox = nameof(GetViewInbox);
+            public const string AcceptViewInboxItem = nameof(AcceptViewInboxItem);
+            public const string DismissViewInboxItem = nameof(DismissViewInboxItem);
+        }
+
         public static class ConfigurationSchema
         {
             public const string GetConfigurationSchemas = nameof(GetConfigurationSchemas);
@@ -539,6 +558,7 @@ public static class Definitions
         public const string Templates = nameof(Templates);
         public const string KeyValues = nameof(KeyValues);
         public const string Transfers = nameof(Transfers);
+        public const string Inbox = nameof(Inbox);
     }
 
     public static class Descriptions
@@ -701,6 +721,12 @@ public static class Definitions
         public const string ResponseTransferForbiddenImport = TransferForbidden + MachineNeedsTransfer + "the scopes of the direct writes of every included kind (" + Scopes.Annotation.Write + " and " + Scopes.Annotation.Manage + " for annotations, " + Scopes.Configuration.Write + " and " + Scopes.Schema.Write + " for schemas, " + Scopes.Configuration.Write + " and " + Scopes.Template.Write + " for templates and " + Scopes.Configuration.Write + " for configurations); reading an import needs the scopes of the kinds it includes. " + TransferForbiddenNames;
         public const string TransferInclude = "The kinds to import, comma-separated and case-insensitive: Annotations, Schemas, Templates, Configurations. Empty means all four. The files of the other kinds are counted as excluded.";
         public const string TransferExisting = "What happens to a document the view already has: Overwrite (default) writes the file as a new version, updates an annotation and re-creates a deleted one; Skip keeps the stored document. An equal document is Unchanged either way.";
+
+        // The inbox of a view: users with the Contributor role only, a machine is refused first. The role also decides
+        // which items there are for the caller, so an item above it answers as an unknown id does.
+        public const string IdInboxItem = "The id of the inbox item, from the list.";
+        public const string ResponseForbiddenViewInbox = ResponseForbiddenUserOnly + " The inbox needs the Contributor role. An item above the caller's role is not found (404).";
+        public const string ResponseNotFoundInboxItem = "The item doesn't exist in this view, has expired, or needs a higher role than the caller's.";
         public const string FederatedIssuerName = "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.";
 
         // The parts the 403 descriptions above are built from.

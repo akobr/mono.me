@@ -293,4 +293,49 @@ public class HttpRequestDataExtensionsTests
     {
         Should.NotThrow(() => HttpRequestDataExtensions.EnsureRole(actual, minimal, "org.project"));
     }
+
+    // The role as a value, for a route whose answer depends on it: the caller's own role, not the minimal one.
+    [Theory]
+    [InlineData(AccountRole.Reader, AccountRole.Reader)]
+    [InlineData(AccountRole.Contributor, AccountRole.Reader)]
+    [InlineData(AccountRole.Administrator, AccountRole.Contributor)]
+    [InlineData(AccountRole.Owner, AccountRole.Administrator)]
+    public async Task GetUserRoleInProject_AtOrAboveTheMinimalRole_IsTheRoleOfTheUser(AccountRole actual, AccountRole minimal)
+    {
+        using var roleChecks = UserRoleChecks.Enforce();
+
+        var role = await TestRequests.User().GetUserRoleInProjectAsync(new RoleAccess(actual), "acme", "web", minimal);
+
+        role.ShouldBe(actual);
+    }
+
+    [Theory]
+    [InlineData(AccountRole.None, AccountRole.Reader, "No Reader access to 'acme.web'.")]
+    [InlineData(AccountRole.Reader, AccountRole.Contributor, "No Contributor access to 'acme.web'.")]
+    [InlineData(AccountRole.ContributorWithSecrets, AccountRole.Administrator, "No Administrator access to 'acme.web'.")]
+    public async Task GetUserRoleInProject_BelowTheMinimalRole_IsAccessDenied(AccountRole actual, AccountRole minimal, string message)
+    {
+        using var roleChecks = UserRoleChecks.Enforce();
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => TestRequests.User().GetUserRoleInProjectAsync(new RoleAccess(actual), "acme", "web", minimal));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe(message);
+    }
+
+    // Where the role check is skipped (a Debug build without Enforce), the caller counts as Owner, whatever is stored.
+    [Fact]
+    public async Task GetUserRoleInProject_WithoutTheRoleCheck_IsOwner()
+    {
+        var role = await TestRequests.User().GetUserRoleInProjectAsync(new RoleAccess(AccountRole.Administrator), "acme", "web", AccountRole.Contributor);
+
+        role.ShouldBe(HttpRequestDataExtensions.IsDevelopmentAuthentication ? AccountRole.Owner : AccountRole.Administrator);
+    }
+
+    // A machine has no role to give, in every build.
+    [Fact]
+    public async Task GetUserRoleInProject_ByAMachine_IsAccessDenied()
+    {
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => UserOnlyRoutes.Machine().GetUserRoleInProjectAsync(new RoleAccess(AccountRole.Owner), "acme", "web", AccountRole.Reader));
+    }
 }
