@@ -222,7 +222,9 @@ if (first?.Id) {
 const inbox = useGetViewInbox(org, project, view, { state: 'Open' })                     // refs, getters or strings
 const dismiss = useDismissViewInboxItem({
   mutation: {
-    onSuccess: () => invalidateByPath(queryClient, `/v1/${org.value}/${project.value}/${view.value}/inbox`),
+    // the view the call changed, which the refs may no longer name by then
+    onSuccess: (_item, { organization, project, view }) =>
+      invalidateByPath(queryClient, `/v1/${organization}/${project}/${view}/inbox`),
   },
 })
 const close = (id: string) => dismiss.mutate({ organization: org.value, project: project.value, view: view.value, id })
