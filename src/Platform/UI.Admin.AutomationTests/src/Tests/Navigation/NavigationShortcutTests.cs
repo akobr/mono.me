@@ -6,7 +6,7 @@ using static Microsoft.Playwright.Assertions;
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Navigation;
 
 // Keyboard Shortcuts: the help ("?", the user menu and the palette) and the go-to chains (g a, g c, g g, g o, g s, g t,
-// g e), which open the sections of the last view. The app ignores its shortcuts while a text box has the focus, so a
+// g e, g i), which open the sections of the last view. The app ignores its shortcuts while a text box has the focus, so a
 // test blurs it first (App.PressShortcutAsync).
 [Area(Area.Navigation)]
 public sealed class NavigationShortcutTests : PlatformTest

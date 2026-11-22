@@ -7,7 +7,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // default layout: "?" (with no text box focused), the user menu's "Keyboard shortcuts" and the palette's action open
 // it, Escape closes it. Three groups, each an h3 with a shortcut per line (its description, then its keys):
 // "General" (Command palette, Focus the search box, Toggle the sidebar, Show this help), "Go to" (Organizations,
-// Annotations, Configurations, Graph, Templates, Schemas, Export & Import) and "Lists and details" (Next row, Previous
+// Annotations, Configurations, Graph, Templates, Schemas, Export & Import, Inbox) and "Lists and details" (Next row, Previous
 // row, Open the detail, Close the detail, Save, Cycle Form, JSON and YAML).
 public sealed partial class ShortcutsHelpDialog(App app)
 {
