@@ -3,6 +3,7 @@ import { useQueries, type QueryFunctionContext, type QueryObserverResult } from 
 import type { Scope } from '@/stores/context'
 import { createLimiter } from '@/utils/limiter'
 import { compareTexts, type CompareFilter, type CompareResult } from '@/utils/view-compare'
+import { annotationStamp } from '@/utils/view-copy'
 import {
   annotationDocument,
   annotationText,
@@ -112,7 +113,7 @@ async function annotationRead(
     own: annotation && annotationText(annotation),
     inexact: !!annotation && hasInexactNumber(annotationDocument(annotation)),
     effectiveInexact: false,
-    expected: annotation?.Modified?.At ?? annotation?.Created?.At ?? null,
+    expected: annotationStamp(annotation),
   }
 }
 
@@ -239,6 +240,9 @@ export function useViewCompare(options: ViewCompareOptions): {
         ),
       // A failed document shows its error with Retry in its own section, not a toast per document.
       meta: { silent: true },
+      // A comparison reads both views whenever it is opened: a key that was restored, deleted or changed in a view
+      // since the last comparison must not show what that one read.
+      staleTime: 0,
     }
   }
 

@@ -13,8 +13,9 @@ const DiffEditor = defineAsyncComponent(() => import('@/components/editor/DiffEd
 /**
  * One key of the comparison of a selection across two views, as a file of "Files changed" (spec "Copy and Compare
  * Annotations and Configurations Between Views", section 5): a heading that opens and closes the section, with the
- * state of the key and its changed lines, links to the documents, what a side lacks, and the diff. The target is the
- * old side of the diff and the source the new one, as a pull request from the source into the target.
+ * state of the key and its changed lines, the copy of this one key, links to the documents, what a side lacks, and
+ * the diff. The target is the old side of the diff and the source the new one, as a pull request from the source into
+ * the target.
  */
 const props = defineProps<{
   file: CompareFile
@@ -24,10 +25,12 @@ const props = defineProps<{
   target: string
   layout: 'auto' | 'split' | 'unified'
   open: boolean
+  /** A copy from the source would change the target, and the target can take one. */
+  copyable?: boolean
   /** The element that scrolls the page; the viewport without one. */
   scrollRoot?: HTMLElement | null
 }>()
-const emit = defineEmits<{ toggle: [] }>()
+const emit = defineEmits<{ toggle: []; copy: [] }>()
 
 const bodyId = useId()
 
@@ -145,7 +148,16 @@ useIntersectionObserver(
           </span>
         </component>
       </h3>
-      <div v-if="inSource || inTarget || file.deleted" class="flex flex-wrap items-center gap-1">
+      <div v-if="inSource || inTarget || file.deleted || copyable" class="flex flex-wrap items-center gap-1">
+        <UButton
+          v-if="copyable"
+          :label="`Copy to ${target}`"
+          icon="i-lucide-copy-plus"
+          color="neutral"
+          variant="outline"
+          size="xs"
+          @click="emit('copy')"
+        />
         <UButton
           v-if="inSource"
           :label="`Open in ${source.view}`"

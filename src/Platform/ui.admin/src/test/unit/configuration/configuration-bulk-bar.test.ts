@@ -3,11 +3,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import type { SetupContext } from 'vue'
 import { setupServer } from 'msw/node'
 import ConfigurationBulkBar from '@/components/configuration/ConfigurationBulkBar.vue'
+import ViewCopyDialog from '@/components/views/ViewCopyDialog.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import ConfigurationsPage from '@/pages/[org]/[project]/[view]/configurations.vue'
 import { useCatalogStore } from '@/stores/catalog'
 import { usePageMemoryStore } from '@/stores/page-memory'
 import { useViewTransferStore } from '@/stores/view-transfer'
+import { canonicalJson, readConfiguration } from '@/utils/view-documents'
 import { mountScreen, settle } from '../../helpers'
 
 // The multi-selection of Configurations (spec "Copy and Compare Annotations and Configurations Between Views", section
@@ -31,7 +33,7 @@ vi.mock('@/components/shell/AppNavbar.vue', async () => {
 })
 
 const server = setupServer(...mockHandlers)
-// unmounted before the body is cleared, so a closing tooltip does not patch removed nodes
+// unmounted before the body is cleared, so a closing tooltip or dialog does not patch removed nodes
 const mounted: { host: { unmount: () => void } }[] = []
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
 afterEach(() => {
@@ -47,9 +49,34 @@ const format = (value: number) => new Intl.NumberFormat().format(value)
 const toolbar = () => document.body.querySelector<HTMLElement>('[role="toolbar"][aria-label="Bulk actions"]')
 const button = (label: string) =>
   [...(toolbar()?.querySelectorAll('button') ?? [])].find((candidate) => candidate.textContent?.trim() === label)!
+const transfers = () => [button('Compare with view'), button('Copy to view')]
+/** What the bar shows, in its order: the number of selected rows, the buttons, and the reason beside them. */
+const parts = () => [...(toolbar()?.children ?? [])].map((child) => child.textContent?.trim())
+
+// the copy dialog is teleported to the body
+const dialog = () => document.body.querySelector<HTMLElement>('[role="dialog"]')
+const dialogButton = (label: string) =>
+  [...(dialog()?.querySelectorAll('button') ?? [])].find((candidate) => candidate.textContent?.trim() === label)
+/** A copy is several requests: a slow machine takes longer than the second `vi.waitFor` waits by default. */
+const eventually = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000 })
+
+/** Both buttons are off for one reason, which is one text beside them and the description of both. */
+function expectBlocked(reason: string) {
+  const [compare, copy] = transfers()
+  expect([compare!.disabled, copy!.disabled]).toEqual([true, true])
+  const described = compare!.getAttribute('aria-describedby')
+  expect(described).toBeTruthy()
+  expect(copy!.getAttribute('aria-describedby')).toBe(described)
+  const text = document.getElementById(described!)
+  expect(text?.textContent).toBe(reason)
+  expect(toolbar()!.contains(text)).toBe(true)
+  // said once, not once per button
+  expect(toolbar()!.textContent!.split(reason)).toHaveLength(2)
+}
 
 describe('ConfigurationBulkBar', () => {
   const comparison = '/acme/billing/default/modeling/compare/selection'
+  const staging = { org: 'acme', project: 'billing', view: 'staging' }
   const keysOf = (count: number) =>
     Array.from({ length: count }, (_, index) => `exe.northwind.invoicing.job-${String(index).padStart(4, '0')}`)
 
@@ -66,20 +93,26 @@ describe('ConfigurationBulkBar', () => {
       expect(view.queryClient.getQueryState(['v1', 'acme', project, 'views'])?.status).toBe('success'),
     )
     await settle()
-    return { ...view, clear }
+    return { ...view, clear, copyDialog: () => view.host.findComponent(ViewCopyDialog) }
   }
 
-  it('shows the number of selected rows, Compare with view and Clear selection', async () => {
+  it('shows the number of selected rows, Compare with view, Copy to view and Clear selection', async () => {
     await mountBar(['sbt.contoso', 'usg.northwind.invoicing'])
 
     expect(toolbar()).not.toBeNull()
     expect(toolbar()!.querySelector('span')?.textContent).toBe('2 selected')
+    // the two actions follow the number of selected rows
+    expect(parts()).toEqual(['2 selected', 'Compare with view', 'Copy to view', 'Clear selection'])
     expect([...toolbar()!.querySelectorAll('button')].map((candidate) => candidate.textContent?.trim())).toEqual([
       'Compare with view',
+      'Copy to view',
       'Clear selection',
     ])
-    expect(button('Compare with view').disabled).toBe(false)
-    expect(button('Compare with view').hasAttribute('aria-describedby')).toBe(false)
+    // both are on, and nothing explains them
+    for (const transfer of transfers()) {
+      expect(transfer.disabled).toBe(false)
+      expect(transfer.hasAttribute('aria-describedby')).toBe(false)
+    }
   })
 
   it('opens the comparison of the selected configurations and keeps the selection', async () => {
@@ -111,6 +144,56 @@ describe('ConfigurationBulkBar', () => {
     expect(useViewTransferStore().keysOf(String(query.set))).toEqual(keys)
   })
 
+  it('opens the copy of the selected configurations with Copy to view', async () => {
+    const view = await mountBar(['usg.northwind.invoicing', 'sbt.contoso'])
+    expect(view.copyDialog().props('open')).toBe(false)
+    expect(dialog()).toBeNull()
+
+    button('Copy to view').click()
+    await settle()
+
+    // the dialog of configurations, for the selected keys; the target is picked in it
+    expect(view.copyDialog().props()).toMatchObject({
+      open: true,
+      kind: 'configurations',
+      keys: ['usg.northwind.invoicing', 'sbt.contoso'],
+      compare: true,
+    })
+    expect(view.copyDialog().props('target')).toBeUndefined()
+    expect(view.copyDialog().props('expected')).toBeUndefined()
+    await vi.waitFor(() => expect(dialog()?.textContent).toContain('Copy 2 configurations to another view'))
+    // only a copy of configurations asks about their annotations
+    expect(dialog()!.textContent).toContain('Copy missing annotations too')
+    // the page stays, with its selection
+    expect(view.router.currentRoute.value.fullPath).toBe('/acme/billing/default')
+    expect(view.clear).not.toHaveBeenCalled()
+  })
+
+  it('copies the selected configurations to the other view and keeps the selection', async () => {
+    // the own configuration of sbt.contoso differs between the views
+    const key = 'sbt.contoso'
+    const source = (await readConfiguration({ ...staging, view: 'default' }, key)).own
+    expect(canonicalJson((await readConfiguration(staging, key)).own)).not.toBe(canonicalJson(source))
+    const view = await mountBar([key])
+
+    button('Copy to view').click()
+    // staging is the only other view, so it is the target
+    await eventually(() => expect(dialogButton('Copy')?.disabled).toBe(false))
+    dialogButton('Copy')!.click()
+    await eventually(() => expect(dialog()?.textContent).toContain('Copied to staging'))
+
+    expect(canonicalJson((await readConfiguration(staging, key)).own)).toBe(canonicalJson(source))
+    // from a list, the copy can be compared next
+    expect(dialogButton('Compare with staging')).toBeDefined()
+
+    dialogButton('Done')!.click()
+    await eventually(() => expect(view.copyDialog().props('open')).toBe(false))
+    // the rows of this view did not change: they stay selected
+    expect(view.clear).not.toHaveBeenCalled()
+    expect(parts()[0]).toBe('1 selected')
+    expect(view.router.currentRoute.value.fullPath).toBe('/acme/billing/default')
+  })
+
   it('clears the selection with Clear selection', async () => {
     const view = await mountBar(['sbt.contoso'])
 
@@ -121,38 +204,62 @@ describe('ConfigurationBulkBar', () => {
     expect(view.router.currentRoute.value.fullPath).toBe('/acme/billing/default')
   })
 
-  it('is disabled in a project without another view, with the reason beside it and as its tooltip', async () => {
+  it('disables both in a project without another view, with the reason once beside them', async () => {
     // acme/shipping has only its default view, and the user is a Contributor there
     const view = await mountBar(['sbt.contoso'], 'shipping')
 
-    const compare = button('Compare with view')
-    expect(compare.disabled).toBe(true)
-    const reason = document.getElementById(compare.getAttribute('aria-describedby')!)
-    expect(reason?.textContent).toBe('The project has no other view')
-    expect(toolbar()!.contains(reason)).toBe(true)
-    compare.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' }))
-    await vi.waitFor(() =>
-      expect(document.body.querySelector('[role="tooltip"]')?.textContent?.trim()).toBe(
-        'The project has no other view',
-      ),
-    )
+    expectBlocked('The project has no other view')
+    // the reason follows the two buttons
+    expect(parts()).toEqual([
+      '1 selected',
+      'Compare with view',
+      'Copy to view',
+      'The project has no other view',
+      'Clear selection',
+    ])
 
-    compare.click()
+    for (const transfer of transfers()) {
+      transfer.click()
+    }
     await settle()
     expect(view.router.currentRoute.value.fullPath).toBe('/acme/shipping/default')
+    expect(view.copyDialog().props('open')).toBe(false)
+    expect(dialog()).toBeNull()
     // the selection can still be cleared
     expect(button('Clear selection').disabled).toBe(false)
   })
 
-  it('is disabled above 100 selected configurations, and formats their number', async () => {
-    await mountBar(keysOf(1234))
+  it.each(['Compare with view', 'Copy to view'])(
+    'shows the reason as the tooltip of the disabled %s',
+    async (label) => {
+      await mountBar(['sbt.contoso'], 'shipping')
+
+      button(label).dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' }))
+
+      await vi.waitFor(() =>
+        expect(document.body.querySelector('[role="tooltip"]')?.textContent?.trim()).toBe(
+          'The project has no other view',
+        ),
+      )
+    },
+  )
+
+  it('disables both above 100 selected configurations, and formats their number', async () => {
+    const view = await mountBar(keysOf(1234))
 
     expect(toolbar()!.querySelector('span')?.textContent).toBe(`${format(1234)} selected`)
-    const compare = button('Compare with view')
-    expect(compare.disabled).toBe(true)
-    expect(document.getElementById(compare.getAttribute('aria-describedby')!)?.textContent).toBe(
-      'Select up to 100 to compare or copy them at once',
-    )
+    expectBlocked('Select up to 100 to compare or copy them at once')
+
+    button('Copy to view').click()
+    await settle()
+    expect(view.copyDialog().props('open')).toBe(false)
+  })
+
+  it('enables both with exactly 100 selected configurations', async () => {
+    await mountBar(keysOf(100))
+
+    expect(transfers().map((transfer) => transfer.disabled)).toEqual([false, false])
+    expect(toolbar()!.textContent).not.toContain('Select up to 100')
   })
 })
 
@@ -321,6 +428,34 @@ describe('the selection of Configurations in the page memory', () => {
     expect(query).toEqual({ kind: 'configurations', key: [first, second] })
     // the selection is still there when the page comes back
     expect(Object.keys(memory().selection)).toHaveLength(2)
+  })
+
+  it('copies the selected configurations from the page, and keeps them selected', async () => {
+    const view = await mountPage()
+    memory().selection = { 'usg.northwind.invoicing': true, 'sbt.contoso': true }
+    await vi.waitFor(() =>
+      expect(view.queryClient.getQueryState(['v1', 'acme', 'billing', 'views'])?.status).toBe('success'),
+    )
+    await settle()
+
+    button('Copy to view').click()
+    await settle()
+
+    // the dialog of the bar gets the selected keys that are in the catalog
+    const copyDialog = view.host.findComponent(ViewCopyDialog)
+    expect(copyDialog.props()).toMatchObject({ open: true, kind: 'configurations' })
+    expect([...(copyDialog.props('keys') as string[])].toSorted()).toEqual(['sbt.contoso', 'usg.northwind.invoicing'])
+
+    await eventually(() => expect(dialogButton('Copy')?.disabled).toBe(false))
+    dialogButton('Copy')!.click()
+    // usg.northwind.invoicing is the same in both views, sbt.contoso is not
+    await eventually(() => expect(dialog()?.textContent).toContain('1 updated, 1 unchanged'))
+    dialogButton('Done')!.click()
+    await eventually(() => expect(copyDialog.props('open')).toBe(false))
+
+    expect(view.router.currentRoute.value.path).toBe('/acme/billing/default/configurations')
+    expect(memory().selection).toEqual({ 'usg.northwind.invoicing': true, 'sbt.contoso': true })
+    expect(selected()).toBe('2 selected')
   })
 
   it('shows the checkboxes but no bar to a Reader', async () => {

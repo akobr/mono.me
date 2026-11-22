@@ -2,14 +2,15 @@
 import { computed, useId } from 'vue'
 
 /**
- * Bulk actions for the selected rows of Configurations (Contributor and above): compare with another view (spec
- * "Copy and Compare Annotations and Configurations Between Views", section 8). The comparison keeps the selection.
+ * Bulk actions for the selected rows of Configurations (Contributor and above): compare with another view and copy
+ * to it (spec "Copy and Compare Annotations and Configurations Between Views", section 8). Both keep the selection:
+ * they change no row of this view.
  */
 const props = defineProps<{ keys: string[] }>()
 const emit = defineEmits<{ clear: [] }>()
 
-const { blocked, openCompare } = useViewTransfer('configurations', () => props.keys)
-// A disabled button takes no focus, so its tooltip is out of reach of a keyboard: the reason is also text beside it.
+const { blocked, openCompare, copying } = useViewTransfer('configurations', () => props.keys)
+// A disabled button takes no focus, so its tooltip is out of reach of a keyboard: the reason is also text beside them.
 const blockedId = useId()
 
 const formatter = new Intl.NumberFormat()
@@ -35,7 +36,21 @@ const count = computed(() => formatter.format(props.keys.length))
         @click="openCompare()"
       />
     </UTooltip>
+    <UTooltip :text="blocked" :disabled="!blocked">
+      <UButton
+        label="Copy to view"
+        icon="i-lucide-copy-plus"
+        size="xs"
+        color="neutral"
+        variant="outline"
+        :disabled="!!blocked"
+        :aria-describedby="blocked ? blockedId : undefined"
+        @click="copying = true"
+      />
+    </UTooltip>
     <span v-if="blocked" :id="blockedId" class="text-xs text-muted">{{ blocked }}</span>
     <UButton class="ms-auto" label="Clear selection" size="xs" color="neutral" variant="ghost" @click="emit('clear')" />
+
+    <ViewCopyDialog v-model:open="copying" kind="configurations" :keys="keys" />
   </div>
 </template>
