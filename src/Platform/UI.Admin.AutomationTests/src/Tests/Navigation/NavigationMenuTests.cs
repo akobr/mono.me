@@ -86,9 +86,9 @@ public sealed class NavigationMenuTests : PlatformTest
     }
 
     // NAV-MNU-03: An Administrator's menu lists every entry without locks.
-    // An Administrator (or Owner) of the project gets the five view entries in their order without a lock, every page of
-    // the project and none of the old pages merged into others, the organization's overview and the global entries;
-    // the palette offers Modeling's Export & Import tab and opens it.
+    // An Administrator (or Owner) of the project gets the six view entries in their order, Inbox last, without a lock,
+    // every page of the project and none of the old pages merged into others, the organization's overview and the
+    // global entries; the palette offers Modeling's Export & Import tab and opens it.
     [Test]
     [TestCase(24)]
     [UserRole(Role.Admin)]
@@ -99,7 +99,7 @@ public sealed class NavigationMenuTests : PlatformTest
 
         var menu = await App.MenuAsync();
         var viewEntries = ViewEntries(menu);
-        await Expect(viewEntries).ToHaveTextAsync(["Annotations", "Configurations", "Values store", "Graph", "Modeling"]);
+        await Expect(viewEntries).ToHaveTextAsync(["Annotations", "Configurations", "Values store", "Graph", "Modeling", "Inbox"]);
         await Expect(viewEntries.Nth(2)).ToHaveAttributeAsync("href", $"/{Routes.KeyValues}");
         await Expect(viewEntries.Locator(LockBadge)).ToHaveCountAsync(0);
 
@@ -128,9 +128,9 @@ public sealed class NavigationMenuTests : PlatformTest
     }
 
     // NAV-MNU-04: A Contributor's menu leaves out Members, Monitor and Export & Import.
-    // A Contributor of the project gets the five view entries without a lock, Views, Machines and Settings of the
-    // project but neither Members nor Monitor, and in the palette the editor actions and the Modeling tabs without
-    // Export & Import (an Administrator's tab).
+    // A Contributor of the project gets the six view entries, Inbox last, without a lock, Views, Machines and Settings
+    // of the project but neither Members nor Monitor, and in the palette the editor actions and the Modeling tabs
+    // without Export & Import (an Administrator's tab).
     [Test]
     [TestCase(27)]
     [UserRole(Role.Contributor)]
@@ -142,7 +142,7 @@ public sealed class NavigationMenuTests : PlatformTest
 
         var menu = await App.MenuAsync();
         var viewEntries = ViewEntries(menu);
-        await Expect(viewEntries).ToHaveTextAsync(["Annotations", "Configurations", "Values store", "Graph", "Modeling"]);
+        await Expect(viewEntries).ToHaveTextAsync(["Annotations", "Configurations", "Values store", "Graph", "Modeling", "Inbox"]);
         await Expect(viewEntries.Locator(LockBadge)).ToHaveCountAsync(0);
 
         foreach (var path in new[] { Routes.Views, Routes.Machines, Routes.Settings() })

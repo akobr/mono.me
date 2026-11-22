@@ -47,6 +47,7 @@ const screens: {
   { name: 'template', path: '/acme/billing/default/modeling/templates/exe' },
   { name: 'schemas', path: '/acme/billing/default/modeling/schemas' },
   { name: 'export-import', path: '/acme/billing/default/modeling/export-import' },
+  { name: 'inbox', path: '/acme/billing/default/inbox' },
   { name: 'members', path: '/acme/billing/members' },
   { name: 'machines', path: '/acme/billing/machines' },
   { name: 'key-values', path: '/acme/billing/default/key-values' },

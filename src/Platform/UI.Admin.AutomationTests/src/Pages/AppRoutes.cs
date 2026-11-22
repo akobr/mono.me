@@ -76,6 +76,9 @@ public sealed partial record AppRoutes(string Organization, string Project, stri
     // Redirects to its first tab, Schemas.
     public string Modeling => $"{ViewPath}/modeling";
 
+    // The inbox of the view (Contributor and up): the results of background jobs and what the platform suggests.
+    public string Inbox => $"{ViewPath}/inbox";
+
     private string ProjectPath => $"{Organization}/{Project}";
 
     private string ViewPath => $"{Organization}/{Project}/{View}";
