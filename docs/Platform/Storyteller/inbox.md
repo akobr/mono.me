@@ -224,7 +224,7 @@ An item that is not open is `ConflictException` with `InboxItemClosed` and "The 
 Then the work starts:
 
 5. **The claim.** The item is saved as `Accepted` with the `Closed` stamp, under its ETag, before the handler runs. So two people cannot start the work twice.
-6. **The point of no return.** The cancellation token of the caller is listened to up to and including the claim; a token cancelled before it starts nothing. From the claim on, the handler, the reopening after a failure and the save of the job run with `CancellationToken.None`. A caller that goes away leaves no accepted item without its work.
+6. **The point of no return.** A call whose cancellation token is already cancelled before the claim starts nothing. The claim's write and everything after it (the handler, the reopening after a failure, the save of the job) run with `CancellationToken.None`: a write that reached the store while its caller went away would otherwise leave an accepted item without its work.
 7. **The handler** runs with the accepted item and the actor (`ViewInboxActionContext`).
 8. **A handler that throws** reopens the item: it is saved as `Open` with `Closed` cleared, and the exception goes on to the caller as it is. A `ConflictException` with `TransferLimit` of a job that could not start arrives as such. The reopening is best effort: when it fails, the item stays accepted without its work, and the failure is logged.
 9. **A job the handler returns** is saved on the item as `Job`, best effort. The answer carries the job whether or not the save succeeded.
