@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useClipboard } from '@vueuse/core'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 
@@ -9,11 +11,36 @@ const route = useRoute()
 const router = useRouter()
 const catalog = useCatalogStore()
 const context = useContextStore()
+const canEdit = useCan('edit')
+const toast = useToast()
+const { copy } = useClipboard({ legacy: true })
 
 const key = computed(() => String((route.params as { key: string }).key))
 const annotation = computed(() => catalog.byKey.get(key.value))
 const base = computed(() => `/${context.org}/${context.project}/${context.view}/configurations/${key.value}`)
 const query = computed(() => ({ q: route.query.q }))
+
+// More actions, as on the annotation detail: the link and the key for everyone, and "Compare with view" for
+// Contributors (spec "Copy and Compare Annotations and Configurations Between Views", section 8).
+const transfer = useViewTransfer('configurations', () => [key.value])
+const menu = computed<DropdownMenuItem[][]>(() => [
+  [
+    {
+      label: 'Copy link',
+      icon: 'i-lucide-link',
+      onSelect: async () => {
+        await copy(`${location.origin}${base.value}`)
+        toast.add({ title: 'Link copied', icon: 'i-lucide-link' })
+      },
+    },
+    {
+      label: 'Copy key',
+      icon: 'i-lucide-copy',
+      onSelect: () => void copy(key.value),
+    },
+  ],
+  ...(canEdit.value ? [transfer.items.value] : []),
+])
 
 const tabs = computed(() => [
   { label: 'Edit', icon: 'i-lucide-pencil', to: { path: base.value, query: query.value }, exact: true },
@@ -60,6 +87,9 @@ function close() {
             </h2>
             <KeyText :value="key" copy />
           </div>
+          <UDropdownMenu :items="menu" :content="{ align: 'end' }">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" size="sm" aria-label="More actions" />
+          </UDropdownMenu>
           <DetailPanelActions />
           <UButton
             icon="i-lucide-x"

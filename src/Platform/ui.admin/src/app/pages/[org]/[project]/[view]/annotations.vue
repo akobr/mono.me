@@ -234,7 +234,7 @@ function reload() {
   <UDashboardPanel
     id="annotations"
     :class="{ hidden: detail.covers.value }"
-    :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }"
+    :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }"
   >
     <template #header>
       <AppNavbar title="Annotations">

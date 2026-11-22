@@ -2,14 +2,17 @@
 import { computed, h, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
+import type { RowSelectionState } from '@tanstack/vue-table'
 import type { TableColumn } from '@nuxt/ui'
 import type { ConfigurationSummary } from '@42for.net/2splatform.sdk'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import AnnotationTypeBadge from '@/components/annotations/AnnotationTypeBadge.vue'
+import RowSelect from '@/components/annotations/grid/RowSelect.vue'
 import AuditActorLink from '@/components/common/AuditActorLink.vue'
 import KeyText from '@/components/common/KeyText.vue'
 import RelativeTime from '@/components/common/RelativeTime.vue'
+import { mergeShownSelection, selectedKeysOf, shownSelection } from '@/utils/row-selection'
 
 interface Row {
   key: string
@@ -19,7 +22,8 @@ interface Row {
 }
 
 // Configurations of the view (companion spec E6) with the same filter language as the annotations; the detail
-// is a nested route, like the annotation grid. The scroll position is kept in the page memory of the view.
+// is a nested route, like the annotation grid. The selection of the rows (spec "Copy and Compare Annotations and
+// Configurations Between Views", section 8) and the scroll position are kept in the page memory of the view.
 const route = useRoute()
 const router = useRouter()
 const catalog = useCatalogStore()
@@ -59,6 +63,21 @@ const rows = computed<Row[]>(() => {
     .toSorted((a, b) => a.key.localeCompare(b.key))
 })
 
+// The selection is keyed by annotation key, as on Annotations.
+const selection = computed<RowSelectionState>({
+  get: () => memory.value.selection,
+  set: (value) => (memory.value.selection = value),
+})
+const shownKeys = computed(() => rows.value.map((row) => row.key))
+// The table gets only the selected keys of its rows: it counts every key of its selection for the header checkbox,
+// which would be wrong under a filter. The keys that the filter hides stay selected.
+const tableSelection = computed<RowSelectionState>({
+  get: () => shownSelection(selection.value, shownKeys.value),
+  set: (next) => (selection.value = mergeShownSelection(selection.value, shownKeys.value, next)),
+})
+// A remembered selection may name configurations that are gone meanwhile; those never reach a bulk action.
+const selectedKeys = computed(() => selectedKeysOf(selection.value).filter((key) => catalog.configurations?.has(key)))
+
 useScrollMemory(
   () => (desktop.value ? table.value?.$el : list.value),
   computed({
@@ -79,13 +98,35 @@ function open(key: string) {
   void router.push({ path: `${base.value}/${key}`, query: { q: route.query.q } })
 }
 
+// The cells of the checkbox and of the type stay on the page background, as the pinned ones of the annotation grid:
+// the tint of a selected row under the colored type badge would take its contrast.
+const opaque = 'bg-default'
+
 const columns: TableColumn<Row>[] = [
+  // The checkboxes of the annotation grid. A click on one does not open the detail: the table leaves a click on a
+  // control to the control.
+  {
+    id: 'select',
+    header: ({ table: api }) =>
+      h(RowSelect, {
+        checked: api.getIsAllRowsSelected() ? true : api.getIsSomeRowsSelected() ? 'indeterminate' : false,
+        label: 'Select all rows',
+        'onUpdate:checked': (value: boolean) => api.toggleAllRowsSelected(value),
+      }),
+    cell: ({ row }) =>
+      h(RowSelect, {
+        checked: row.getIsSelected(),
+        label: `Select ${row.original.key}`,
+        'onUpdate:checked': (value: boolean) => row.toggleSelected(value),
+      }),
+    meta: { class: { td: opaque }, style: { th: 'width: 40px', td: 'width: 40px' } },
+  },
   // The name of the type, as in the annotations grid (424-34); a custom name can be long, so the cell cannot grow.
   {
     id: 'type',
     header: 'Type',
     cell: ({ row }) => h(AnnotationTypeBadge, { type: row.original.key.slice(0, 3), variant: 'label' }),
-    meta: { style: { th: 'width: 160px', td: 'width: 160px; max-width: 160px' } },
+    meta: { class: { td: opaque }, style: { th: 'width: 160px', td: 'width: 160px; max-width: 160px' } },
   },
   {
     id: 'name',
@@ -115,7 +156,7 @@ const rowClass = (row: { original: Row }) =>
   <UDashboardPanel
     id="configurations"
     :class="{ hidden: detail.covers.value }"
-    :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }"
+    :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-hidden' }"
   >
     <template #header>
       <AppNavbar title="Configurations">
@@ -145,6 +186,8 @@ const rowClass = (row: { original: Row }) =>
     </template>
 
     <template #body>
+      <ConfigurationBulkBar v-if="selectedKeys.length && canEdit" :keys="selectedKeys" @clear="selection = {}" />
+
       <LoadingState
         v-if="!catalog.configurations && catalog.status !== 'error' && !catalog.configurationsError"
         label="Loading configurations…"
@@ -173,16 +216,18 @@ const rowClass = (row: { original: Row }) =>
           <UButton label="New configuration" icon="i-lucide-plus" @click="creating = true" />
         </template>
       </EmptyState>
+      <!-- min-h-0 flex-1, as the annotation grid: the bulk bar above must not push the last row out. -->
       <UTable
         v-else-if="desktop"
         ref="table"
+        v-model:row-selection="tableSelection"
         :data="rows"
         :columns="columns"
         :get-row-id="(row: Row) => row.key"
         :virtualize="{ estimateSize: 40 }"
         :meta="{ class: { tr: rowClass } }"
         sticky
-        class="h-full"
+        class="min-h-0 flex-1"
         :ui="{ td: 'py-2 text-sm', th: 'py-2 text-xs', tr: 'cursor-pointer' }"
         :on-select="(_event: Event, row: { original: Row }) => open(row.original.key)"
       />

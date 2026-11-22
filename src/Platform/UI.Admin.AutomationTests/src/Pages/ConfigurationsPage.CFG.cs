@@ -14,14 +14,16 @@ public sealed partial class ConfigurationsPage
 
     public const string EmptyStateDescriptionText = "Create one with New, or from the configuration link in the header of an annotation.";
 
-    // The columns of the grid: the type's name, the annotation's Name (else the last part of its key), the key, "v<n>",
-    // the author of the last version (a link for Administrators) and the time of it ("just now" under a minute).
-    public const int TypeColumn = 0;
-    public const int NameColumn = 1;
-    public const int KeyColumn = 2;
-    public const int VersionColumn = 3;
-    public const int AuthorColumn = 4;
-    public const int UpdatedColumn = 5;
+    // The columns of the grid: the row's checkbox ("Select <key>"; the header's is "Select all rows"), the type's name,
+    // the annotation's Name (else the last part of its key), the key, "v<n>", the author of the last version (a link
+    // for Administrators) and the time of it ("just now" under a minute).
+    public const int SelectColumn = 0;
+    public const int TypeColumn = 1;
+    public const int NameColumn = 2;
+    public const int KeyColumn = 3;
+    public const int VersionColumn = 4;
+    public const int AuthorColumn = 5;
+    public const int UpdatedColumn = 6;
 
     // One poll of ExpectListedAsync on the grid's table: true once a rendered row has the key in its Key cell, else it
     // scrolls the table's scroll container (UTable's root, the table's parent) a page down, or back to the top from the
@@ -62,7 +64,7 @@ public sealed partial class ConfigurationsPage
         ? app.Page.GetByRole(AriaRole.Row).Filter(new() { Has = app.Page.GetByRole(AriaRole.Cell) }).First
         : app.Page.GetByRole(AriaRole.Listitem).Filter(new() { Has = app.Page.GetByRole(AriaRole.Button) }).First;
 
-    // A cell of the key's grid row by its column (TypeColumn … UpdatedColumn); the grid only, from 768 px.
+    // A cell of the key's grid row by its column (SelectColumn … UpdatedColumn); the grid only, from 768 px.
     public ILocator ItemCell(string key, int column)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(column);
@@ -122,8 +124,8 @@ public sealed partial class ConfigurationsPage
         return dialog;
     }
 
-    // Opens the configuration of a row by its Name cell (the Author cell can be a link), or of a list item by its
-    // button; the detail's URL keeps the list's q.
+    // Opens the configuration of a row by its Name cell (the Select cell holds a checkbox and the Author cell can be a
+    // link), or of a list item by its button; the detail's URL keeps the list's q.
     public async Task OpenItemAsync(ILocator item)
     {
         ArgumentNullException.ThrowIfNull(item);

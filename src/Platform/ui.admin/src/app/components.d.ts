@@ -47,6 +47,7 @@ declare module 'vue' {
     CombinatorRenderer: typeof import('./components/configuration/renderers/CombinatorRenderer.vue')['default']
     CombinedSchemaView: typeof import('./components/configuration/CombinedSchemaView.vue')['default']
     CommandPalette: typeof import('./components/shell/CommandPalette.vue')['default']
+    ConfigurationBulkBar: typeof import('./components/configuration/ConfigurationBulkBar.vue')['default']
     ConfigurationComposition: typeof import('./components/configuration/ConfigurationComposition.vue')['default']
     ConfigurationCreateDialog: typeof import('./components/configuration/ConfigurationCreateDialog.vue')['default']
     ConfigurationEditor: typeof import('./components/configuration/ConfigurationEditor.vue')['default']
@@ -195,6 +196,7 @@ declare module 'vue' {
     VersionCompare: typeof import('./components/versions/VersionCompare.vue')['default']
     VersionsView: typeof import('./components/versions/VersionsView.vue')['default']
     VersionTimeline: typeof import('./components/versions/VersionTimeline.vue')['default']
+    ViewCompareFile: typeof import('./components/views/ViewCompareFile.vue')['default']
     ZonedDateTimeInput: typeof import('./components/annotations/ZonedDateTimeInput.vue')['default']
   }
 }
