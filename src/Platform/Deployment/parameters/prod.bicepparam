@@ -92,6 +92,13 @@ param mcpCustomDomain = true
 // One replica always runs: no cold start on the first call after an idle period, about 4-5 USD a month at the idle rate
 // beyond the free grant (decisions, "The MCP server"). 0 scales it to zero again, for 0 USD.
 param mcpMinReplicas = 1
+// The MCP server's budget prod-2s-mcp-budget (the subscription's Container Apps cost): its first month, never changed
+// while the budget exists (a re-created budget needs the month of its run); the what-if refuses mcpEnabled without it.
+// With one replica always on the cost is about 4-6 USD a month at the idle rate, so the amount is 12: the 50 % alert
+// (6 USD) means more than the idle baseline, 100 % about a replica busy all month (runbook, "The cost of the MCP
+// server"). mcpCooldownSeconds (300) matters only with mcpMinReplicas = 0.
+param mcpBudgetStartDate = '2026-12-01'
+param mcpBudgetAmount = 12
 
 // The MCP clients (runbook-mcp-server.md, "Trust a client"): every client outside mcpTrustedClientIds only reads and
 // reveals no secret. The trusted list stays empty until a sign-in of a client with a Client ID Metadata Document has been

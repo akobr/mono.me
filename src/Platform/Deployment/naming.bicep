@@ -23,6 +23,7 @@ type resourceNamesType = {
   containerAppsEnvironment: string
   mcpApp: string
   mcpIdentity: string
+  mcpBudget: string
 }
 
 @export()
@@ -42,6 +43,7 @@ func resourceNames(environment environmentName, product string, company string, 
   containerAppsEnvironment: '${environment}-${product}-cae'
   mcpApp: '${environment}-${product}-mcp-ca'
   mcpIdentity: '${environment}-${product}-mcp-mi'
+  mcpBudget: '${environment}-${product}-mcp-budget'
 }
 
 @export()

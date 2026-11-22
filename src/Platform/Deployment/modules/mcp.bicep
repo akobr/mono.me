@@ -1,8 +1,9 @@
 // The MCP server (docs/Platform/Deployment/runbook-mcp-server.md): a Container Apps environment (workload profiles, the
 // Consumption profile only) and the server's Container App, scaled to zero between calls (0.25 vCPU, 0.5 GiB, at most
-// maxReplicas replicas), inside the monthly free grant of Container Apps. The environment has no base fee, no virtual
-// network and no zone redundancy; its console and system logs go to the platform's Log Analytics workspace, under its
-// daily cap.
+// maxReplicas replicas). The monthly free grant of Container Apps covers about 200 hours of such a replica; beyond it a
+// warm replica costs about 0.027 USD an hour, and main.bicep's budget prod-2s-mcp-budget warns (decisions.md, "The MCP
+// server"). The environment has no base fee, no virtual network and no zone redundancy; its console and system logs go
+// to the platform's Log Analytics workspace, under its daily cap.
 //
 // The server holds no data and no secret. It signs people in at the AuthKit domain and proves itself to the API with a
 // token of its own managed identity (the actor mcp), which has no Azure role. Every setting is an environment variable
@@ -66,6 +67,11 @@ param minReplicas int
 @minValue(1)
 @maxValue(10)
 param maxReplicas int
+
+@description('cooldownPeriod: the seconds the last replica stays up after the last request (the platform\'s default is 300).')
+@minValue(60)
+@maxValue(1800)
+param cooldownSeconds int
 
 resource environment 'Microsoft.App/managedEnvironments@2026-07-01' = {
   name: environmentName
@@ -166,7 +172,8 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
       activeRevisionsMode: 'Single'
       maxInactiveRevisions: 10
       ingress: {
-        // MCP clients run anywhere, so no IP restriction: without a valid token a call only gets 401. The managed
+        // MCP clients run anywhere, so no IP restriction: without a valid token a call only gets 401, though it still
+        // wakes a replica, a scanner's call too (the host name is public in Certificate Transparency logs). The managed
         // certificate needs the app reachable from the certificate authority too. A request may take 240 seconds.
         external: true
         // The port of .NET's container images (ASPNETCORE_HTTP_PORTS).
@@ -229,11 +236,14 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
           ]
         }
       ]
-      // With minReplicas 0, zero replicas without calls (about 5 minutes after the last one), and a call starts one, a
-      // cold start of a few seconds; with 1, one replica always runs. Every 20 concurrent calls one more.
+      // With minReplicas 0, zero replicas cooldownSeconds after the last call, and a call starts one, a cold start of 10
+      // to 30 seconds; with 1 or more, that many always run and the cool-down has no effect (it applies only from the last
+      // replica to zero). Every 20 concurrent calls one more; those go after the platform's scale-down window of 300
+      // seconds. With minReplicas 0 a running replica is billed at the active rate, with 1 at the idle rate between calls.
       scale: {
         minReplicas: minReplicas
         maxReplicas: maxReplicas
+        cooldownPeriod: cooldownSeconds
         rules: [
           {
             name: 'http'

@@ -188,6 +188,18 @@ param mcpMinReplicas int = 0
 @maxValue(10)
 param mcpMaxReplicas int = 3
 
+@description('The seconds the MCP server\'s last replica stays up after the last request before it scales to zero (cooldownPeriod; 300 is the platform\'s own default). Every request wakes a replica, a scanner\'s too: lower means fewer warm seconds per request, and a cold start of 10 to 30 seconds after every pause longer than this.')
+@minValue(60)
+@maxValue(1800)
+param mcpCooldownSeconds int = 300
+
+@description('The first day of the first month of the MCP server\'s budget (yyyy-MM-01): the month of the run that creates it, or a later one. Required with mcpEnabled; fixed once the budget exists, like budgetStartDate.')
+param mcpBudgetStartDate string = ''
+
+@description('The monthly budget of the subscription\'s Container Apps cost, the MCP server\'s, in its billing currency; alerts at 50 and 100 % of the actual cost and at 100 % of the forecast. The cost is 0 inside the monthly free grant (about 200 hours of a replica).')
+@minValue(1)
+param mcpBudgetAmount int = 1
+
 var names = resourceNames(environment, product, company, regionCode)
 var tags = resourceTags(environment)
 
@@ -213,6 +225,9 @@ var mcpCustomDomainChecked = mcpEnabled && mcpCustomDomain && !mcpAppExists
 var mcpInitialImageChecked = mcpEnabled && !mcpAppExists && empty(mcpInitialImage)
   ? fail('mcpInitialImage is required for the run that creates the MCP server\'s Container App (mcpAppExists = false).')
   : mcpInitialImage
+var mcpBudgetStartDateChecked = mcpEnabled && (length(mcpBudgetStartDate) != 10 || !endsWith(mcpBudgetStartDate, '-01'))
+  ? fail('mcpBudgetStartDate is required with mcpEnabled: the first day of the month of the run that creates the MCP server\'s budget (yyyy-MM-01), or of a later month.')
+  : mcpBudgetStartDate
 // A blank client id would stop the API at start, and with it the admin UI and sform: the deployment fails instead.
 var mcpAllowedClientIdsChecked = mcpEnabled && hasBlankEntry(mcpAllowedClientIds)
   ? fail('mcpAllowedClientIds entries must not be blank with mcpEnabled: the API would not start.')
@@ -257,6 +272,55 @@ resource budget 'Microsoft.Consumption/budgets@2026-06-01' = {
         enabled: true
         operator: 'GreaterThanOrEqualTo'
         threshold: 80
+        thresholdType: 'Actual'
+        contactEmails: [ownerEmail]
+      }
+      actual100: {
+        enabled: true
+        operator: 'GreaterThanOrEqualTo'
+        threshold: 100
+        thresholdType: 'Actual'
+        contactEmails: [ownerEmail]
+      }
+      forecasted100: {
+        enabled: true
+        operator: 'GreaterThanOrEqualTo'
+        threshold: 100
+        thresholdType: 'Forecasted'
+        contactEmails: [ownerEmail]
+      }
+    }
+  }
+}
+
+// The MCP server's own budget (decisions.md, "The MCP server"): the subscription's Container Apps cost, because the
+// free grant is per subscription and month. Inside the grant the cost is 0, so a cost means the grant is used up, e.g.
+// by scanner requests that keep a replica warm. It also counts the environment's meters (private endpoint, planned
+// maintenance), which the server doesn't use. Free, like every budget; its warning comes a day or a few after the cost.
+resource mcpBudget 'Microsoft.Consumption/budgets@2026-06-01' = if (mcpEnabled) {
+  name: names.mcpBudget
+  properties: {
+    category: 'Cost'
+    amount: mcpBudgetAmount
+    timeGrain: 'Monthly'
+    timePeriod: {
+      startDate: mcpBudgetStartDateChecked
+    }
+    filter: {
+      // The meter category of Container Apps in cost data, the serviceName of its meters in the Retail Prices API.
+      dimensions: {
+        name: 'MeterCategory'
+        operator: 'In'
+        values: [
+          'Azure Container Apps'
+        ]
+      }
+    }
+    notifications: {
+      actual50: {
+        enabled: true
+        operator: 'GreaterThanOrEqualTo'
+        threshold: 50
         thresholdType: 'Actual'
         contactEmails: [ownerEmail]
       }
@@ -385,6 +449,7 @@ module mcp 'modules/mcp.bicep' = if (mcpEnabled) {
     apiBaseUrl: 'https://${apiHostName}/api'
     minReplicas: mcpMinReplicas > mcpMaxReplicas ? fail('mcpMinReplicas must not exceed mcpMaxReplicas.') : mcpMinReplicas
     maxReplicas: mcpMaxReplicas
+    cooldownSeconds: mcpCooldownSeconds
   }
 }
 
