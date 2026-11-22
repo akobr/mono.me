@@ -1,0 +1,98 @@
+name: Platform.Storyteller.Api.Functions.UnitTests
+
+# The unit tests of the Storyteller API (src/Platform/Storyteller/Api.Functions/test) on every pull request and push to main
+# that touches Storyteller, a library the API builds on, the vendored packages or the root build files. With every
+# organization in one Cosmos DB container, the API's access checks are the only thing between tenants, and these tests are
+# what proves them: the tenant isolation tests (every route family of another organization, for users, delegated users and
+# machines of every kind) and the role refusals. Release is the run that matters: a Debug build (DEV_AUTH) skips the checks
+# of users, and the role refusals return early there. The Debug run covers the DEV_AUTH branches and the startup guard that
+# keeps such a build off any deployment. No Docker, emulator, network service or secret is needed. Spec:
+# docs/Platform/Storyteller/specs/2026-11-22 Refuse Debug Builds Outside Development and Test the Tenant Isolation of the API in CI.md.
+on:
+  pull_request:
+    paths:
+      - 'src/Platform/Storyteller/**'
+      - 'src/Libraries/Platform/Storyteller/ConfigurationFormats/**'
+      - 'src/Libraries/Utils/Async/**'
+      - 'src/Platform/version.json'
+      - 'src/.stylecop/**'
+      - '.packages/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'nuget.config'
+      - 'stylecop.json'
+      - 'version.json'
+      - '.github/workflows/Platform.Storyteller.Api.Functions.UnitTests.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/Platform/Storyteller/**'
+      - 'src/Libraries/Platform/Storyteller/ConfigurationFormats/**'
+      - 'src/Libraries/Utils/Async/**'
+      - 'src/Platform/version.json'
+      - 'src/.stylecop/**'
+      - '.packages/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'nuget.config'
+      - 'stylecop.json'
+      - 'version.json'
+      - '.github/workflows/Platform.Storyteller.Api.Functions.UnitTests.yml'
+  workflow_dispatch:
+  # A future deployment of the API can gate on it.
+  workflow_call:
+
+# A newer pull request run replaces an older one. Under workflow_call the context is the caller's, so the group differs from
+# the caller's own and a caller never cancels its gate.
+concurrency:
+  group: storyteller-api-functions-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  API_TESTS: src/Platform/Storyteller/Api.Functions/test/Api.Functions.UnitTests.csproj
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: API unit tests (${{ matrix.configuration }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      # Both runs report: a failure in Debug says nothing about Release, and the other way round.
+      fail-fast: false
+      matrix:
+        configuration: [ Release, Debug ]
+    steps:
+      # The whole history: the versioning of the build fails on a shallow clone.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # The configuration of the test project is the API's too (its project reference), so Release compiles DEV_AUTH out.
+      - name: API unit tests
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: dotnet test --project "$API_TESTS" -c "$CONFIGURATION" --report-trx --results-directory TestResults
+
+      - name: Test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyteller-api-functions-${{ matrix.configuration }}
+          path: TestResults
+          if-no-files-found: ignore

@@ -9,7 +9,8 @@ name: Platform.Storyteller.CosmosDb
 # docs/Platform/Storyteller/specs/2026-11-09 Shared Organization Container.md, sections 8 and 10. On a pull request the
 # classic job runs only the Emulator=Classic tests (Backend.CosmosDb has them, the two integration suites none); by
 # hand or called, the whole suites. The vNext job also runs the unit tests of DbCreator (no emulator): no other workflow
-# runs the Storyteller unit tests, and the seed's integration suite builds on them. By hand, vnext_runs runs the vNext
+# runs them, and the seed's integration suite builds on them (the API's unit tests run in
+# Platform.Storyteller.Api.Functions.UnitTests.yml). By hand, vnext_runs runs the vNext
 # job several times at once on the same commit, a check that it is steady (424-310), and classic: false leaves out the
 # classic job.
 on:
