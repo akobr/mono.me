@@ -622,9 +622,10 @@ The [MCP server](../Storyteller/mcp.md) lets an AI assistant work with the platf
 | Entra application | `2S Platform Token Exchange` | the audience `api://<app id>` of the server's actor tokens: it stands for the Storyteller exchange only, so its tokens are no credential anywhere else. No secret, no certificate, no redirect URI, v1 tokens |
 | Managed identity | `prod-2s-mcp-mi` | the server's own identity, not the API's: it proves the server to the API as the actor `mcp` and has **no Azure role** (the API's identity reads every secret of the vault) |
 | Container Apps environment | `prod-2s-cae` | workload profiles with the Consumption profile only: no base fee, scale to zero, the monthly free grant of Container Apps. No virtual network, no zone redundancy. Its console and system logs go to `prod-2s-log` through a diagnostic setting (the tables `ContainerAppConsoleLogs` and `ContainerAppSystemLogs`), under the workspace's daily cap, with no shared key of the workspace |
-| Container App | `prod-2s-mcp-ca` | the server: 0.25 vCPU, 0.5 GiB, 0 to 3 replicas (one more for every 20 concurrent requests), external HTTPS ingress on port 8080, TCP probes (the health endpoints exist only in Development), single revision mode, the identity above, no secret |
+| Container App | `prod-2s-mcp-ca` | the server: 0.25 vCPU, 0.5 GiB, 0 to 3 replicas (one more for every 20 concurrent requests; the last one goes 300 seconds after the last request, `mcpCooldownSeconds`), external HTTPS ingress on port 8080, TCP probes (the health endpoints exist only in Development), single revision mode, the identity above, no secret |
 | Image | `ghcr.io/akobr/2s-platform-mcp:<commit>` | built once per commit by the .NET SDK without a Dockerfile (chiseled Ubuntu, non-root, port 8080) by the workflow `Platform.Storyteller.Mcp.yml` on `main`, which deploys it by its digest; a public package, so the app pulls it without a credential |
 | Custom domain | `mcp.2s.42for.net` | a free managed certificate of the environment, validated by the CNAME |
+| Budget | `prod-2s-mcp-budget` | the subscription's Container Apps cost, which is 0 inside the free grant (about 200 hours of a replica a month): 1 USD a month, alerts at 50 and 100 % of the actual cost and at 100 % of the forecast. Every request wakes a replica for about 5.5 minutes, a scanner's too, so the first email means the grant is used up ([decisions](decisions.md#the-mcp-server), [runbook, phase 11](runbook-mcp-server.md#11-the-cost-of-the-mcp-server)) |
 
 ```sh
 MCP_HOST="mcp.2s.42for.net"
@@ -704,6 +705,8 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | (defaults) | `Scopes` `User.Impersonation`, `NoSecretReveal`, `AllowedClientIds` empty (MCP clients register dynamically; the API logs once at start that it accepts any client and which restrictions the untrusted ones get), 10-minute tokens, actor tokens up to 24 hours old (Azure.Identity caches them) |
 
 **The custom domain:** the records `mcp.2s` (CNAME to the app's `properties.configuration.ingress.fqdn`) and `asuid.mcp.2s` (TXT, its `properties.customDomainVerificationId`) in the zone `42for.net` (step 12). A CAA record of the zone, if there is one, must allow `digicert.com`. Then `az containerapp hostname bind -g "$RG" -n "$MCP_APP" --hostname "$MCP_HOST" --environment "$CAE" --validation-method CNAME`. The template binds it with `mcpCustomDomain`: the host name with the binding type `Auto` and the managed certificate.
+
+**The budget** is easiest in the portal, as in step 2: **Cost Management → Budgets → Add**, scope the subscription, the filter **Service name** (the meter category) `Azure Container Apps`, amount 1, monthly, alerts at 50 and 100 % of the actual cost and at 100 % of the forecasted cost to `$OWNER_EMAIL`. The `az containerapp create` above leaves the cool-down at the platform's 300 seconds; the CLI sets `cooldownPeriod` only through `--yaml`.
 
 **WorkOS production** (step 13): dynamic client registration on, and the resource indicator `https://mcp.2s.42for.net/mcp`, the default one only if staging showed that it leaves the `aud` of the admin UI's tokens alone (runbook, phase 1).
 

@@ -9,7 +9,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook. The MCP se
 | File | Cookbook step | What |
 | --- | --- | --- |
 | `scripts/Initialize-Subscription.ps1` | 1 | providers, Flex Consumption in the region, the Cosmos DB free tier still free |
-| `main.bicep` | 2–9, 11 (roles) | subscription scope: the resource group, the budget and every resource, through `modules/` |
+| `main.bicep` | 2–9, 11 (roles), 17a (the MCP server's budget) | subscription scope: the resource group, the budget, with `mcpEnabled` the MCP server's budget `prod-2s-mcp-budget` (the subscription's Container Apps cost), and every resource, through `modules/` |
 | `modules/identity.bicep` | 3 | the user-assigned managed identity `prod-2s-api-mi` |
 | `modules/monitoring.bicep` | 4 | Log Analytics `prod-2s-log` (0.15 GB a day, 30 days), Application Insights `prod-2s-api-appi` |
 | `modules/cosmos.bicep` | 5 | `prod-2s-42fornet-cdb`: free tier, one region, session, continuous 7-day backup, delete lock, **no database** |
@@ -19,7 +19,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook. The MCP se
 | `modules/staticwebapp.bicep` | 9 | `prod-2s-app-swa`: Free, `eastus2` (metadata only; West Europe, the only European one, refuses new tenants) |
 | `modules/access.bicep` | 6, 7, 11.2, 17a | the owner's roles, and the deployment identity's roles once it exists (with the MCP server also Container Apps Contributor on its Container App only) |
 | `domains.bicep`, `modules/hostname-binding.bicep` | 10 | `api.2s.42for.net` with a managed certificate, `app.2s.42for.net` |
-| `modules/mcp.bicep` | 17a | with `mcpEnabled`: the Container Apps environment `prod-2s-cae` (the Consumption profile only, logs into `prod-2s-log` through a diagnostic setting) and the MCP server `prod-2s-mcp-ca` (0.25 vCPU, 0.5 GiB, 0–3 replicas, its settings, no secret); with `mcpCustomDomain` also `mcp.2s.42for.net` with the environment's free managed certificate (a Container App has no binding of its own, so the template that writes the app binds its domain) |
+| `modules/mcp.bicep` | 17a | with `mcpEnabled`: the Container Apps environment `prod-2s-cae` (the Consumption profile only, logs into `prod-2s-log` through a diagnostic setting) and the MCP server `prod-2s-mcp-ca` (0.25 vCPU, 0.5 GiB, 0–3 replicas, scaled to zero `mcpCooldownSeconds` after the last request, its settings, no secret); with `mcpCustomDomain` also `mcp.2s.42for.net` with the environment's free managed certificate (a Container App has no binding of its own, so the template that writes the app binds its domain) |
 | `modules/mcp-existing.bicep` | 17a | the MCP server as it runs: a later run keeps the image that `Platform.Storyteller.Mcp.yml` deployed and the bound certificate |
 | `modules/identity.bicep` (second call) | 17a | with `mcpEnabled`: the MCP server's own identity `prod-2s-mcp-mi`, with no Azure role |
 | `scripts/New-ByokApplication.ps1` | 11.1 | the Entra app `2S Platform Customer Keys` and its federation with the identity |
