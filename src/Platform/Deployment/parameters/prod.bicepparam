@@ -75,9 +75,9 @@ param budgetStartDate = '2026-11-01'
 // mcpAppExists = true, so later runs keep the image that Platform.Storyteller.Mcp.yml deployed, and mcpCustomDomain =
 // true, which binds mcp.2s.42for.net with a managed certificate. mcpEnabled = false turns the API's exchange off again
 // and leaves the Container App as it is.
-param mcpEnabled = false
+param mcpEnabled = true
 param mcpHostName = 'mcp.2s.42for.net'
-param mcpExchangeAppId = ''
-param mcpInitialImage = ''
+param mcpExchangeAppId = '2399e89b-0b03-4d80-9f02-cf25a146509d'
+param mcpInitialImage = 'ghcr.io/akobr/2s-platform-mcp:20ef5b5a2e55db09753cf8ca5cadfef28b0e2b22'
 param mcpAppExists = false
 param mcpCustomDomain = false
