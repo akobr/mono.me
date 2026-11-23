@@ -114,5 +114,19 @@ internal sealed class TokenExchangeActorNotice : IHostedService
                 actor.Id,
                 trustedCount);
         }
+
+        // With AllowedClientIds, a trusted client that is not allowed never gets a token, so its trust never applies.
+        if (!anyClient)
+        {
+            var allowed = Entries(actor.AllowedClientIds).ToHashSet(StringComparer.Ordinal);
+
+            foreach (var clientId in Entries(actor.TrustedClientIds).Distinct(StringComparer.Ordinal).Where(clientId => !allowed.Contains(clientId)))
+            {
+                _logger.LogWarning(
+                    "The client {ClientId} of the TrustedClientIds of the actor {ActorId} is not in its AllowedClientIds: the exchange refuses it, so its trust never applies.",
+                    clientId,
+                    actor.Id);
+            }
+        }
     }
 }

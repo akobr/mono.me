@@ -166,6 +166,9 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         {
             HttpResponseData response => (int)response.StatusCode,
             IStatusCodeActionResult { StatusCode: { } statusCode } => statusCode,
+
+            // An ObjectResult without a code answers the code of its ProblemDetails, as ASP.NET Core writes it.
+            ObjectResult { Value: ProblemDetails { Status: { } problemStatus } } => problemStatus,
             IActionResult => (int)HttpStatusCode.OK,
             _ => null,
         };
