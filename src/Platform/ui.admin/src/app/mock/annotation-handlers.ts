@@ -811,8 +811,7 @@ export const annotationHandlers: HttpHandler[] = [
   // PatchAnnotation, in the API's order (AnnotationsHttp.cs): access, key, conditions, media type, body, the key's
   // state, the patch, the rules, the write. A patch never creates or re-creates a key, and one that changes nothing
   // writes nothing. If-Match is not modelled: the mock has no ETags, and the admin UI sends none. The body is read
-  // before the database, so the database part runs without an await and the concurrent patches of the bulk actions
-  // (four at a time) do not overwrite each other.
+  // before the database section (withDb), so the section does not wait for it.
   http.patch<ScopeParams & { key: string }>(`${api}/annotations/:key`, async (info) => {
     const text = await info.request.text()
     return withDb<ScopeParams & { key: string }>((db, { params, request }) => {
@@ -861,7 +860,8 @@ export const annotationHandlers: HttpHandler[] = [
         return errorResponse(400, `The body is not a patch of an annotation: ${malformed}`, 'PatchInvalid')
       }
 
-      if (trashOf(overridesOf(db, params.org, params.project, params.view))[params.key]) {
+      // read without creating the view's overrides: a patch that writes nothing leaves the stored database as it was
+      if (db.annotations[`${params.org}/${params.project}/${params.view}`]?.trash?.[params.key]) {
         return errorResponse(
           404,
           `The annotation '${params.key}' is deleted.`,

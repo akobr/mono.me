@@ -91,8 +91,25 @@ const ignoredByType: Record<AnnotationTypeCode, string[]> = {
 /** ASCII case folding, as the API matches member names (OrdinalIgnoreCase). */
 const fold = (name: string) => name.toLowerCase()
 
+const token = "[!#$%&'*+.^_`|~0-9a-z-]+"
+const mediaTypePattern = new RegExp(
+  String.raw`^\s*(${token}/${token})\s*(?:;\s*${token}=(?:${token}|"(?:[^"\\]|\\.)*")\s*)*$`,
+  'i',
+)
+
 /**
- * The patch format by Content-Type (case-insensitive, parameters ignored) and by the body: application/json or none
+ * The media type of a Content-Type, lower-case: '' when there is none, undefined when the header does not parse (the
+ * API answers an unparseable header with 415, as an unsupported one). Parameters such as charset are allowed.
+ */
+export function mediaTypeOf(contentType: string | null): string | undefined {
+  if (!contentType?.trim()) {
+    return ''
+  }
+  return mediaTypePattern.exec(contentType)?.[1]!.toLowerCase()
+}
+
+/**
+ * The patch format by Content-Type (case-insensitive, parameters allowed) and by the body: application/json or none
  * decides by the body (an object is a merge patch, an array a JSON Patch). Another media type is unsupported (415);
  * a body that does not fit its format is a PatchInvalid message.
  */
@@ -100,7 +117,7 @@ export function patchFormatOf(
   contentType: string | null,
   body: unknown,
 ): AnnotationPatchFormat | { unsupported: true } | { invalid: string } {
-  const mediaType = (contentType ?? '').split(';')[0]!.trim().toLowerCase()
+  const mediaType = mediaTypeOf(contentType)
   if (mediaType === mergePatchMediaType) {
     return isObject(body) ? 'merge' : { invalid: 'A merge patch (RFC 7396) of an annotation is a JSON object.' }
   }
@@ -117,10 +134,12 @@ export function patchFormatOf(
   return { unsupported: true }
 }
 
-/** Whether the media type (parameters ignored) is one a PATCH of an annotation takes; none counts as JSON. */
+/** Whether the Content-Type parses and is one a PATCH of an annotation takes; none counts as JSON. */
 export function isPatchMediaType(contentType: string | null): boolean {
-  const mediaType = (contentType ?? '').split(';')[0]!.trim().toLowerCase()
-  return ['', 'application/json', mergePatchMediaType, jsonPatchMediaType].includes(mediaType)
+  const mediaType = mediaTypeOf(contentType)
+  return (
+    mediaType !== undefined && ['', 'application/json', mergePatchMediaType, jsonPatchMediaType].includes(mediaType)
+  )
 }
 
 const operations = new Set(['add', 'remove', 'replace', 'move', 'copy', 'test'])
@@ -130,7 +149,9 @@ const operations = new Set(['add', 'remove', 'replace', 'move', 'copy', 'test'])
  * of the six operations, a JSON Pointer path, a value where it needs one and a from where it needs one.
  */
 export function jsonPatchProblem(patch: readonly unknown[]): string | undefined {
-  const unknown = patch.findIndex((operation) => !isObject(operation) || !operations.has(String(operation.op)))
+  const unknown = patch.findIndex(
+    (operation) => !isObject(operation) || typeof operation.op !== 'string' || !operations.has(operation.op),
+  )
   if (unknown >= 0) {
     return `Invalid JSON Patch document: the operation ${unknown} is not an operation of RFC 6902.`
   }
@@ -208,8 +229,30 @@ function applyMerge(current: Annotation, document: Document, patch: Document): A
  * its own operation: a test that does not hold, or whose path does not exist, is a precondition (412); any other
  * failure is 400, as a move into its own child is (fast-json-patch would apply it).
  */
+/**
+ * A copy of a JSON value whose objects have no prototype. A JSON name such as `__proto__` (the API takes it as a value
+ * name) is then an own member that fast-json-patch can add, test and remove with its prototype guard off, without
+ * ever touching a prototype.
+ */
+function bare(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(bare)
+  }
+  if (typeof value !== 'object' || value === null) {
+    return value
+  }
+  const copy = Object.create(null) as Document
+  for (const [name, member] of Object.entries(value)) {
+    copy[name] = bare(member)
+  }
+  return copy
+}
+
+/** Plain objects again; JSON.parse makes a `__proto__` name an own member. */
+const plain = (value: unknown): unknown => JSON.parse(JSON.stringify(value))
+
 function applyJsonPatch(document: Document, patch: Operation[]): { document: Document } | AnnotationPatchFailure {
-  let result: unknown = structuredClone(document)
+  let result: unknown = bare(document)
   for (const [index, operation] of patch.entries()) {
     const failed = (reason: string): AnnotationPatchFailure => ({
       status: operation.op === 'test' ? 412 : 400,
@@ -220,11 +263,15 @@ function applyJsonPatch(document: Document, patch: Operation[]): { document: Doc
       return failed(`The value at '${operation.from}' cannot be moved into itself ('${operation.path}').`)
     }
     try {
-      result = applyOperation(result, operation, true, true, true, index).newDocument
+      // every object of the document and of the operation's value has no prototype, so the guard can be off; the
+      // result is made bare again, as copy and move bring plain objects in
+      const step = { ...operation, value: bare((operation as { value?: unknown }).value) } as Operation
+      result = bare(applyOperation(result, step, true, true, false, index).newDocument)
     } catch (error) {
       return failed(((error as Error).message ?? '').split('\n')[0]!)
     }
   }
+  result = result === undefined ? undefined : plain(result)
   if (!isObject(result)) {
     return { status: 400, code: 'PatchInvalid', message: 'The patched annotation is not a JSON object.' }
   }

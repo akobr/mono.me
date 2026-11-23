@@ -79,15 +79,41 @@ describe('the mock PatchAnnotation: requests', () => {
       (await patch('sbt.northwind', [{ op: 'replace', path: '/Title', value: 'D' }], 'Application/JSON; charset=utf-8'))
         .body,
     ).toMatchObject({ Title: 'D' })
-    expect((await patch('sbt.northwind', { Title: 'E' }, undefined)).body).toMatchObject({ Title: 'E' })
   })
 
-  it('refuses another media type with 415 and Accept-Patch', async () => {
-    const answer = await patch('sbt.northwind', { Title: 'A' }, 'text/plain')
+  it('decides by the body when the request has no Content-Type', async () => {
+    await seedSubject()
+    let sent: string | null | undefined
+    server.events.on('request:start', ({ request }) => void (sent ??= request.headers.get('Content-Type')))
 
-    expect(answer.status).toBe(415)
-    expect(answer.body).toMatchObject({ ErrorCode: 'InvalidContentType' })
-    expect(answer.headers.get('Accept-Patch')).toBe('application/merge-patch+json, application/json-patch+json')
+    // bytes, not a string: fetch gives a string body a text/plain media type
+    const response = await fetch(`${base}/sbt.northwind`, {
+      method: 'PATCH',
+      body: new TextEncoder().encode(JSON.stringify([{ op: 'replace', path: '/Title', value: 'No header' }])),
+    })
+    server.events.removeAllListeners('request:start')
+
+    expect(sent).toBeNull()
+    expect(response.status).toBe(200)
+    expect(await read()).toMatchObject({ Title: 'No header' })
+  })
+
+  it('refuses another media type, or one that does not parse, with 415 and Accept-Patch', async () => {
+    for (const contentType of [
+      'text/plain',
+      'application/merge-patch+json; =',
+      'application/merge-patch+json; charset',
+    ]) {
+      const answer = await patch('sbt.northwind', { Title: 'A' }, contentType)
+
+      expect(answer.status, contentType).toBe(415)
+      expect(answer.body).toMatchObject({ ErrorCode: 'InvalidContentType' })
+      expect(answer.headers.get('Accept-Patch')).toBe('application/merge-patch+json, application/json-patch+json')
+    }
+    await seedSubject()
+    expect((await patch('sbt.northwind', { Title: 'A' }, 'application/merge-patch+json; charset=utf-8')).status).toBe(
+      200,
+    )
   })
 
   it('refuses a body that is not JSON, does not fit its format, or has a malformed operation with 400 PatchInvalid', async () => {
@@ -101,12 +127,15 @@ describe('the mock PatchAnnotation: requests', () => {
       [[{ op: 'add', path: 'Title', value: 'x' }], undefined],
       [[{ op: 'add', path: '/Title' }], undefined],
       [[null], undefined],
+      [[{ op: ['replace'], path: '/Title', value: 'x' }], undefined],
     ]
     for (const [body, contentType, text] of cases) {
       const answer = await patch('sbt.northwind', body, contentType ?? 'application/json-patch+json', { text })
       expect(answer.status, JSON.stringify(body ?? text)).toBe(400)
       expect(answer.body).toMatchObject({ ErrorCode: 'PatchInvalid' })
     }
+    // a malformed operation answers before the key is looked up
+    expect((await patch('sbt.nobody', [{ op: ['replace'], path: '/Title', value: 'x' }])).status).toBe(400)
   })
 
   it('refuses If-None-Match, an invalid key and a Reader', async () => {
@@ -431,6 +460,45 @@ describe('the mock PatchAnnotation: the write', () => {
     expect(await read('sbt.contoso')).toMatchObject({ IsDisabled: true })
     expect(await read('sbt.fabrikam')).toMatchObject({ Description: 'Concurrent' })
   })
+
+  it('keeps a patch made while a restore reads its body', async () => {
+    await deleteAnnotation(org, project, view, 'sbt.contoso')
+    // the restore's body arrives only after the patch was sent, so its handler waits for it inside the database section
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const body = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        await gate
+        controller.enqueue(new TextEncoder().encode(JSON.stringify({ Keys: ['sbt.contoso'], Descendants: false })))
+        controller.close()
+      },
+    })
+    const restoring = fetch(`${base}/deleted/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      duplex: 'half',
+    } as RequestInit)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    const patching = patch('sbt.northwind', { Title: 'Patched during a restore' })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    release()
+
+    expect((await restoring).status).toBe(200)
+    expect((await patching).status).toBe(200)
+
+    expect(await read()).toMatchObject({ Title: 'Patched during a restore' })
+    expect(await read('sbt.contoso')).toMatchObject({ AnnotationKey: 'sbt.contoso' })
+  })
+
+  it('writes nothing to the stored database for a patch that changes nothing or misses its key', async () => {
+    const before = JSON.stringify(loadDb())
+
+    expect((await patch('sbt.northwind', {})).status).toBe(200)
+    expect((await patch('sbt.nobody', { Title: 'A' })).status).toBe(404)
+
+    expect(JSON.stringify(loadDb())).toBe(before)
+  })
 })
 
 describe('the mock PatchAnnotation: details of the API', () => {
@@ -491,6 +559,20 @@ describe('mergeValues', () => {
     })
     expect(mergeValues({ a: [1, { b: null }] }, { a: [2, { c: null }] })).toEqual({ a: [2, { c: null }] })
     expect(mergeValues('scalar', { a: 1 })).toEqual({ a: 1 })
+  })
+
+  it('takes a value named __proto__ as a name in a JSON Patch, without touching a prototype', async () => {
+    await seedSubject({ Values: { plan: 'basic' } })
+
+    const { status, body } = await patch('sbt.northwind', [
+      { op: 'add', path: '/Values/__proto__', value: null },
+      { op: 'add', path: '/Values/limits', value: JSON.parse('{"__proto__": {"cpu": 2}}') },
+    ])
+
+    expect(status).toBe(200)
+    expect(Object.keys(body!.Values as object).toSorted()).toEqual(['__proto__', 'limits', 'plan'])
+    expect(Object.keys((body!.Values as { limits: object }).limits)).toEqual(['__proto__'])
+    expect(({} as Record<string, unknown>).cpu).toBeUndefined()
   })
 
   it('takes a value named __proto__ as a name', () => {
