@@ -86,6 +86,11 @@ jobs:
         with:
           global-json-file: global.json
 
+      # The vendored packages are the files of their SHA256SUMS (the hashes of the README): a changed binary fails here.
+      - name: Vendored packages
+        working-directory: .packages
+        run: sha256sum -c SHA256SUMS
+
       # The configuration of the test project is the API's too (its project reference), so Release compiles DEV_AUTH out.
       - name: API unit tests
         env:

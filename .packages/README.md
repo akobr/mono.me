@@ -17,5 +17,6 @@ ones the local builds restored until now (the global packages folder, whose cont
 package's nuspec depends on the public `OpenApi.Core` `1.0.0`, so the Storyteller API, the Scheduler and the Supervisor
 each reference `OpenApi.Core` themselves, and `Directory.Packages.props` pins both packages to the custom build.
 
-Remove a package, its row and, with the last one, the source in `nuget.config` once a public build has the change and
+`SHA256SUMS` holds the same hashes; the API's unit test workflow checks the files against it (`sha256sum -c SHA256SUMS`) before
+anything is restored, and `nuget.config` maps the two ids to this folder only (`packageSourceMapping`). Remove a package, its row, its line of `SHA256SUMS` and, with the last one, the source in `nuget.config` once a public build has the change and
 none of the three projects needs the custom version any more.

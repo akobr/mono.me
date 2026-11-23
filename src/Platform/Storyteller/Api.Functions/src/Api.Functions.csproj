@@ -23,6 +23,13 @@
     <DefineConstants>$(DefineConstants);DEV_AUTH</DefineConstants>
   </PropertyGroup>
 
+  <!-- A Debug build (DEV_AUTH) skips the checks of users: it is never published, so it never reaches a deployment, also not one
+       the startup guard cannot recognize (a VM, plain Docker, Container Instances). -p:AllowDevelopmentAuthenticationPublish=true
+       publishes one anyway, for a local container only. -->
+  <Target Name="RefuseDevelopmentAuthenticationPublish" BeforeTargets="PrepareForPublish" Condition="$(DefineConstants.Contains('DEV_AUTH')) And '$(AllowDevelopmentAuthenticationPublish)' != 'true'">
+    <Error Code="STORYTELLER001" Text="DEV_AUTH: a Debug build of the Storyteller API skips the checks of users and is never published. Publish with -c Release." />
+  </Target>
+
   <ItemGroup>
     <InternalsVisibleTo Include="42.Platform.Storyteller.Api.Functions.UnitTests" />
   </ItemGroup>
