@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.65.8193"
+    "version": "0.10.66.34979"
   },
   "servers": [
     {
@@ -17039,7 +17039,7 @@
             }
           },
           "400": {
-            "description": "The state is not Open or Done, or the continuation token is not one of the inbox (ErrorCode InvalidQuery).",
+            "description": "The state is not Open or Done, or the continuation token is not one that the inbox issues (ErrorCode InvalidQuery). A token of the inbox of another view is not refused: it pages this view below the item it names, so start again without a token after a change of the view.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17152,7 +17152,7 @@
             }
           },
           "409": {
-            "description": "The item is not an action (ErrorCode InboxItemNotAction), or it was already accepted or dismissed (ErrorCode InboxItemClosed). The item changed concurrently too many times (ErrorCode Conflict); try again. What the action starts could not start: the error code is the one of that work, such as TransferLimit, and the item stays open.",
+            "description": "The item is not an action (ErrorCode InboxItemNotAction), or it was already accepted or dismissed (ErrorCode InboxItemClosed). The item changed concurrently too many times (ErrorCode Conflict); try again. What the action starts could not start: the error code is the one of that work, such as TransferLimit, and the item is opened again on a best effort, so read it again before you offer another try.",
             "content": {
               "application/json": {
                 "schema": {
