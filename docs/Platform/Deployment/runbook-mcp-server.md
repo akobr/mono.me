@@ -300,6 +300,7 @@ If the job fails with `AuthorizationFailed` on `Microsoft.App/containerApps/writ
 | Your data | list your organizations and a project's annotations | the same as in the admin UI |
 | No account | sign in with a WorkOS user that has no Storyteller account | "No Storyteller account exists for this sign-in. Register once with sform or the admin UI." |
 | Read only | ask the assistant to change one annotation | nothing changes: the assistant has no write tool, or the call answers "The 2S API lets this client app only read for you, so the change was not made. …" (`ActorReadOnly`) |
+| The tool list | connect the client while the API is idle (no call for a while) | the list comes within about 5 seconds: `tools/list` waits that long for the person's token, then lists the write tools anyway and logs "tools/list: the Storyteller token for the person took longer than 5 seconds; …" (the API refuses a write of a read-only client in any case). It is one exchange per sign-in token, cached for the calls that follow |
 | Read only at the API | the same change sent to the API itself, past the MCP server: take a read-only Storyteller token from the exchange (staging, the actor's credential) and `PUT` one annotation with it | `403` with `ErrorCode` `ActorReadOnly`; hiding a tool in the MCP server proves nothing about the API |
 | The client | the API's Application Insights (`prod-2s-api-appi`, **Logs**): `traces \| where message has "via mcp (client" \| project timestamp, message \| take 20` | every request of the assistant: `A request … via mcp (client <id>) answered …`, with `client_01…` for a dynamically registered client or the metadata URL for one with CIMD |
 | Audit | once a client is trusted ([Trust a client](#trust-a-client)): an access change through it, e.g. `create_machine` and then `delete_machine` of a test machine, then the access audit trail in the admin UI | your account `via mcp (client <id>)` |
@@ -346,7 +347,7 @@ To trust it no longer, remove the entry and run the template the same way: once 
 
 ## Cut off one client
 
-For a client with a stable id: a CIMD metadata URL. Not for a dynamically registered client: it registers again under a new id, so use [Cut off every unlisted client](#cut-off-every-unlisted-client).
+For a client with a stable id: a CIMD metadata URL. Not for a dynamically registered client: it registers again under a new id, so use [Cut off every unlisted client](#cut-off-every-unlisted-client). While the list has an entry, a sign-in that names no client, and a Storyteller token issued before the API recorded clients, is refused too: it cannot show that it is not the blocked client.
 
 1. Find the id the API recorded (step 2 of [Trust a client](#trust-a-client)).
 2. In `parameters/prod.bicepparam` (compared ignoring case; it wins over `mcpAllowedClientIds` and `mcpTrustedClientIds`):
