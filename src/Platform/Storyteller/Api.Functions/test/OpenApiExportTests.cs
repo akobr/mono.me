@@ -242,7 +242,12 @@ public class OpenApiExportTests
 
             responses.GetProperty("401").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseUnauthorizedUserOnly, id);
             responses.GetProperty("401").TryGetProperty("content", out _).ShouldBeFalse(id);
-            responses.GetProperty("403").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseForbiddenViewInbox, id);
+
+            // accept and dismiss write, so a client app that may only read is refused them through an actor
+            var forbidden = id == Definitions.RouteIds.Inbox.GetViewInbox
+                ? Definitions.Descriptions.ResponseForbiddenViewInbox
+                : $"{Definitions.Descriptions.ResponseForbiddenViewInbox} {Definitions.Descriptions.ForbiddenActorReadOnly}";
+            responses.GetProperty("403").GetProperty("description").GetString().ShouldBe(forbidden, id);
             Reference(operation, "403").ShouldBe("#/components/schemas/ErrorResponse", id);
             Reference(operation, "500").ShouldBe("#/components/schemas/ErrorResponse", id);
         }

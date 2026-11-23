@@ -147,6 +147,9 @@ public static class TenantRoutes
         Api(nameof(ViewTransferHttp.GetViewExportArchive), "view-transfers"),
         Api(nameof(ViewTransferHttp.StartViewImport), "view-transfers", body: "{}") with { ControlStatus = 400 },
         Api(nameof(ViewTransferHttp.GetViewImport), "view-transfers"),
+        Api(nameof(ViewInboxHttp.GetViewInbox), "view-inbox", usersOnly: true),
+        Api(nameof(ViewInboxHttp.AcceptViewInboxItem), "view-inbox", usersOnly: true),
+        Api(nameof(ViewInboxHttp.DismissViewInboxItem), "view-inbox", usersOnly: true),
 
         // An access point in the route: v1/access/points/{key}/...
         Key(nameof(AccessHttp.GetAccessPoint), "access-point", TenantGate.Api),
