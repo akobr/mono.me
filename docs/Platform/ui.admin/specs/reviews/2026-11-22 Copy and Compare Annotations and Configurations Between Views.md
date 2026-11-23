@@ -199,6 +199,23 @@ A second review of the pull request, verified point by point against the branch 
 
 Tests: `view-copy.test.ts` (the target changed since the check, both kinds), `view-copy-dialog.test.ts` (the same in the dialog), `view-documents.test.ts` (the digits below a millisecond), `view-compare.test.ts` (a stored list with a key that is no text), `JsonPatchTests` (the escaped pointers of every operation). After the fixes: `npm test` 3,031 passed, `npm run test:e2e` 543 passed and 27 skipped, `npm run test:visual:docker` 88 passed, lint, type check and build pass; the unit tests of Backend.Core (1,693), Api.Functions (4,285), the MCP server (809) and the CLI (2,578) pass on JsonPatch.Net 5.1.0, and so do `JsonPatchTests`, `CosmosAnnotationPatchTests` and `ConfigurationIsolationTests` on the Cosmos DB container.
 
+### CodeRabbit, second round
+
+After the push, CodeRabbit left 11 more comments. Fixed:
+
+- **A key that failed in the check** has no entry in its `sources` or `targets`; a checked copy now skips it ("The check did not show what a copy would do with it. Check again.") instead of taking it as unchecked.
+- **The comparison guard before prerequisites.** A configuration whose annotation the target lacks is compared with version 0 against `expected` and the check before its annotation and ancestors are created, so a configuration that is then skipped leaves no annotation behind.
+- **Prerequisites as checked.** A run answers `prerequisites`, the source text of each annotation it creates for another key; the copy after a check takes them as `checkedPrerequisites` and does not create one that changed since, nor anything below it.
+- **A first write that committed.** After a `POST`, the target counts as written before the read back: a failed read back is a `Failed` row ("It was written to {target}, but it could not be read back: …"), and that row and the merged one carry `written: true`. `copyChangedTarget` counts them, so `useViewCopy` refreshes the target's catalog.
+- **The comparison of a copy result** closes the dialog only when the navigation went through; a guard that cancels it leaves the result.
+- **A key deleted between the two reads** of `readConfiguration` (the version read answers `AnnotationDeleted`) reads as deleted.
+- **"Effective differs"** shows only when the effective texts differ, not for equal texts with a number beyond 2^53.
+- **A comparison opened again** shows its cached documents while both views are read again; a file is `refreshing` meanwhile and offers no copy.
+- **The e2e test of Stop** holds the first write of a configuration, stops while it waits, and asserts that the key finishes and the next one does not start.
+- **Json.More.Net** goes to 3.1.0, the minimum of JsonPointer.Net 7.1 (a restore showed no downgrade, but the central version now matches).
+
+Tests: five engine tests (a key failed in the check, the comparison guard before prerequisites, a changed annotation of a configuration, a changed missing ancestor, a failed read back), a dialog test (a cancelled way to the comparison), a read test (deleted between the reads), two page tests (refreshing, equal inexact texts), and the e2e test of Stop. After the fixes: `npm test` 3,040 passed, `npm run test:e2e` 543 passed and 27 skipped, `npm run test:visual:docker` 88 passed, lint, type check and build pass; Binding.JsonE's tests (2,429) and the API build pass on Json.More.Net 3.1.0.
+
 ### Left for later
 
 - **A run against a real API.** The mock differs from the API where the spec names it (a configuration write without an annotation, the members of an ancestor that the API creates, `If-Match` and `ETag`). The copy avoids each of these paths, but none was exercised against the API.
