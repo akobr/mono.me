@@ -64,6 +64,12 @@ export interface ViewCopyRequest {
    * any more is skipped, so a copy writes only what its check showed.
    */
   checked?: Readonly<Record<string, string | null>>
+  /**
+   * What a check read in the target, by key (`ViewCopyResult.targets` of the check): a key whose target is not that
+   * any more is skipped, unless the target holds the content of the source by now, so a copy to production writes
+   * nothing that its check did not show.
+   */
+  checkedTargets?: Readonly<Record<string, string | number | null>>
   /** Decide and report, write nothing. */
   dryRun?: boolean
 }
@@ -82,6 +88,12 @@ export interface ViewCopyResult {
    * the own configuration), null for none. A copy after a check passes those of the check as `checked`.
    */
   sources: Record<string, string | null>
+  /**
+   * The stamp of the target document of each selected key that the run read: `annotationStamp` of the annotation,
+   * the version of the configuration, null for none. A copy after a check passes those of the check as
+   * `checkedTargets`.
+   */
+  targets: Record<string, string | number | null>
 }
 
 export interface ViewCopyOptions {
@@ -97,7 +109,7 @@ const exactTools = 'Copy it with Export & Import or sform.'
 const inexactMessage = `It holds a number beyond 2^53. ${exactTools}`
 const changedMessage = (target: string) => `It changed in ${target} meanwhile. Copy it again.`
 const comparedMessage = (target: string) => `It changed in ${target} since it was compared.`
-const checkedMessage = (source: string) => `It changed in ${source} since it was checked.`
+const checkedMessage = (view: string) => `It changed in ${view} since it was checked.`
 export const stoppedMessage = 'Not copied, the copy was stopped.'
 
 const mergeOrder = (key: string) => metaOf(key.slice(0, key.indexOf('.')))?.mergeOrder ?? 99
@@ -138,7 +150,7 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
   const { client, signal } = options
   const dryRun = !!request.dryRun
   const targetScope: Scope = { ...source, view: target }
-  const result: ViewCopyResult = { target, dryRun, items: [], stopped: false, sources: {} }
+  const result: ViewCopyResult = { target, dryRun, items: [], stopped: false, sources: {}, targets: {} }
   const keys = inMergeOrder(request.keys)
 
   /** Whether the target has the annotation: read once, then kept up to date by the writes of the run. */
@@ -157,6 +169,13 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
   function sourceRead(key: string, text: string | null): boolean {
     result.sources[key] = text
     return !request.checked || !(key in request.checked) || request.checked[key] === text
+  }
+
+  /** Records the stamp of the target that the run read for a selected key, and whether it is what the check read. */
+  function targetRead(key: string, stamp: string | number | null): boolean {
+    result.targets[key] = stamp
+    const checked = request.checkedTargets
+    return !checked || !(key in checked) || checked[key] === stamp
   }
 
   /**
@@ -293,22 +312,22 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
       return true
     }
     const same = !!stored && annotationText(annotation) === annotationText(stored.value)
+    const stamp = annotationStamp(stored?.value)
     const moved =
-      role.selected &&
-      !!request.expected &&
-      key in request.expected &&
-      request.expected[key] !== annotationStamp(stored?.value)
-    if (moved) {
-      // The comparison page showed something else: its section reads the target again, whatever the run does.
+      role.selected && !!request.expected && key in request.expected && request.expected[key] !== stamp
+    const movedSinceCheck = role.selected && !targetRead(key, stamp)
+    if (moved || movedSinceCheck) {
+      // The comparison page or the check showed something else: the section reads the target again, whatever the
+      // run does.
       void invalidateAnnotation(client, targetScope, key)
     }
-    // What the page showed guards a write only: a target that changed since, and now holds what the source has, is
-    // unchanged.
-    if (moved && !same) {
+    // What the page and the check showed guards a write only: a target that changed since, and now holds what the
+    // source has, is unchanged.
+    if ((moved || movedSinceCheck) && !same) {
       if (!stored) {
         notCopied.add(key)
       }
-      add('Annotation', key, 'Skipped', comparedMessage(target))
+      add('Annotation', key, 'Skipped', moved ? comparedMessage(target) : checkedMessage(target))
       return !!stored
     }
 
@@ -362,6 +381,7 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
       add('Configuration', key, 'Failed', inexactMessage)
       return
     }
+    // Only the root: the API runs the directives of the root member only, and keeps a nested one as data.
     if ('$remove' in document || '$patch' in document) {
       add(
         'Configuration',
@@ -379,6 +399,8 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
         return
       }
       if (!request.missingAnnotations) {
+        // None is read: a copy after this check skips the key if the annotation appears in the target meanwhile.
+        targetRead(key, null)
         add('Configuration', key, 'Skipped', `Its annotation is not in ${target}.`)
         return
       }
@@ -392,11 +414,12 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
     const stored = await readConfiguration(targetScope, key)
     const same = !!stored.own && canonicalJson(stored.own) === canonicalJson(document)
     const moved = !!request.expected && key in request.expected && request.expected[key] !== stored.version
-    if (moved) {
+    const movedSinceCheck = !targetRead(key, stored.version)
+    if (moved || movedSinceCheck) {
       void invalidateConfiguration(client, targetScope, key)
     }
-    if (moved && !same) {
-      add('Configuration', key, 'Skipped', comparedMessage(target))
+    if ((moved || movedSinceCheck) && !same) {
+      add('Configuration', key, 'Skipped', moved ? comparedMessage(target) : checkedMessage(target))
       return
     }
 
@@ -449,9 +472,9 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
         return
       } else {
         if (!dryRun) {
-          // The whole document, as sform and the MCP server replace one: the API takes the ~0 and ~1 of a JSON
-          // Pointer literally, so a patch by member would write a wrong member for a name with "/" or "~". The test
-          // fails with 412 when the target changed since it was read.
+          // The whole document, as sform and the MCP server replace one: a copy replaces it as a whole, and an API
+          // on JsonPatch.Net before 5.1.0 took the ~0 and ~1 of a JSON Pointer literally, so a patch by member wrote a
+          // wrong member for a name with "/" or "~". The test fails with 412 when the target changed since it was read.
           await patchConfiguration(source.org, source.project, target, key, [
             { op: 'test', path: '', value: stored.own },
             { op: 'replace', path: '', value: document },

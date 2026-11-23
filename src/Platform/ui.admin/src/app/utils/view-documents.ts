@@ -36,13 +36,22 @@ function isUnset(value: unknown): boolean {
   return Array.isArray(value) ? value.length === 0 : isObject(value) && Object.keys(value).length === 0
 }
 
-/** The instant of a date in UTC; a text that is no date stays as it is. */
+/**
+ * The instant of a date in UTC; a text that is no date stays as it is. A Date keeps milliseconds, and .NET writes up to
+ * seven digits of a second: the digits below a millisecond are kept, without their trailing zeros, so two dates that
+ * the API tells apart are never the same here.
+ */
 function instant(value: unknown): unknown {
   if (typeof value !== 'string') {
     return value
   }
   const time = Date.parse(value)
-  return Number.isNaN(time) ? value : new Date(time).toISOString()
+  if (Number.isNaN(time)) {
+    return value
+  }
+  const below = /T\d{2}:\d{2}:\d{2}\.\d{3}(\d+)/.exec(value)?.[1]?.replace(/0+$/, '') ?? ''
+  const utc = new Date(time).toISOString()
+  return below ? `${utc.slice(0, -1)}${below}Z` : utc
 }
 
 /**

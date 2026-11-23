@@ -1476,6 +1476,22 @@ describe('ViewCopyDialog: states that must not leak', () => {
     expect(view.copied).toHaveLength(1)
   })
 
+  it('copies only over what its check showed of the target: a document changed there since is skipped', async () => {
+    const view = await openDialog({ keys: [differs] })
+    await check()
+    expect(rows('Checked documents')).toEqual([['Annotation', differs, 'To update', '']])
+
+    // another client changes the target after the check
+    const there = await getAnnotation(org, project, 'staging', differs, { includeInactive: true })
+    await setAnnotation(org, project, 'staging', differs, { ...there, Title: 'Changed in staging after the check' })
+    await copy('Copy 1 to staging')
+
+    expect(rows('Copied documents')).toEqual([
+      ['Annotation', differs, 'Skipped', 'It changed in staging since it was checked.'],
+    ])
+    expect(view.copied).toHaveLength(1)
+  })
+
   it('leaves no plan of a check that it was closed under', async () => {
     // one key: a check is not stopped during its last key, so this one ends with a whole plan
     const view = await openDialog({ keys: [onlyDefault] })

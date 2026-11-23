@@ -218,10 +218,16 @@ describe('annotationDocument', () => {
     expect(annotationDocument(subject('northwind', { ValidFrom: '2026-03-01T10:00:00+02:00' }))).not.toEqual({
       ValidFrom: '2026-03-01T10:00:00.000Z',
     })
-    // a browser keeps milliseconds: what the API tells apart below them is the same instant here
+    // a browser keeps milliseconds, and the digits below them are kept too: the API tells such dates apart
     expect(annotationDocument(subject('northwind', { ValidFrom: '2026-03-01T10:00:00.1239999Z' }))).toEqual({
-      ValidFrom: '2026-03-01T10:00:00.123Z',
+      ValidFrom: '2026-03-01T10:00:00.1239999Z',
     })
+    expect(annotationDocument(subject('northwind', { ValidFrom: '2026-03-01T12:00:00.1234500+02:00' }))).toEqual({
+      ValidFrom: '2026-03-01T10:00:00.12345Z',
+    })
+    expect(annotationText(subject('northwind', { ValidFrom: '2026-03-01T10:00:00.1234Z' }))).not.toBe(
+      annotationText(subject('northwind', { ValidFrom: '2026-03-01T10:00:00.1235Z' })),
+    )
   })
 
   it('keeps a date that is no date as it is', () => {

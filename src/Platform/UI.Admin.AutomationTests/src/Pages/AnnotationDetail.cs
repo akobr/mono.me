@@ -7,11 +7,11 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // on a phone, where it hides the navbar until "Back to the list"); the graph shows the same detail at …/graph/<key>
 // (section GraphSection). Its identity line (test id annotation-identity) shows the type's icon and the key, in the
 // Form mode only; an unknown key shows "Annotation not found". The header has the type, the Name as its heading, the key
-// with "Copy to clipboard", "More actions" (Show in graph or Show in list, Copy link, Copy key and, for Contributors
-// and up, "Compare with view", a link to the comparison of this annotation with another view, "Copy to view", which
-// opens the dialog "Copy <key> to another view", and Delete), the panel's pin and full-screen buttons and "Close the
-// detail" (from md). Deleting asks "Delete <key>?" (no typed confirmation), then the toast "<key> deleted" with "Undo"
-// (10 seconds) and the list.
+// with "Copy to clipboard", "More actions" (Show in graph or Show in list, Copy link, Copy key, "Compare with view",
+// a link to the comparison of this annotation with another view, for every role, and, for Contributors and up, "Copy
+// to view", which opens the dialog "Copy <key> to another view", and Delete), the panel's pin and full-screen buttons
+// and "Close the detail" (from md). Deleting asks "Delete <key>?" (no typed confirmation), then the toast "<key>
+// deleted" with "Undo" (10 seconds) and the list.
 public sealed partial class AnnotationDetail(App app, AppRoutes routes, string section = AnnotationDetail.AnnotationsSection)
 {
     public const string AnnotationsSection = "annotations";

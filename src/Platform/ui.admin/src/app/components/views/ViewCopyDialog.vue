@@ -205,6 +205,8 @@ async function start(dryRun: boolean): Promise<void> {
         expected: props.expected,
         // A copy after a check writes only what the check showed: a source changed since is skipped.
         checked: dryRun ? undefined : plan.value?.sources,
+        // It overwrites only what the check showed of the target: a document changed there since is skipped too.
+        checkedTargets: dryRun ? undefined : plan.value?.targets,
         dryRun,
       },
       controller.signal,

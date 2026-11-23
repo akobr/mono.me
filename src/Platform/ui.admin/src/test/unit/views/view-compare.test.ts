@@ -948,13 +948,21 @@ describe('view transfer store', () => {
     const good = keySetId(['sbt.a'])
     sessionStorage.setItem(
       storageKey,
-      JSON.stringify([['only-an-id'], [1, ['sbt.x']], ['keys-are-a-text', 'sbt.x'], [good, ['sbt.a']], null]),
+      JSON.stringify([
+        ['only-an-id'],
+        [1, ['sbt.x']],
+        ['keys-are-a-text', 'sbt.x'],
+        ['keys-are-no-texts', ['sbt.x', 7, null]],
+        [good, ['sbt.a']],
+        null,
+      ]),
     )
 
     const store = useViewTransferStore()
 
     expect(store.keysOf('only-an-id')).toBeUndefined()
     expect(store.keysOf('keys-are-a-text')).toBeUndefined()
+    expect(store.keysOf('keys-are-no-texts')).toBeUndefined()
     expect(store.keysOf(good)).toEqual(['sbt.a'])
   })
 })
