@@ -151,6 +151,18 @@ Not run: the deployed-UI automation suite, and anything against a real API. The 
 9. Three tests of the API's JSON Patch stand in for the run against a real API.
 10. The embedded diff tints its old side red and draws a one-sided document whole in the unified layout; Configurations and Annotations lose the strip below their bulk bar.
 
+### Merge with read-only Modeling for Readers
+
+Before the pull request was merged, `main` opened Modeling to Readers, read-only ([424-272](https://linear.app/424fun/issue/424-272/admin-ui-read-only-modeling-schemas-templates-deleted-for-readers), PR #216). The comparison of a selection is a page of Modeling and had no role check of its own, so it would have shown its copy buttons to a Reader. The branch merges `main` and follows the new rule: a comparison only reads, so every member compares; a copy writes, so it stays with Contributors.
+
+- `useViewTransfer` has `canCopy` (`useCan('edit')`): its menu items hold **Copy to view** only from Contributor up. Both **More actions** menus show **Compare with view** to every role, also disabled with its reason in a project with one view.
+- `compare.selection.vue` shows the copy of the page and of each section, and mounts its `ViewCopyDialog`, only from Contributor up. For a Reader its legend says nothing of a copy, the caption of the source side is "this view" instead of "after a copy", and the empty state points to **More actions** of a detail.
+- The bulk bars stay with Contributors, as every bulk action and as case ANN-ROL-03 asserts.
+- Tests: two Reader tests of the menus are rewritten and one added (`view-transfer-menu.test.ts`), three Reader tests of the page (`compare-selection.test.ts`), and the end-to-end case "a Reader compares, and gets no copy" (`views.spec.ts`, desktop and mobile).
+- Docs: the role rules in `admin-ui.md` and the README.
+
+After the merge: `npm test` 2,935 passed in 140 files, `npm run test:e2e` 542 passed and 26 skipped, `npm run test:visual:docker` 88 passed, lint, type check and build pass, and the automation project builds.
+
 ### Left for later
 
 - **A run against a real API.** The mock differs from the API where the spec names it (a configuration write without an annotation, the members of an ancestor that the API creates, `If-Match` and `ETag`). The copy avoids each of these paths, but none was exercised against the API.

@@ -135,7 +135,7 @@ The header links to the configuration, drawn by where the configuration comes fr
 
 The configuration itself is edited on its own page (see Configuration). The header also shows when the annotation was created and last updated, and by whom.
 
-**More actions** (**…**) in the header has **Show in graph** (on **Graph**, **Show in list**), **Copy link** and **Copy key**. Contributors and the roles above also get **Compare with view** and **Copy to view** (see [Working with several views](#working-with-several-views)), and **Delete**. A deleted annotation has none of these three.
+**More actions** (**…**) in the header has **Show in graph** (on **Graph**, **Show in list**), **Copy link** and **Copy key**. Every role also gets **Compare with view**, and Contributors and the roles above **Copy to view** and **Delete** (see [Working with several views](#working-with-several-views)). A deleted annotation has none of these three.
 
 The breadcrumb and **Lineage** show its ancestors in merge order.
 
@@ -186,7 +186,7 @@ The JSON and YAML editors help with bindings too:
 - Inside `@config("…")` the list offers the paths of this configuration; inside `@annotation("…")` the fields of the annotation's values, or of the ancestor named by the second argument; the second argument offers the ancestor types.
 - Hovering a binding explains it, the same way as the line under a form field.
 
-The header has the breadcrumb of the annotation detail, always by subject: the parents of the annotation up to its subject. **Lineage**, at its right, lists every ancestor in merge order, the order in which their configuration is inherited. Each ancestor, in the breadcrumb or in **Lineage**, opens its own configuration. **Annotation**, above the name, opens the annotation of this configuration. It does not keep the list filter. **More actions** (**…**) has **Copy link** and **Copy key**, and for Contributors and the roles above **Compare with view** and **Copy to view** (see [Working with several views](#working-with-several-views)).
+The header has the breadcrumb of the annotation detail, always by subject: the parents of the annotation up to its subject. **Lineage**, at its right, lists every ancestor in merge order, the order in which their configuration is inherited. Each ancestor, in the breadcrumb or in **Lineage**, opens its own configuration. **Annotation**, above the name, opens the annotation of this configuration. It does not keep the list filter. **More actions** (**…**) has **Copy link**, **Copy key** and **Compare with view**, and for Contributors and the roles above **Copy to view** (see [Working with several views](#working-with-several-views)).
 
 **Effective** shows the merged document: the ancestors, the template of the type and the own document, read-only, as JSON or YAML. Its **Composition** view explains it like a blame view. The list above the document has every merge in the order applied: each ancestor's template and configuration, indented by its depth and listed before the ancestor that inherits it (marked `via <key>` when that is not the annotation itself), with its version and the number of values it set. A shared ancestor, such as the subject of an execution, appears once per branch and is marked **Applied again**. The gutter of the document shows, on each line, the step that set it, and hovering it names the document. Selecting a step highlights its lines; its paths are listed under it too. An ancestor opens its own configuration, a deleted one is marked **Deleted**, and a template opens in **Modeling**, for every role. A value that a later document repeats keeps the document that set it first. The view loads when you open it, and its address keeps it (`?show=composition`). When the effective document and the composition were read at different moments, a warning offers **Refresh**.
 
@@ -217,7 +217,7 @@ A project has views: variants of its annotations and their configurations, such 
 
 The view you are in is the **source**, and the other view is the **target**. Both actions follow the same rules:
 
-- They need the Contributor role or a higher one. **Export & Import** moves a whole view as one zip and needs an Administrator (see [Export and import](#export-and-import)).
+- **Compare with view** only reads, so it is open to every role in **More actions**, and the comparison of a selection opens for every role, as **Compare views** does. **Copy to view** writes to the other view and needs the Contributor role or a higher one, as every change does; so do the bulk bars, which a Reader does not get. A Reader sees the comparison without any copy button. **Export & Import** moves a whole view as one zip and needs an Administrator (see [Export and import](#export-and-import)).
 - They take at most 100 keys at once. With more rows selected, the bulk bar disables them and says "Select up to 100 to compare or copy them at once".
 - In a project without another view they are disabled, with "The project has no other view".
 - They keep the selection of the list, because they change no row of the view you are in.
@@ -275,14 +275,14 @@ A section can have notes under its heading:
 - "The own configurations are the same. The difference is inherited (ancestors, the template, key values), and a copy does not change it.": shown with **Effective**, for a key that **Own** marks **Effective differs**.
 - "It holds a number beyond 2^53, which the browser cannot compare exactly.": the browser rounds such an integer, so the documents never count as **Identical**.
 
-The address holds the kind, the target and the keys, and `content=effective` for **Effective**. You can reload it, bookmark it or send it to someone with the Contributor role. Two limits apply:
+The address holds the kind, the target and the keys, and `content=effective` for **Effective**. You can reload it, bookmark it or send it to any member of the project. Two limits apply:
 
 - **100 keys:** an address with more keys compares the first 100 and says "Only the first 100 keys are compared."
 - **A long selection:** keys that do not fit in an address (more than about 1,500 characters, some 40 keys of executions) stay in the browser tab, and the address carries only their id (`set=…`). It still works after a reload of that tab. In another tab or browser, or after you sign out, the page says "The selection is gone. A comparison of many rows opens only in the browser tab that started it." A tab keeps its eight latest long selections.
 
 ### Copying to another view
 
-**Copy to view** opens a dialog. On the comparison page, **Copy {n} to {target}** opens it for the documents that the chosen chip shows and that a copy would change, and **Copy to {target}** of a section opens it for that one key. The target is then the compared view. When a copy would change none of the shown documents, the button is disabled and says "Nothing to copy".
+**Copy to view** (Contributor or a higher role) opens a dialog. On the comparison page, **Copy {n} to {target}** opens it for the documents that the chosen chip shows and that a copy would change, and **Copy to {target}** of a section opens it for that one key. The target is then the compared view. When a copy would change none of the shown documents, the button is disabled and says "Nothing to copy".
 
 - **Copy to** picks the target. The only other view is preselected. With several, it is the view you last picked for a comparison or a copy in the project, but never `default`: you pick the production view yourself.
 - **When {target} already has it:** **Overwrite**, the default, replaces its content with the content of the source. **Skip** leaves it as it is. A document with the same content is left alone either way.
@@ -344,7 +344,7 @@ The comparison of a selection is a page below **Compare views**, at `…/modelin
 
 The switcher keeps the tab when it changes the view or the project. From the comparison of a selection it opens **Compare views**. The command palette lists the tabs of your role after **Modeling**, and `G` then `T`, `S` or `E` opens **Templates**, **Schemas** or **Export & Import**. Links to the old addresses of the five pages still work: `…/{view}/schemas/type/exe`, for example, opens `…/{view}/modeling/schemas/type/exe`, and the query and the hash stay.
 
-A Reader browses Modeling read-only: the schemas, the templates and their versions, the deleted annotations and the comparison of views, without the actions that create, edit, delete or restore them. The entry shows the lock of the other read-only screens, such as **Annotations**, and in the collapsed sidebar its tooltip says "Read-only for your role". The **Views** page shows **Compare** to every role, and the schema layers on the **Schema** tab of a configuration link to their schemas. These are the rules of the API and `sform` too: a Reader reads all of this, a change needs the Contributor role, and **Delete permanently**, the export and the import need the Administrator role (see [Export and import](#export-and-import)).
+A Reader browses Modeling read-only: the schemas, the templates and their versions, the deleted annotations and the comparison of views, without the actions that create, edit, delete or restore them. The entry shows the lock of the other read-only screens, such as **Annotations**, and in the collapsed sidebar its tooltip says "Read-only for your role". The **Views** page shows **Compare** to every role, and the schema layers on the **Schema** tab of a configuration link to their schemas. These are the rules of the API and `sform` too: a Reader reads all of this, a change needs the Contributor role, and **Delete permanently**, the export and the import need the Administrator role (see [Export and import](#export-and-import)). **Compare with view** of the details and the comparison of a selection are open to every role as well, as they only read; the bulk bars and **Copy to view** need the Contributor role, as every change does.
 
 ## Export and import
 

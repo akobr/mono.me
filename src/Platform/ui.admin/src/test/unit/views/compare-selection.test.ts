@@ -124,14 +124,14 @@ function recordWrites() {
 const annotationReads = (urls: string[]) => urls.filter((url) => /\/annotations\/[a-z]{3}\./.test(url))
 const configurationReads = (urls: string[]) => urls.filter((url) => url.includes('/configuration/'))
 
-async function mountSelection(query: string, source = { org, project, view: 'default' }) {
+async function mountSelection(query: string, source = { org, project, view: 'default' }, role = 'Owner') {
   const view = await mountScreen(
     SelectionPage,
     {},
     {
       path: `/${source.org}/${source.project}/${source.view}/modeling/compare/selection?${query}`,
       scope: source,
-      accessMap: { 'acme.billing': 'Owner', 'acme.shipping': 'Owner' },
+      accessMap: { 'acme.billing': role, 'acme.shipping': role },
       routes,
     },
   )
@@ -1561,6 +1561,49 @@ describe('The views of a comparison', () => {
 
     expect(view.router.currentRoute.value.path).toBe('/acme/billing/default/modeling/compare/selection')
     await eventually(() => expect(view.router.currentRoute.value.query.to).toBe('staging'))
+  })
+})
+
+describe('The comparison for a Reader', () => {
+  // Modeling is open to every member (424-272), and a comparison only reads; a copy writes to the target, which needs
+  // the Contributor role.
+  it('compares, without any copy', async () => {
+    const view = await mountSelection(
+      `kind=annotations&to=staging&${keysQuery('sbt.northwind', 'sbt.initech')}`,
+      production,
+      'Reader',
+    )
+    await compared()
+
+    expect(heading('sbt.northwind')).toBe('Subject sbt.northwind Different +2 −9')
+    expect(heading('sbt.initech')).toBe('Subject sbt.initech Only in default +12 −0')
+    // no copy of the page, of a section or of the dialog, and the legend says nothing of a copy
+    expect(copyButton()).toBeUndefined()
+    expect(copyable()).toEqual([])
+    expect(actions('sbt.northwind')).toEqual(['Open in default', 'Open in staging'])
+    expect(copyDialog(view).exists()).toBe(false)
+    expect(paragraphs()).toContain('Only the selected keys are compared.')
+    expect(text()).not.toContain('after a copy')
+    expect(text()).toContain('this view')
+  })
+
+  it('compares the effective configurations, and says nothing of a copy', async () => {
+    await mountSelection(
+      `kind=configurations&to=staging&content=effective&${keysQuery('sbt.contoso')}`,
+      production,
+      'Reader',
+    )
+    await compared()
+
+    expect(paragraphs()).toContain('What staging and default read.')
+    expect(copyButton()).toBeUndefined()
+    expect(copyable()).toEqual([])
+  })
+
+  it('says how to start a comparison from a detail', async () => {
+    await mountSelection('kind=annotations&to=staging', production, 'Reader')
+
+    expect(text()).toContain('Open an annotation or a configuration and choose Compare with view in its More actions.')
   })
 })
 

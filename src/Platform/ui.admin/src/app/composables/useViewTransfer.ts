@@ -17,6 +17,9 @@ export function useViewTransfer(kind: ViewItemKind, keys: MaybeRefOrGetter<reado
   const router = useRouter()
   const store = useViewTransferStore()
   const others = useOtherViews()
+  // A comparison only reads, so every member of the project compares, as on Compare views (424-272). A copy writes to
+  // the other view, which needs the Contributor role in the API too.
+  const canCopy = useCan('edit')
 
   /** Why the actions are off: no other view, or more keys than the limit. Undefined when they are on. */
   const blocked = computed(() => {
@@ -55,23 +58,24 @@ export function useViewTransfer(kind: ViewItemKind, keys: MaybeRefOrGetter<reado
   const copying = ref(false)
 
   /**
-   * "Compare with view" and "Copy to view" as the items of a menu group. A blocked item stays, disabled, with the
-   * reason below it.
+   * "Compare with view", and from Contributor up "Copy to view", as the items of a menu group. A blocked item stays,
+   * disabled, with the reason below it.
    */
   const items = computed<DropdownMenuItem[]>(() => {
     const compare: DropdownMenuItem = { label: 'Compare with view', icon: 'i-lucide-git-compare' }
     const copy: DropdownMenuItem = { label: 'Copy to view', icon: 'i-lucide-copy-plus' }
+    const offered = canCopy.value ? [compare, copy] : [compare]
     if (blocked.value) {
-      return [compare, copy].map((item) => ({ ...item, disabled: true, description: blocked.value }))
+      return offered.map((item) => ({ ...item, disabled: true, description: blocked.value }))
     }
     return [
       // A link where the keys fit in an address: it can be opened in a new tab, and a form with unsaved changes asks
       // before it is left. A longer list has no address until it is kept, so its item opens the comparison itself.
       compareTo.value ? { ...compare, to: compareTo.value } : { ...compare, onSelect: () => void openCompare() },
       // The copy takes what is stored, so its dialog opens over a form with unsaved changes without asking.
-      { ...copy, onSelect: () => (copying.value = true) },
+      ...(canCopy.value ? [{ ...copy, onSelect: () => (copying.value = true) }] : []),
     ]
   })
 
-  return { blocked, compareTo, openCompare, copying, items }
+  return { blocked, compareTo, openCompare, canCopy, copying, items }
 }

@@ -106,10 +106,11 @@ const menu = computed<DropdownMenuItem[][]>(() => [
       onSelect: () => void copy(props.annotationKey),
     },
   ],
+  // Another view is compared with what this view has, and a deleted annotation is not in it. Every role compares;
+  // the items hold Copy to view from Contributor up.
+  ...(props.deleted ? [] : [transfer.items.value]),
   ...(canEdit.value && !props.deleted
     ? [
-        // Another view is compared with what this view has, and a deleted annotation is not in it.
-        transfer.items.value,
         [
           {
             label: 'Delete',

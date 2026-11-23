@@ -44,6 +44,33 @@ const shipping: Scope = { org: 'acme', project: 'shipping', view: 'default' }
 const portal: Scope = { org: 'northwind', project: 'portal', view: 'default' }
 const accessMap = { 'acme.billing': 'Owner', 'acme.shipping': 'Contributor', 'northwind.portal': 'Reader' }
 
+/** northwind/portal, where the user is a Reader, gets a second view. */
+function portalWithStaging() {
+  server.use(
+    http.get('*/api/v1/northwind/portal/views', () =>
+      HttpResponse.json([
+        { Name: 'default', IsDefault: true, IsRegistered: true },
+        { Name: 'staging', IsDefault: false, IsRegistered: true },
+      ]),
+    ),
+  )
+}
+
+/** What a Reader's "Compare with view" is: an enabled link to the comparison of the one key, and no Copy to view. */
+async function expectReaderCompare(view: { router: Router; host: VueWrapper }, href: string) {
+  const compare = item('Compare with view')
+  expect(compare.tagName).toBe('A')
+  expect(compare.getAttribute('href')).toBe(href)
+  expect(compare.hasAttribute('aria-disabled')).toBe(false)
+  expect(labels()).not.toContain('Copy to view')
+  // a comparison only reads (424-272); the copy writes, and there is no dialog to open
+  expect(copyDialog(view).exists()).toBe(false)
+
+  compare.click()
+  await settle()
+  expect(view.router.currentRoute.value.fullPath).toBe(href)
+}
+
 /** The views of the project arrived: only then a menu knows whether there is another view. */
 const viewsKnown = (view: { queryClient: QueryClient }, scope: Scope) =>
   vi.waitFor(() =>
@@ -199,12 +226,26 @@ describe('More actions of the annotation detail', () => {
     await expectCopy(view, 'annotations', key)
   })
 
-  it('does not offer them to a Reader', async () => {
+  it('offers a Reader Compare with view, without Copy to view and Delete', async () => {
+    portalWithStaging()
     const view = await mountDetail(portal)
     await openMenu()
 
-    expect(groups()).toEqual([['Show in graph'], ['Copy link', 'Copy key']])
-    // and there is no dialog to open
+    expect(groups()).toEqual([['Show in graph'], ['Copy link', 'Copy key'], ['Compare with view']])
+    await expectReaderCompare(view, `/northwind/portal/default/modeling/compare/selection?kind=annotations&key=${key}`)
+  })
+
+  it('keeps the Compare with view of a Reader, disabled with the reason, in a project without another view', async () => {
+    const view = await mountDetail(portal)
+    await openMenu()
+
+    expect(groups()).toEqual([['Show in graph'], ['Copy link', 'Copy key'], ['Compare with view']])
+    const compare = item('Compare with view')
+    expect(compare.getAttribute('aria-disabled')).toBe('true')
+    expect(compare.hasAttribute('href')).toBe(false)
+    expect(compare.querySelector('[data-slot="itemDescription"]')?.textContent?.trim()).toBe(
+      'The project has no other view',
+    )
     expect(copyDialog(view).exists()).toBe(false)
   })
 
@@ -295,13 +336,16 @@ describe('More actions of the configuration detail', () => {
     expect(dialog()!.textContent).toContain('Copy missing annotations too')
   })
 
-  it('offers only the copies to a Reader', async () => {
+  it('offers a Reader the copies and Compare with view, without Copy to view', async () => {
+    portalWithStaging()
     const view = await mountDetail(portal)
     await openMenu()
 
-    expect(groups()).toEqual([['Copy link', 'Copy key']])
-    // and there is no dialog to open
-    expect(copyDialog(view).exists()).toBe(false)
+    expect(groups()).toEqual([['Copy link', 'Copy key'], ['Compare with view']])
+    await expectReaderCompare(
+      view,
+      `/northwind/portal/default/modeling/compare/selection?kind=configurations&key=${key}`,
+    )
   })
 
   it('keeps the items, disabled with the reason, in a project without another view', async () => {
