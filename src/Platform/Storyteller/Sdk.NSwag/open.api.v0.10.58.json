@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.58.33196"
+    "version": "0.10.58.51142"
   },
   "servers": [
     {
@@ -16943,7 +16943,7 @@
             }
           },
           "400": {
-            "description": "invalid_request, invalid_client (an unknown actor or a bad proof), invalid_grant (a refused subject token, the replay limit, or no Storyteller account for the person), unsupported_grant_type (also while the exchange is off), invalid_target or invalid_scope.",
+            "description": "invalid_request, invalid_client (an unknown actor or a bad proof), invalid_grant (a refused subject token, the replay limit, no Storyteller account for the person, or a client app of Auth:TokenExchange:DeniedClientIds, whose description tells the person to sign in with another app), unsupported_grant_type (also while the exchange is off), invalid_target or invalid_scope.",
             "content": {
               "application/json": {
                 "schema": {

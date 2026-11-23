@@ -913,7 +913,7 @@ public class TokenExchangeOptionsTests
     [InlineData("HTTPS://ChatGPT.com/OAuth/Client.json", true)]
     [InlineData("CURSOR", true)]
     [InlineData("https://chatgpt.com/oauth/codex/client.json", false)]
-    [InlineData(null, false)]
+    [InlineData(null, true)]
     public void IsDeniedClient_IgnoresCaseAfterTrimmingTheEntries(string? clientId, bool denied)
     {
         var options = new TokenExchangeOptions { DeniedClientIds = [" https://chatgpt.com/oauth/client.json ", "cursor", string.Empty] };

@@ -55,12 +55,14 @@ public class TokenExchangeOptions
             && audiences.Any(audience => actorAudiences.Contains(NormalizeAudience(audience)));
     }
 
-    // False for null (a subject token that names no client). Entries are trimmed and compared ignoring case: a wider match
-    // is the safe direction for a deny list.
+    // Entries are trimmed and compared ignoring case: a wider match is the safe direction for a deny list. A subject token
+    // (or a Storyteller token issued before subject_client_id) that names no client cannot show that it is not a denied
+    // one, so null counts as denied while the list has an entry, and as allowed while it is empty.
     public bool IsDeniedClient(string? clientId)
     {
-        return clientId is not null
-            && DeniedClientIds.Any(denied => !string.IsNullOrWhiteSpace(denied) && string.Equals(denied.Trim(), clientId, StringComparison.OrdinalIgnoreCase));
+        var denied = DeniedClientIds.Where(entry => !string.IsNullOrWhiteSpace(entry)).Select(entry => entry.Trim()).ToList();
+        return denied.Count > 0
+            && (clientId is null || denied.Any(entry => string.Equals(entry, clientId, StringComparison.OrdinalIgnoreCase)));
     }
 
     // Trimmed and without a trailing '/'; compare the result ignoring case. Shared with the start check of actors that

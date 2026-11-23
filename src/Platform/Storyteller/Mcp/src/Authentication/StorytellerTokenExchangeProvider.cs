@@ -58,6 +58,10 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
     private readonly string _tokenEndpoint;
     private readonly TimeSpan _exchangeTimeout;
     private readonly MemoryCache _cache;
+
+    // Publishing an answer and Forget's compare-and-remove, so a Forget of a refused token never removes the fresh one
+    // another call published meanwhile.
+    private readonly Lock _cacheLock = new();
     private readonly ConcurrentDictionary<string, Lazy<Task<StorytellerToken>>> _inFlight = new(StringComparer.Ordinal);
 
     public StorytellerTokenExchangeProvider(
@@ -121,9 +125,12 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
 
         var key = GetCacheKey(userToken);
 
-        if (_cache.TryGetValue(key, out CachedToken? cached) && string.Equals(cached!.Token.AccessToken, accessToken, StringComparison.Ordinal))
+        lock (_cacheLock)
         {
-            _cache.Remove(key);
+            if (_cache.TryGetValue(key, out CachedToken? cached) && string.Equals(cached!.Token.AccessToken, accessToken, StringComparison.Ordinal))
+            {
+                _cache.Remove(key);
+            }
         }
     }
 
@@ -231,11 +238,14 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
             // An answer with MinRemainingLifetime or less left serves the calls that wait for it only.
             if (refreshAt > now)
             {
-                _cache.Set(key, new CachedToken(token, refreshAt), new MemoryCacheEntryOptions
+                lock (_cacheLock)
                 {
-                    Size = 1,
-                    AbsoluteExpirationRelativeToNow = refreshAt - now,
-                });
+                    _cache.Set(key, new CachedToken(token, refreshAt), new MemoryCacheEntryOptions
+                    {
+                        Size = 1,
+                        AbsoluteExpirationRelativeToNow = refreshAt - now,
+                    });
+                }
             }
 
             return token;

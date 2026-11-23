@@ -6130,7 +6130,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<OAuthErrorResponse>("invalid_request, invalid_client (an unknown actor or a bad proof), invalid_grant (a refused subject token, the replay limit, or no Storyteller account for the person), unsupported_grant_type (also while the exchange is off), invalid_target or invalid_scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<OAuthErrorResponse>("invalid_request, invalid_client (an unknown actor or a bad proof), invalid_grant (a refused subject token, the replay limit, no Storyteller account for the person, or a client app of Auth:TokenExchange:DeniedClientIds, whose description tells the person to sign in with another app), unsupported_grant_type (also while the exchange is off), invalid_target or invalid_scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
