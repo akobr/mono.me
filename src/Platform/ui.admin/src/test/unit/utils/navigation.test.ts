@@ -12,7 +12,7 @@ describe('Modeling entry', () => {
     viewItems(projectRole).find((item) => item.label === 'Modeling')
 
   // Inbox follows Modeling (424-31), so the five entries before it keep their positions.
-  it.each(['Owner', 'Contributor', 'Reader'] as const)(
+  it.each(['Owner', 'Contributor'] as const)(
     'lists the six entries of the view section of %s, with Modeling before Inbox',
     (role) => {
       expect(viewItems(role).map((item) => item.label)).toEqual([
@@ -25,6 +25,17 @@ describe('Modeling entry', () => {
       ])
     },
   )
+
+  // The inbox is closed to a Reader, not read-only, so the entry is hidden (minRole, 424-272).
+  it('lists the five entries of the view section of a Reader, without Inbox', () => {
+    expect(viewItems('Reader').map((item) => item.label)).toEqual([
+      'Annotations',
+      'Configurations',
+      'Values store',
+      'Graph',
+      'Modeling',
+    ])
+  })
 
   it('opens the Modeling page with the puzzle icon and lists the tabs of a Contributor in order', () => {
     const base = '/acme/billing/staging/modeling'
@@ -119,14 +130,13 @@ describe('Inbox entry', () => {
       label: 'Inbox',
       icon: 'i-lucide-inbox',
       to: '/acme/billing/staging/inbox',
-      editRole: 'Contributor',
-      lockedHint: 'Contributors only',
+      minRole: 'Contributor',
       locked: false,
     })
   })
 
-  it('is shown to a reader, locked, because the API serves the inbox from Contributor up', () => {
-    expect(inbox(context('Reader'))).toMatchObject({ locked: true, lockedHint: 'Contributors only' })
+  it('is hidden from a reader, because the API serves the inbox from Contributor up', () => {
+    expect(inbox(context('Reader'))).toBeUndefined()
     expect(inbox(context('Contributor'))).toMatchObject({ locked: false })
     expect(inbox(context('Owner'))).toMatchObject({ locked: false })
   })

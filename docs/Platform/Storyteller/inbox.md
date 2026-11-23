@@ -557,7 +557,7 @@ The **Inbox** page of a view (`ui.admin/src/app/pages/[org]/[project]/[view]/inb
 
 ### The menu
 
-- **The entry.** **Inbox** (icon `i-lucide-inbox`) is the sixth and last entry of the view section of the sidebar, after **Modeling** (`utils/navigation.ts`). It is the last one so that the other entries keep their positions. It has `editRole: 'Contributor'` and `lockedHint: 'Contributors only'`: every role sees the entry, a Reader with a lock, and the tooltip of the lock in the collapsed sidebar says "Contributors only".
+- **The entry.** **Inbox** (icon `i-lucide-inbox`) is the sixth and last entry of the view section of the sidebar, after **Modeling** (`utils/navigation.ts`). It is the last one so that the other entries keep their positions. It has `minRole: 'Contributor'`: the page is closed to a Reader, not read-only, so a Reader does not see the entry (the rule of the menu since 424-272: a lock means read-only, a page the role must not open is hidden). At its address the page shows the lock "Contributors only".
 - **The switchers.** `inbox` is the last of the `viewSections` of `utils/context-paths.ts`, so a switch of the view or the project keeps the page. The tab is not carried over: the page of the other view opens on **Open**.
 - **The shortcut.** `g i` opens the page of the view the menu shows, for every role (`components/shell/CommandPalette.vue`). The shortcut help lists it as **Inbox** in the group **Go to** (`composables/useShortcutsHelp.ts`).
 - **The command palette** lists the page among **Pages**, as it lists every entry of the menu, a locked one included. It builds the menu without marks, so its entry never has one.
@@ -754,10 +754,10 @@ The simplifications:
   - the suggested action accepted after its confirmation: the result arrives, and the action is under **Done**, with `?tab=done` in the address;
   - an item dismissed and found under **Done**, also after a reload;
   - a Contributor (`acme/shipping`) without the items of Administrators;
-  - the lock of a Reader (`northwind/portal`) in the menu and on the page, without a request to the inbox;
+  - a Reader (`northwind/portal`) without the entry in the menu, and the lock on the page at its address, without a request to the inbox;
   - an export started on Export & Import, found under **Done** and downloaded again under the same name; the test reaches the page through the menu, because a reload would drop the archive of the mock;
   - an import started there, and its report from the item under **Done**, without **Import now** and inside the screen.
-- **Playwright** (`test/e2e/navigation.spec.ts`): the six entries of the view section for every role, with the lock on **Modeling** and **Inbox** for a Reader.
+- **Playwright** (`test/e2e/navigation.spec.ts`): the six entries of the view section from Contributor up, and the five of a Reader, without **Inbox**.
 - **axe** (`test/e2e/accessibility.spec.ts`): the page of an Owner with its three open items, in both themes. The menus of the other screens of `acme/billing` carry the mark.
 - **Visual baselines** (`test/e2e/visual.spec.ts`): the screen `inbox` as it opens, in both themes, on desktop and mobile. The baselines show only the open list: the **Done** tab, the empty states, the lock and the slideover are not captured. The desktop baselines of the other screens with a view section have the entry and its mark.
 - **UI automation suite** (`src/Platform/UI.Admin.AutomationTests`): `AppRoutes.Inbox`, and the six entries in the menus of an Administrator and a Contributor (`NavigationMenuTests`, cases 24 and 27). The page has no Testiny case yet.

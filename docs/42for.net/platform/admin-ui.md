@@ -261,7 +261,7 @@ The CLI does the same with `sform story export` and `sform story import` (see [C
 
 **Inbox**, the last entry of the view in the sidebar, after **Modeling** (or `G` then `I`, or the command palette), is where the platform leaves things for the people of the project. Today a deployment leaves one thing there: the end of every [export and import](#export-and-import) of the view. The switcher keeps the page when it changes the view or the project, on its **Open** tab.
 
-The page needs the Contributor role or a higher one. A Reader sees the entry with a lock, and the page shows the notice "Contributors only"; in the collapsed sidebar, the tooltip of the entry says the same. The ends of exports and imports are for Administrators and Owners, the roles that may export and import. So the inbox of a Contributor is empty for now, and says "Nothing to do".
+The page needs the Contributor role or a higher one. A Reader does not see the entry, and the page shows the notice "Contributors only" at its address. The ends of exports and imports are for Administrators and Owners, the roles that may export and import. So the inbox of a Contributor is empty for now, and says "Nothing to do".
 
 The page has two tabs. **Open** lists the items nobody has handled, newest first, with their number on the tab. **Done** lists the dismissed ones, with who dismissed each and when. The address keeps the tab.
 

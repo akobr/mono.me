@@ -141,8 +141,9 @@ test("a contributor sees the items of Contributors, and none of the Administrato
   await expect(item(page, finishedImport, 'Done')).toHaveCount(0)
 })
 
-// The API serves the inbox from Contributor up: a Reader sees the entry with the lock, and the page asks for nothing.
-test('a reader sees the lock of Contributors, in the menu and on the page', async ({ page }, testInfo) => {
+// The API serves the inbox from Contributor up: a Reader has no entry in the menu (minRole, 424-272), the page at its
+// address shows the lock, and nothing asks the inbox.
+test('a reader has no Inbox entry, and the page shows the lock of Contributors', async ({ page }, testInfo) => {
   const inboxRequests: string[] = []
   page.on('request', (request) => {
     if (new URL(request.url()).pathname.endsWith('/inbox') && request.url().includes('/api/')) {
@@ -156,10 +157,9 @@ test('a reader sees the lock of Contributors, in the menu and on the page', asyn
   await expect(page.getByRole('list', { name: 'Open items' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Refresh' })).toHaveCount(0)
 
-  const entry = (await menu(page, testInfo)).getByRole('link', { name: 'Inbox', exact: true })
-  await expect(entry).toHaveAttribute('href', '/northwind/portal/default/inbox')
-  await expect(entry.locator('[data-slot="linkTrailingBadge"]')).toHaveCount(1)
-  await expect(entry.locator('[data-slot="linkLeadingChip"]')).toHaveCount(0)
+  const navigation = await menu(page, testInfo)
+  await expect(navigation.getByRole('link', { name: 'Modeling', exact: true })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: 'Inbox', exact: true })).toHaveCount(0)
   expect(inboxRequests).toEqual([])
 })
 

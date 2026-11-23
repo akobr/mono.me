@@ -216,12 +216,10 @@ describe('the mark of the Inbox entry', () => {
     expect(requests.map((url) => url.pathname)).toEqual(['/api/v1/acme/shipping/default/inbox'])
   })
 
-  it('asks for nothing and marks nothing for a Reader, whose entry has the lock', async () => {
+  it('has no Inbox entry and asks for nothing for a Reader', async () => {
     await mountMenu(portal)
 
-    expect(inbox().getAttribute('href')).toBe('/northwind/portal/default/inbox')
-    expect(lock()).not.toBeNull()
-    expect(dot()).toBeFalsy()
+    expect(entry()).toBeNull()
     expect(requests).toEqual([])
   })
 
@@ -236,9 +234,8 @@ describe('the mark of the Inbox entry', () => {
     })
     await settle()
 
-    expect(lock()).not.toBeNull()
-    expect(dot()).toBeFalsy()
-    expect(inbox().hasAttribute('aria-describedby')).toBe(false)
+    // the entry leaves the menu with its mark
+    expect(entry()).toBeNull()
     expect(document.getElementById('navigation-inbox-mark')).toBeNull()
     expect(requests).toHaveLength(1)
   })
