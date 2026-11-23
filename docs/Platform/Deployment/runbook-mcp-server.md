@@ -85,7 +85,7 @@ Start-Process "$($metadata.authorization_endpoint)?$query"
 
 **Expect** an error from WorkOS, no sign-in page and no redirect to `example.com`. **Stop** and don't trust any client in production if WorkOS signs you in: anyone could then take tokens in a trusted client's name.
 
-9. The precondition: a token of a self-registered client must never be an API bearer token. Once the custom AuthKit domain makes both issuers the same, only its `aud` keeps it out; the local API already has the AuthKit domain as its issuer, so the check holds for that case. Register a client, get a token without `resource`, call a plain API route, then repeat with `$resource` set to the 2S application's audience (the `aud` of step 4):
+9. The precondition: a token of a self-registered client must never be an API bearer token. Once the custom AuthKit domain makes both issuers the same, only its `aud` keeps it out; the local API already has the AuthKit domain as its issuer, so the check holds for that case. Run it against a Release build of the API with the staging settings (`dotnet run -c Release`): a Debug build decodes bearer tokens without checking their audience (`DEV_AUTH`), so it could answer `200` where Release refuses. Register a client, get a token without `resource`, call a plain API route, then repeat with `$resource` set to the 2S application's audience (the `aud` of step 4):
 
 ```powershell
 $redirect = 'http://127.0.0.1:8765/callback'
@@ -300,6 +300,7 @@ If the job fails with `AuthorizationFailed` on `Microsoft.App/containerApps/writ
 | Your data | list your organizations and a project's annotations | the same as in the admin UI |
 | No account | sign in with a WorkOS user that has no Storyteller account | "No Storyteller account exists for this sign-in. Register once with sform or the admin UI." |
 | Read only | ask the assistant to change one annotation | nothing changes: the assistant has no write tool, or the call answers "The 2S API lets this client app only read for you, so the change was not made. …" (`ActorReadOnly`) |
+| Read only at the API | the same change sent to the API itself, past the MCP server: take a read-only Storyteller token from the exchange (staging, the actor's credential) and `PUT` one annotation with it | `403` with `ErrorCode` `ActorReadOnly`; hiding a tool in the MCP server proves nothing about the API |
 | The client | the API's Application Insights (`prod-2s-api-appi`, **Logs**): `traces \| where message has "via mcp (client" \| project timestamp, message \| take 20` | every request of the assistant: `A request … via mcp (client <id>) answered …`, with `client_01…` for a dynamically registered client or the metadata URL for one with CIMD |
 | Audit | once a client is trusted ([Trust a client](#trust-a-client)): an access change through it, e.g. `create_machine` and then `delete_machine` of a test machine, then the access audit trail in the admin UI | your account `via mcp (client <id>)` |
 | Secrets | ask for a secret value | refused (`NoSecretReveal`), and the secret tools are not listed |
@@ -371,7 +372,7 @@ The switch for dynamically registered clients, whose ids are random: list the cl
 param mcpAllowedClientIds = ['<each id of mcpTrustedClientIds>']
 ```
 
-Pull request, what-if (only `prod-2s-api-fa/appsettings`: `+ Auth__TokenExchange__Actors__0__AllowedClientIds__<n>`), then create. From the restart on, the API refuses the exchange of every other client; the API checks this list at the exchange only, so the tokens such a client already has run out within 10 minutes (`TokenLifetimeMinutes`). With no trusted client there is nothing to list: turn the exchange off instead ([10. Rolling back](#10-rolling-back)).
+Pull request, what-if (only `prod-2s-api-fa/appsettings`: `+ Auth__TokenExchange__Actors__0__AllowedClientIds__<n>`), then create. From the restart on, the API refuses the exchange of every other client; the API checks this list at the exchange only, so the tokens such a client already has run out within 10 minutes (`TokenLifetimeMinutes`) plus the clock skew (`MachineAuth:Federation:ClockSkewSeconds`, 30 seconds). With no trusted client there is nothing to list: turn the exchange off instead ([10. Rolling back](#10-rolling-back)).
 
 Turning dynamic client registration off in WorkOS production does the same for the whole environment, and also locks out Cursor and every other client without CIMD. Access tokens WorkOS issued before stay valid until they expire.
 
