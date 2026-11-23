@@ -37,6 +37,31 @@ public class TokenExchangeActorNoticeTests
         ]);
     }
 
+    // With AllowedClientIds, a trusted client the list does not name is refused at the exchange, so its trust never applies.
+    [Fact]
+    public async Task StartAsync_WarnsAboutATrustedClientThatIsNotAllowed()
+    {
+        var logger = await StartAsync(new TokenExchangeOptions
+        {
+            Enabled = true,
+            Actors =
+            [
+                new TokenExchangeActorOptions
+                {
+                    Id = "mcp",
+                    SubjectAudiences = ["https://mcp.example/mcp"],
+                    AllowedClientIds = ["vscode", " cursor "],
+                    TrustedClientIds = ["cursor", "https://claude.ai/oauth/mcp-oauth-client-metadata"],
+                    UntrustedClientRestrictions = [ActorRestrictions.ReadOnly],
+                },
+            ],
+        });
+
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        entry.Message.ShouldBe("The client https://claude.ai/oauth/mcp-oauth-client-metadata of the TrustedClientIds of the actor mcp is not in its AllowedClientIds: the exchange refuses it, so its trust never applies.");
+    }
+
     // NoSecretReveal is the actor's own restriction without AllowSecrets, so UntrustedClientRestrictions that only repeat it
     // leave every client with the actor's whole policy: still the exposure the warning is about, and trust has no effect.
     [Fact]

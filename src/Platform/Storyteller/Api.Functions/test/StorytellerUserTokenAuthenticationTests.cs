@@ -120,6 +120,7 @@ public class StorytellerUserTokenAuthenticationTests
     [InlineData("not found", 404)]
     [InlineData("not modified", 304)]
     [InlineData("object", 200)]
+    [InlineData("problem", 422)]
     [InlineData("response", 201)]
     public async Task RequestThroughAnActor_IsLoggedWithTheActorAndTheClient(string answer, int statusCode)
     {
@@ -139,6 +140,7 @@ public class StorytellerUserTokenAuthenticationTests
                     "not found" => new NotFoundResult(),
                     "not modified" => new StatusCodeResult(304),
                     "object" => new ObjectResult("value"),
+                    "problem" => new ObjectResult(new ProblemDetails { Status = 422 }),
                     _ => new TestHttpResponseData(invoked) { StatusCode = HttpStatusCode.Created },
                 };
                 return Task.CompletedTask;
