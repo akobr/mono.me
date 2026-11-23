@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.58.51142"
+    "version": "0.10.65.8193"
   },
   "servers": [
     {
@@ -16975,6 +16975,352 @@
         }
       }
     },
+    "/v1/{organization}/{project}/{view}/inbox": {
+      "get": {
+        "tags": [
+          "Inbox"
+        ],
+        "description": "The inbox of the view, newest first, 50 items a page: the results of background jobs such as exports and imports (Notification), what the platform suggests (Action) and plain messages (Message). An item is open for everybody who sees it until one of them accepts or dismisses it. Only the items the caller's role on the project may see are listed and counted (MinimalRole); OpenCount is every open one of them, whatever the page and the state. The inbox of a view without items is empty. Users only, with the Contributor role.",
+        "operationId": "GetViewInbox",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "Open (default), or Done: the accepted and the dismissed items.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of items, newest first, at most 50, and the count of the open items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewInboxResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The state is not Open or Done, or the continuation token is not one of the inbox (ErrorCode InvalidQuery).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). The inbox needs the Contributor role. An item above the caller's role is not found (404).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/inbox/{id}/accept": {
+      "post": {
+        "tags": [
+          "Inbox"
+        ],
+        "description": "Accepts an open action of the inbox. The item becomes Accepted for everybody who sees it, stamped with the caller, and what the action stands for is started: typically a background job, named by Job, whose result arrives as a notification of its own. Only an item of the kind Action can be accepted. No request body. Users only, with the Contributor role and the role the item needs (MinimalRole).",
+        "operationId": "AcceptViewInboxItem",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the inbox item, from the list.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The accepted item, with the job its acceptance started when there is one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewInboxItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The item doesn't exist in this view, has expired, or needs a higher role than the caller's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is not an action (ErrorCode InboxItemNotAction), or it was already accepted or dismissed (ErrorCode InboxItemClosed). The item changed concurrently too many times (ErrorCode Conflict); try again. What the action starts could not start: the error code is the one of that work, such as TransferLimit, and the item stays open.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). The inbox needs the Contributor role. An item above the caller's role is not found (404). Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "The deployment has nothing that runs the action of the item (ErrorCode InboxActionNotAvailable); the item stays open.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/inbox/{id}/dismiss": {
+      "post": {
+        "tags": [
+          "Inbox"
+        ],
+        "description": "Dismisses an open item of the inbox, of any kind. The item becomes Dismissed for everybody who sees it, stamped with the caller, and stays among the done items until it expires; nothing is started. No request body. Users only, with the Contributor role and the role the item needs (MinimalRole).",
+        "operationId": "DismissViewInboxItem",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the inbox item, from the list.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The dismissed item.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewInboxItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The item doesn't exist in this view, has expired, or needs a higher role than the caller's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item was already accepted or dismissed (ErrorCode InboxItemClosed). The item changed concurrently too many times (ErrorCode Conflict); try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). The inbox needs the Contributor role. An item above the caller's role is not found (404). Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
     "/v1/{organization}/{project}/views": {
       "get": {
         "tags": [
@@ -21735,6 +22081,124 @@
           },
           "Message": {
             "type": "string"
+          }
+        }
+      },
+      "ViewInboxItem": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Kind": {
+            "enum": [
+              "Notification",
+              "Action",
+              "Message"
+            ],
+            "type": "string",
+            "default": "Notification"
+          },
+          "Topic": {
+            "type": "string"
+          },
+          "Level": {
+            "enum": [
+              "Info",
+              "Success",
+              "Warning",
+              "Error"
+            ],
+            "type": "string",
+            "default": "Info"
+          },
+          "Title": {
+            "type": "string"
+          },
+          "Text": {
+            "type": "string"
+          },
+          "MinimalRole": {
+            "enum": [
+              "None",
+              "Reader",
+              "Contributor",
+              "ContributorWithSecrets",
+              "Administrator",
+              "Owner"
+            ],
+            "type": "string",
+            "default": "None"
+          },
+          "State": {
+            "enum": [
+              "Open",
+              "Accepted",
+              "Dismissed"
+            ],
+            "type": "string",
+            "default": "Open"
+          },
+          "CreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "CreatedBy": {
+            "$ref": "#/components/schemas/AuditActor"
+          },
+          "ExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "Closed": {
+            "$ref": "#/components/schemas/AuditStamp"
+          },
+          "Action": {
+            "type": "string"
+          },
+          "Job": {
+            "$ref": "#/components/schemas/ViewInboxJob"
+          }
+        }
+      },
+      "ViewInboxJob": {
+        "type": "object",
+        "properties": {
+          "Kind": {
+            "enum": [
+              "ViewExport",
+              "ViewImport"
+            ],
+            "type": "string",
+            "default": "ViewExport"
+          },
+          "Id": {
+            "type": "string"
+          },
+          "FileName": {
+            "type": "string"
+          }
+        }
+      },
+      "ViewInboxResponse": {
+        "type": "object",
+        "properties": {
+          "Items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViewInboxItem"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "OpenCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

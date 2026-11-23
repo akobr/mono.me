@@ -23364,7 +23364,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). The inbox needs the Contributor role. An item above the caller\'s role is not found (404).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). The inbox needs the Contributor role. An item above the caller\'s role is not found (404). Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -23519,7 +23519,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). The inbox needs the Contributor role. An item above the caller\'s role is not found (404).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). The inbox needs the Contributor role. An item above the caller\'s role is not found (404). Through an actor, a client app that may only read gets 403 with ErrorCode ActorReadOnly.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)

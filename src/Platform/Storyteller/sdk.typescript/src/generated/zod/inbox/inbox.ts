@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.58.40890
+ * OpenAPI spec version: 0.10.65.8193
  */
 import * as zod from "zod";
 
@@ -71,6 +71,7 @@ export const GetViewInboxResponse = zod.object({
             Id: zod.string().optional(),
             Name: zod.string().optional(),
             Via: zod.string().optional(),
+            ViaClient: zod.string().optional(),
           })
           .optional(),
         ExpiresAt: zod.iso.datetime({ offset: true }).optional(),
@@ -85,6 +86,7 @@ export const GetViewInboxResponse = zod.object({
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
                 Via: zod.string().optional(),
+                ViaClient: zod.string().optional(),
               })
               .optional(),
           })
@@ -158,6 +160,7 @@ export const AcceptViewInboxItemResponse = zod.object({
       Id: zod.string().optional(),
       Name: zod.string().optional(),
       Via: zod.string().optional(),
+      ViaClient: zod.string().optional(),
     })
     .optional(),
   ExpiresAt: zod.iso.datetime({ offset: true }).optional(),
@@ -172,6 +175,7 @@ export const AcceptViewInboxItemResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })
@@ -239,6 +243,7 @@ export const DismissViewInboxItemResponse = zod.object({
       Id: zod.string().optional(),
       Name: zod.string().optional(),
       Via: zod.string().optional(),
+      ViaClient: zod.string().optional(),
     })
     .optional(),
   ExpiresAt: zod.iso.datetime({ offset: true }).optional(),
@@ -253,6 +258,7 @@ export const DismissViewInboxItemResponse = zod.object({
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),
+          ViaClient: zod.string().optional(),
         })
         .optional(),
     })

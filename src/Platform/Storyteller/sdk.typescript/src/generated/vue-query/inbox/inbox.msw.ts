@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.58.40890
+ * OpenAPI spec version: 0.10.65.8193
  */
 import { faker } from "@faker-js/faker";
 
@@ -83,6 +83,10 @@ export const getGetViewInboxResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          ViaClient: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -112,6 +116,10 @@ export const getGetViewInboxResponseMock = (
                 undefined,
               ]),
               Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              ViaClient: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -216,6 +224,10 @@ export const getAcceptViewInboxItemResponseMock = (
         faker.string.alpha({ length: { min: 10, max: 20 } }),
         undefined,
       ]),
+      ViaClient: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
     },
     undefined,
   ]),
@@ -245,6 +257,10 @@ export const getAcceptViewInboxItemResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -337,6 +353,10 @@ export const getDismissViewInboxItemResponseMock = (
         faker.string.alpha({ length: { min: 10, max: 20 } }),
         undefined,
       ]),
+      ViaClient: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
     },
     undefined,
   ]),
@@ -366,6 +386,10 @@ export const getDismissViewInboxItemResponseMock = (
             undefined,
           ]),
           Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          ViaClient: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
