@@ -94,6 +94,27 @@ public class JsonPatchTests
         result.Should().BeEquivalentTo(JObject.Parse("""{ "ratio": 3 }"""));
     }
 
+    // RFC 6901: ~1 is "/" and ~0 is "~" in a member name. The admin UI's editor (buildPatch) and the MCP server write
+    // such pointers for a member whose name holds either character.
+    [Fact]
+    public async Task ApplyPatch_EscapedPointers_ChangeTheMembersTheyName()
+    {
+        var document = JObject.Parse("""{ "a/b": 1, "m~n": 2, "~/": 3, "a": { "b": 4 } }""");
+        var patch = JArray.Parse("""
+            [
+              { "op": "test", "path": "/a~1b", "value": 1 },
+              { "op": "replace", "path": "/a~1b", "value": 10 },
+              { "op": "remove", "path": "/m~0n" },
+              { "op": "add", "path": "/~0~1x", "value": 5 },
+              { "op": "test", "path": "/~0~1", "value": 3 }
+            ]
+            """);
+
+        var result = await document.ApplyPatch(patch);
+
+        result.Should().BeEquivalentTo(JObject.Parse("""{ "a/b": 10, "~/": 3, "~/x": 5, "a": { "b": 4 } }"""));
+    }
+
     [Fact]
     public async Task ApplyPatch_MissingPath_ThrowsOperationFailed()
     {
