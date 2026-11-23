@@ -135,7 +135,9 @@ public sealed class ModelingTabsTests : PlatformTest
 
     // MOD-TAB-03: A Reader browses Modeling read-only, with the Administrators only lock on Export & Import.
     // A Reader opens Modeling on Schemas with the four tabs of a Contributor and without New schema. The execution
-    // template is either "No execution template" without Create template or its document, read-only and without Save,
+    // schema is either "No schema" without Create or its document, read-only with the badge "Read-only" and without
+    // Save, Revert or Delete; either state is read-only, so the check holds on any target. The execution template is
+    // either "No execution template" without Create template or its document, read-only and without Save,
     // Revert or Delete. Export & Import shows "Administrators only" under the four tabs with none selected; Deleted has
     // Show cascaded, and on a target with deletions no selection and a row's menu with only its details (the mock's
     // Reader project has none, so there the rows are covered by the admin UI's own tests); Compare views opens
@@ -164,11 +166,29 @@ public sealed class ModelingTabsTests : PlatformTest
         // The lock that closed the whole of Modeling below Contributor until 424-272.
         await Expect(Page.GetByText("Contributors only", new() { Exact = true })).ToHaveCountAsync(0);
 
+        // Every type has a schema detail, so this step checks a read-only state on any target, whether the schema
+        // exists or not; the mock's northwind/portal has the execution schema.
+        await schemas.OpenTypeAsync("exe");
+        await Expect(schemas.CreateButton).ToHaveCountAsync(0);
+        await Expect(schemas.SaveButton).ToHaveCountAsync(0);
+        await Expect(schemas.RevertButton).ToHaveCountAsync(0);
+        await Expect(schemas.DeleteButton).ToHaveCountAsync(0);
+        if (await schemas.NoSchema.IsVisibleAsync())
+        {
+            await Expect(schemas.Document.Content).ToHaveCountAsync(0);
+        }
+        else
+        {
+            await Expect(schemas.ReadOnlyBadge).ToBeVisibleAsync();
+            await Expect(schemas.Document.Content).Not.ToBeEditableAsync();
+        }
+
         // A deployed Reader project may have no execution template; the mock's northwind/portal has one.
         await templates.OpenAsync("exe");
         if (await templates.NoTemplate.IsVisibleAsync())
         {
             await Expect(templates.CreateTemplateButton).ToHaveCountAsync(0);
+            TestContext.Current?.Output.WriteLine("The target has no execution template: its read-only document was not checked.");
         }
         else
         {
@@ -193,7 +213,11 @@ public sealed class ModelingTabsTests : PlatformTest
         await deleted.WaitForListAsync();
         await Expect(deleted.SelectCheckboxes).ToHaveCountAsync(0);
         await Expect(deleted.BulkActions).ToHaveCountAsync(0);
-        if (!await deleted.NothingDeleted.IsVisibleAsync())
+        if (await deleted.NothingDeleted.IsVisibleAsync())
+        {
+            TestContext.Current?.Output.WriteLine("The target has no deleted annotation: the rows of a Reader were not checked.");
+        }
+        else
         {
             await deleted.ActionsButtons.First.ClickAsync();
             await Expect(deleted.MenuItems).ToHaveTextAsync(["Show details"]);

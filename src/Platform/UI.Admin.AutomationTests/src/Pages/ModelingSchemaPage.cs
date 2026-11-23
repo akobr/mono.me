@@ -47,6 +47,19 @@ public sealed partial class ModelingSchemaPage(App app, AppRoutes routes)
 
     public VersionsView Versions => new(app, Panel.Root);
 
+    // A Reader's editor of an existing schema carries this badge in its actions.
+    public ILocator ReadOnlyBadge => Panel.Root.GetByText("Read-only", new() { Exact = true });
+
+    // A Reader's empty state of a schema that does not exist, instead of the starter document.
+    public ILocator NoSchema => Panel.Root.GetByRole(AriaRole.Heading, new() { Name = "No schema", Exact = true });
+
+    // Opens the schema of a type and waits until it loaded: its editor, or a Reader's "No schema".
+    public async Task OpenTypeAsync(string type)
+    {
+        await app.GotoAsync(routes.TypeSchema(type));
+        await Expect(Document.Content.Or(NoSchema)).ToBeVisibleAsync();
+    }
+
     // Opens the schema of an annotation (it applies to the annotation and its descendants) and waits for its editor.
     public async Task OpenAnnotationAsync(string key)
     {
