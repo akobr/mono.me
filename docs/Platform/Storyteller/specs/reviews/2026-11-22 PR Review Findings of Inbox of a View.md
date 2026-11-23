@@ -60,6 +60,41 @@ The tab dismisses that item only when the end it showed is the server's end and 
 
 Main removed `lockedHint` and made the lock of an entry mean read-only. The inbox is closed to a Reader, so its entry now has `minRole: 'Contributor'`: a Reader does not see it, and the page at its address still shows the lock "Contributors only". This changes section 7.1 of the spec (a locked entry for a Reader); the menu's tests, the e2e test of a Reader and the docs follow.
 
+## Grok review (2026-11-23)
+
+A review of PR #220 by Grok (verdict approve-ready), checked against the rebased branch: four important points and nine nits. Five changes are made, the rest is left with the reason.
+
+### 12. Fixed: the toaster dismissed a shared item in the name of the person, whoever caused it
+
+The state of an item is shared, and the dismissal is stamped with the person of the tab without a click of theirs. `dismissJobItem` now dismisses only a `Notification` of the job whose `CreatedBy` is the signed-in account, and nothing while the account is not known. The tab follows only jobs it started, so the rule changes nothing today; it keeps the automatic dismissal from closing an item that somebody else caused once 424-8 adds producers. `inbox.md` (Results the tab already showed) says the dismissal is automatic. Test: `dismisses nothing that another account started, and nothing without an account`. A read state per person stays out of scope (spec, decision 6).
+
+### 13. Fixed: a wrong `ViewInbox:RetentionDays` failed every failure notification with only a warning
+
+The options are validated at the start of the host (`ValidateOnStart`), so a wrong setting stops the API where it is seen. The publisher still reads the setting only in a push without an expiry, so a container without a host builds the transfers all the same. `ViewInboxRegistrationTests` checks `IStartupValidator`; without `ValidateOnStart` it fails.
+
+### 14. Pinned: the archive stays when the failure of an export cannot be saved
+
+When `FailAsync` cannot save the failure because the store throws, the job's state is unknown: it may have ended, with its archive. Deleting the archive then could take a succeeded export's download away, so it stays, and the purge removes it after the retention; only a succeeded export is downloaded. `export-import.md` (Jobs) already said so; the test `ProcessExport_KeepsTheArchive_WhenItsFailureCannotBeSaved` now pins it. A third state of `FailAsync` would change nothing a client can see.
+
+### 15. Documented: a keyed push is the same item only with the same key and time
+
+The comment of `ViewInboxPush.Key` and `inbox.md` (Pushing an item) say that the id comes from the key **and** `CreatedAt`, so a producer passes the time of its event, never the time of the push. `Push_WithAKey_GivesAnotherItemForAnotherKeyOrAnotherTime` already shows the second item.
+
+### 16. Nits fixed
+
+- **Handlers are singletons**: said in `IViewInboxActionHandler` and `inbox.md`. Two handlers of one code already stop only the inbox service at its first build; catching them at the start of the host is left.
+- **The answer of accept names a job the item may not store**: a comment in `SaveJobAsync` says it is deliberate (the caller learns the job its acceptance started).
+- **A cut no longer splits a character of two UTF-16 units**: `Push_CutsBeforeACharacterOfTwoUnits_NeverInItsMiddle`.
+- **`canRead` of the page is `canUseInbox`.**
+
+### 17. Nits left
+
+- `?state=1` is accepted as `Done`, as on the key/value routes (`KeyValueQuery.GetEnum`); `inbox.md` names it.
+- The Done tab is ordered by arrival, not by the time of closing: the keyset paging needs one sort key, and an index on the closing time would sort the open items too. `inbox.md` says so.
+- A changed first page drops the pages loaded with **Load more**: keeping them while the old last item is still on the new first page is a refinement, not a fix; the behaviour is documented and tested.
+- `dismissJobItem` looks at the 50 newest open items (finding 6 above).
+- The version header of the generated TypeScript files is Orval's; changing it is outside this change.
+
 ### Checks
 
 | Suite | Result |

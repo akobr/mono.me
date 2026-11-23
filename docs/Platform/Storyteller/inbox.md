@@ -164,10 +164,10 @@ A producer takes `IViewInboxPublisher` and calls `PushAsync(ViewInboxPush push, 
 | `CreatedAt` | The time of the event. Required with a `Key`; when left out, now. |
 
 - **Validation.** A wrong push is an error of its producer, not of a request: it throws `ArgumentException` and stores nothing. That is a blank organization, project, view or title; a `Topic` or an `Action` that is not a code (`^[A-Za-z][A-Za-z0-9]{0,63}\z`: a letter, then up to 63 letters or digits); an `Action` kind without an `Action` code, or another kind with one; a `MinimalRole` below `Contributor`; a `Key` without `CreatedAt`.
-- **Cuts.** A `Title` longer than 200 characters is cut to 199 and `…`, a `Text` longer than 2000 to 1999 and `…`, as the jobs cut their messages.
+- **Cuts.** A `Title` longer than 200 characters is cut to 199 and `…`, a `Text` longer than 2000 to 1999 and `…`, as the jobs cut their messages. A cut never splits a character of two UTF-16 units, such as an emoji: it ends one unit earlier.
 - **Lifetime.** Without `ExpiresAt` the item lives for `ViewInbox:RetentionDays` from the push, also when `CreatedAt` is in the past. A given `ExpiresAt` is kept when it is between one minute and 365 days from now; a time outside is moved to the nearer limit. The store gets the time the item still has (`ExpiresAt` minus now) as the time to live of the write.
 - **Without a `Key`** every push stores a new item.
-- **With a `Key`** the id comes from the key and `CreatedAt`, so a second push of the same event meets the stored item. That item is returned as it is, also when somebody closed it meanwhile; nothing is written, and the title, the text and the expiry of the second push are neither compared nor applied. When the create conflicts and the read finds nothing (the stored item expired in between), the create is repeated once; a second conflict throws `InvalidOperationException`.
+- **With a `Key`** the id comes from the key and `CreatedAt`, so a second push of the same event meets the stored item. It is the same item only with the same key **and** the same `CreatedAt`: a producer passes the time of its event, which it can read again (the transfers pass the job's `CompletedAt`), never the time of the push, which would store a second item. That item is returned as it is, also when somebody closed it meanwhile; nothing is written, and the title, the text and the expiry of the second push are neither compared nor applied. When the create conflicts and the read finds nothing (the stored item expired in between), the create is repeated once; a second conflict throws `InvalidOperationException`.
 - **The token** of the caller stops the push.
 
 The push of a finished export, as `ViewTransferNotifications` builds it, with the text of one export written out:
@@ -268,7 +268,7 @@ public sealed record ViewInboxActionResult
 - **The code** of `Action` is compared exactly, case included, with the `Action` of the item.
 - **`RunAsync`** is called after the item is accepted, and its token is never the caller's: the work runs to its end. A typical handler starts a background job, whose result arrives later as a notification, and returns the job.
 - **Throw only when nothing was started.** The item is then open again and can be accepted once more.
-- **Registration.** A handler is a registered `IViewInboxActionHandler` service; `ViewInboxService` takes all of them. Two handlers with one code fail the construction of the service ("The inbox action '{code}' has two handlers: …"), which stops the readers of the inbox and nothing else (see [Two services](#two-services)).
+- **Registration.** A handler is a registered `IViewInboxActionHandler` service, a singleton: `ViewInboxService` is one and takes all of them when it is built, so a scoped handler would live as long as the host. Two handlers with one code fail the construction of the service ("The inbox action '{code}' has two handlers: …"), which stops the readers of the inbox and nothing else (see [Two services](#two-services)).
 
 A handler that starts an export, in the shape `ViewInboxRegistrationTests` uses:
 
@@ -671,7 +671,7 @@ Against a deployed API every **Accept** answers `501` today (see [Not there yet]
 
 A tab that followed a job to its end has shown it: the toast, the automatic download of an export, or the result on the Export & Import page. The notification of that job would report it a second time and mark the menu for the person who just saw it. So `components/transfer/TransferToaster.vue`, when it hears the end of a job, dismisses the job's item (`dismissJobItem` of `queries/inbox.ts`):
 
-1. It reads the first page of the open items of the job's view and looks for the notification whose `Job.Id` is the job's.
+1. It reads the first page of the open items of the job's view and looks for the notification whose `Job.Id` is the job's and whose `CreatedBy` is the signed-in account. The state of an item is shared, and the dismissal is stamped with this person without a click of theirs, so an item that somebody else caused is never dismissed, and nothing is dismissed while the account is not known.
 2. When the item is not there yet, it waits two seconds (`jobItemRetryMs`) and looks once more. The back end pushes the item right after it saves the end of the job.
 3. It dismisses the item. The item is then under **Done**, dismissed by that person, with its **Download** or **Show the result**.
 4. It reads the lists of the view again, once, after the dismissal: reading them first would mark the menu for a moment.
@@ -857,7 +857,7 @@ Section `ViewInbox` (`ViewInboxOptions`):
 | --- | --- | --- |
 | `ViewInbox:RetentionDays` | `30` | Days an item lives when its producer names no `ExpiresAt`; between 1 and 365 |
 
-The range is checked when the setting is first read, and the publisher reads it in the push that needs it, not when it is built and not at the start of the host. A value outside the range fails every push that names no `ExpiresAt` with "ViewInbox:RetentionDays must be between 1 and 365."; a push with its own expiry, such as the result of a job, still works. The service of exports and imports takes the publisher and is built all the same: a wrong setting costs the notifications of failed jobs (each logged as a warning), never an export. The limits of one minute and 365 days of an item's life are constants of the publisher.
+The range is checked at the start of the host (`ValidateOnStart`): a value outside it stops the API with "ViewInbox:RetentionDays must be between 1 and 365.", where it is seen, instead of failing the notification of every failed job later with only a warning. The publisher still reads the setting only in a push that names no `ExpiresAt`, not when it is built, so a container built without a host (a test) builds the service of exports and imports all the same, and only such a push fails. The limits of one minute and 365 days of an item's life are constants of the publisher.
 
 ## Registration
 
