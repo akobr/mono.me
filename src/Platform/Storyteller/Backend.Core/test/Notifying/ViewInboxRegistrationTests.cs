@@ -116,6 +116,10 @@ public class ViewInboxRegistrationTests
 
         await using var provider = services.BuildServiceProvider(Validated);
 
+        // a host stops at its start, where the wrong setting is seen
+        Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IStartupValidator>().Validate())
+            .Message.ShouldContain("ViewInbox:RetentionDays must be between 1 and 365.");
+
         // the setting is read by the push, not by the construction of the publisher that the jobs take
         var transfers = provider.GetRequiredService<IViewTransferService>();
         await transfers.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Folder, null, Actor, TestContext.Current.CancellationToken);

@@ -153,6 +153,18 @@ public class ViewInboxPublisherTests
     }
 
     [Fact]
+    public async Task Push_CutsBeforeACharacterOfTwoUnits_NeverInItsMiddle()
+    {
+        // the emoji takes the 199th and 200th unit, where the cut would split it
+        var title = new string('t', 198) + "🚀" + "end";
+
+        var cut = await _publisher.PushAsync(Push() with { Title = title });
+
+        cut.Title.ShouldBe(new string('t', 198) + "…");
+        cut.Title!.Any(char.IsSurrogate).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Push_WithoutAnExpiry_LivesForTheRetentionOfTheOptions()
     {
         (await _publisher.PushAsync(Push())).ExpiresAt.ShouldBe(Start.AddDays(30));

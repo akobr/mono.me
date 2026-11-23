@@ -252,7 +252,9 @@ public sealed class ViewTransferService : IViewTransferService
             _logger.LogError(exception, "The {Kind} job {Id} of {Organization}.{Project}.{View} failed.", message.Kind, message.Id, message.Organization, message.Project, message.View);
             var failed = await FailAsync(message, exception is StorytellerException ? exception.Message : $"The {message.Kind.ToString().ToLowerInvariant()} failed: {exception.Message}", cancellationToken);
 
-            // the archive of an export that ended before stays downloadable
+            // The archive of an export that ended before stays downloadable. When the failure could not be saved, the
+            // job may have ended too, so its archive stays as well: only a succeeded export is downloaded, and the
+            // purge removes what is left after the retention.
             if (failed && message.Kind == ViewTransferKind.Export)
             {
                 await TryDeleteArchiveAsync(ViewTransferNames.GetArchiveName(message), cancellationToken);

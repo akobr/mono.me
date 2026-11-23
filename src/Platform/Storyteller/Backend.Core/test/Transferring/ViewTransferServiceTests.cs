@@ -1190,6 +1190,31 @@ public class ViewTransferServiceTests
         content.Length.ShouldBe(export.Size!.Value);
     }
 
+    [Fact]
+    public async Task ProcessExport_KeepsTheArchive_WhenItsFailureCannotBeSaved()
+    {
+        SetEveryKind();
+        var service = WithInbox(_inbox);
+        var message = await StartAsync(service, ViewTransferKind.Export);
+
+        // the store answers no write of an end: the job's state after the exception is not known
+        _store.Replacing = record =>
+        {
+            if (record.Status is ViewTransferStatus.Succeeded or ViewTransferStatus.Failed)
+            {
+                throw new IOException("The store does not answer.");
+            }
+        };
+
+        await service.ProcessAsync(message);
+
+        // the job may have ended with its archive, so the archive stays until the purge, and nothing is pushed
+        var export = (await service.GetExportAsync("acme", "main", "default", message.Id))!;
+        export.Status.ShouldBe(ViewTransferStatus.Running);
+        _storage.Archives.Keys.ShouldContain(ViewTransferNames.GetArchiveName(message));
+        _inbox.Pushes.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData(ViewTransferKind.Export)]
     [InlineData(ViewTransferKind.Import)]

@@ -32,7 +32,9 @@ public sealed record ViewInboxPush
 
     public ViewInboxJob? Job { get; init; }
 
-    // Makes the push idempotent, with CreatedAt as the time of the event (required with a Key).
+    // Makes the push idempotent, with CreatedAt as the time of the event (required with a Key). The id is built from
+    // both, so a second push is the same item only with the same Key AND the same CreatedAt: a producer passes the
+    // time of its event, which it can read again, never the time of the push.
     public string? Key { get; init; }
 
     public DateTimeOffset? CreatedAt { get; init; }

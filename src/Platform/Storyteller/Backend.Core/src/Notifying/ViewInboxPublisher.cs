@@ -149,7 +149,15 @@ public sealed partial class ViewInboxPublisher : IViewInboxPublisher
     // As the jobs cut their messages.
     private static string? Cut(string? text, int length)
     {
-        return text is not null && text.Length > length ? $"{text[..(length - 1)]}…" : text;
+        if (text is null || text.Length <= length)
+        {
+            return text;
+        }
+
+        // never half of a character outside the basic plane, such as an emoji
+        var end = length - 1;
+        end = char.IsHighSurrogate(text[end - 1]) ? end - 1 : end;
+        return $"{text[..end]}…";
     }
 
     private static DateTimeOffset Limit(DateTimeOffset expiresAt, DateTimeOffset now)

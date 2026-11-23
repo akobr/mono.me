@@ -328,6 +328,8 @@ public sealed class ViewInboxService : IViewInboxService
                 claimed.View);
         }
 
+        // Also when the save failed: the caller learns the job its acceptance started, which the next read of the item
+        // does not name.
         return item;
     }
 

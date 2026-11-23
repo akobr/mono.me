@@ -14,7 +14,12 @@ public static class ViewInboxEntryPoint
             .Bind(configuration.GetSection(ViewInboxOptions.SectionName))
             .Validate(
                 options => options.RetentionDays is >= ViewInboxOptions.MinRetentionDays and <= ViewInboxOptions.MaxRetentionDays,
-                $"{ViewInboxOptions.SectionName}:{nameof(ViewInboxOptions.RetentionDays)} must be between {ViewInboxOptions.MinRetentionDays} and {ViewInboxOptions.MaxRetentionDays}.");
+                $"{ViewInboxOptions.SectionName}:{nameof(ViewInboxOptions.RetentionDays)} must be between {ViewInboxOptions.MinRetentionDays} and {ViewInboxOptions.MaxRetentionDays}.")
+
+            // A wrong setting stops a host at its start, where it is seen, instead of every push without an expiry (the
+            // notification of every failed job) failing later with only a warning. The publisher still reads the
+            // setting only when it pushes, so a container built without a host does not fail on it.
+            .ValidateOnStart();
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IViewInboxPublisher, ViewInboxPublisher>();
