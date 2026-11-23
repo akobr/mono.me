@@ -50,6 +50,11 @@ public static class StorytellerCallFilter
         "The one-time credentials of a completed create_machine or reset_machine cannot be read again: reset the machine, "
         + "or delete and recreate a Certificate machine.";
 
+    private static readonly AsyncLocal<CancellationToken> Call = new();
+
+    // The token of the tool call that runs in this flow: DeadlineBodyHandler ties the bodies of the API's answers to it.
+    internal static CancellationToken CurrentCall => Call.Value;
+
     public static McpRequestHandler<CallToolRequestParams, CallToolResult> Create(McpRequestHandler<CallToolRequestParams, CallToolResult> next)
     {
         return async (request, cancellationToken) =>
@@ -102,6 +107,7 @@ public static class StorytellerCallFilter
                 // Only the tool's own calls: a failed token exchange above is a sign-in error, not an unfinished write.
                 try
                 {
+                    Call.Value = call.Token;
                     return await next(request, call.Token);
                 }
                 catch (Exception exception) when (IsUnfinishedCall(exception, cancellationToken))
@@ -174,14 +180,15 @@ public static class StorytellerCallFilter
     }
 
     // The SDK reports a body it could not read as an ApiException with the status of the answer, the one-time credentials
-    // of a new machine in a 200 among them; Newtonsoft wraps the transport failure in a JsonException first.
-    private static IOException? FindBrokenBody(Exception exception)
+    // of a new machine in a 200 among them; Newtonsoft wraps the transport failure in a JsonException first. The deadline
+    // ends such a read with an OperationCanceledException (DeadlineBodyHandler).
+    private static Exception? FindBrokenBody(Exception exception)
     {
         for (var inner = exception; inner is not null; inner = inner.InnerException)
         {
-            if (inner is IOException broken)
+            if (inner is IOException or OperationCanceledException)
             {
-                return broken;
+                return inner;
             }
         }
 
