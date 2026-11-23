@@ -50,26 +50,6 @@ var baseAccountId = builder.Configuration["BaseAccount:Id"] is { Length: > 0 } c
 const string authKitStagingOwner = "user_01M41P6G2TTSXXMM88WNVMRQKG";
 var defaultSeedOwner = baseAccountId ?? (seedStagingAccounts ? authKitStagingOwner : null);
 
-// Start: the defaults above. Create with options…: asks for the base account (prefilled with BaseAccount:Id, else the
-// default AuthKit staging user) and the staging accounts of one run.
-builder.AddProject<Projects.DbCreator>("db-creator")
-    .WithReference(cosmos)
-    .WaitFor(cosmos)
-    .WithCreateOptions(baseAccountId, seedStagingAccounts, authKitStagingOwner)
-    .WithExplicitStart();
-
-// Start: the built-in data set showcase of DbCreator (the fabrikam / invoicing-suite scope of the admin UI's showcase
-// mock); the seed ensures the containers itself, and a second start reports the set as seeded already. Seed with
-// options…: asks for the sets (those of DbCreator's data-sets folder), a folder, the owner, the target and the flags.
-var dbSeed = builder.AddProject<Projects.DbCreator>("db-seed")
-    .WithReference(cosmos)
-    .WaitFor(cosmos)
-    .WithSeedOptions(
-        Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../Storyteller/DbCreator/src/data-sets")),
-        baseAccountId,
-        defaultSeedOwner)
-    .WithExplicitStart();
-
 // Local Key Vault emulator (Lowkey Vault): the key-encryption keys of the Standard level of key/value secrets.
 // Relaxed ports let the vault answer on the host port that Aspire maps to 8443.
 var keyVault = builder.AddContainer("keyvault", "nagyesta/lowkey-vault", "7.3.112")
@@ -77,11 +57,34 @@ var keyVault = builder.AddContainer("keyvault", "nagyesta/lowkey-vault", "7.3.11
     .WithEnvironment("LOWKEY_ARGS", "--LOWKEY_VAULT_RELAXED_PORTS=true")
     .WithLifetime(ContainerLifetime.Persistent);
 
-// The seed writes the Standard pairs of a set's key-values.json with the vault of the API, so the API decrypts them.
-dbSeed
+// A DbCreator resource on the Cosmos DB of this host, started from the dashboard.
+IResourceBuilder<ProjectResource> AddDbCreator(string name) => builder.AddProject<Projects.DbCreator>(name)
+    .WithReference(cosmos)
+    .WaitFor(cosmos)
+    .WithExplicitStart();
+
+// A seed writes the Standard pairs of a set's key-values.json with the vault of the API, so the API decrypts them.
+IResourceBuilder<ProjectResource> AddDbSeed(string name) => AddDbCreator(name)
     .WithEnvironment("AzureKeyVaults__default", keyVault.GetEndpoint("https"))
     .WithEnvironment("KeyValues__Protection__Emulator", "true")
     .WaitFor(keyVault);
+
+// Start: the defaults above. Create with options…: asks for the base account (prefilled with BaseAccount:Id, else the
+// default AuthKit staging user) and the staging accounts of one run, which runs as db-creator-options under it.
+AddDbCreator("db-creator")
+    .WithCreateOptions(AddDbCreator("db-creator-options"), baseAccountId, seedStagingAccounts, authKitStagingOwner);
+
+// Start: the built-in data set showcase of DbCreator (the fabrikam / invoicing-suite scope of the admin UI's showcase
+// mock); the seed ensures the containers itself, and a second start reports the set as seeded already. Seed with
+// options…: asks for the sets (those of DbCreator's data-sets folder), a folder (relative to the repository root), the
+// owner, the target and the flags, and runs as db-seed-options under it.
+AddDbSeed("db-seed")
+    .WithSeedOptions(
+        AddDbSeed("db-seed-options"),
+        Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../Storyteller/DbCreator/src/data-sets")),
+        Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../../..")),
+        baseAccountId,
+        defaultSeedOwner);
 
 var apiFunctions = builder.AddProject<Projects.Api_Functions>("api-functions")
     .WithHttpEndpoint(port: 7071, name: "http", isProxied: false)

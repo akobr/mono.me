@@ -5,9 +5,11 @@ namespace _42.Platform.Aspire.Host;
 
 /// <summary>
 /// The dashboard commands that run DbCreator with options: <c>Seed with options…</c> on <c>db-seed</c> and
-/// <c>Create with options…</c> on <c>db-creator</c>. The dashboard asks for the options in a dialog; the command keeps
-/// them as the pending invocation of its resource, whose arguments and environment are callbacks evaluated at every
-/// start, starts the resource and clears them once it has started. The plain Start keeps the defaults.
+/// <c>Create with options…</c> on <c>db-creator</c>. The dashboard asks for the options in a dialog. A command does not
+/// start its own resource: it starts a second DbCreator resource under it (<c>db-seed-options</c>,
+/// <c>db-creator-options</c>), whose arguments and environment are callbacks that read the options of the invocation,
+/// and clears them once that start has begun. The plain Start of <c>db-seed</c> and <c>db-creator</c> never reads them,
+/// so it always runs with the defaults, also while an invocation with options is starting.
 /// </summary>
 internal static class DbSeedCommands
 {
@@ -30,39 +32,40 @@ internal static class DbSeedCommands
 
     /// <summary>
     /// The arguments of <c>db-seed</c> (<c>seed showcase</c>, with <paramref name="defaultOwner"/> as <c>--owner</c>
-    /// when there is no base account) and its <c>Seed with options…</c> command.
+    /// when there is no base account) and its <c>Seed with options…</c> command, which runs <paramref name="runner"/>
+    /// with the options of the dialog. A relative folder of the dialog is resolved under
+    /// <paramref name="folderBaseDirectory"/>, the repository root.
     /// </summary>
     public static IResourceBuilder<ProjectResource> WithSeedOptions(
         this IResourceBuilder<ProjectResource> dbSeed,
+        IResourceBuilder<ProjectResource> runner,
         string dataSetsDirectory,
+        string folderBaseDirectory,
         string? baseAccountId,
         string? defaultOwner)
     {
+        string[] defaults = baseAccountId is null && defaultOwner is not null
+            ? ["seed", DefaultSet, "--owner", defaultOwner]
+            : ["seed", DefaultSet];
+        dbSeed.WithArgs(defaults);
+
+        // The runner's own Start, without an invocation, runs the defaults too.
         var pending = new PendingInvocation<string[]>();
-        dbSeed.WithArgs(context =>
-        {
-            if (pending.Value is { } arguments)
+        runner
+            .WithArgs(context =>
             {
-                foreach (var argument in arguments)
+                foreach (var argument in pending.Value ?? defaults)
                 {
                     context.Args.Add(argument);
                 }
-
-                return;
-            }
-
-            context.Args.Add("seed");
-            context.Args.Add(DefaultSet);
-            if (baseAccountId is null && defaultOwner is not null)
-            {
-                context.Args.Add("--owner");
-                context.Args.Add(defaultOwner);
-            }
-        });
+            })
+            .WithParentRelationship(dbSeed)
+            .WithExplicitStart();
 
         if (baseAccountId is not null)
         {
             dbSeed.WithEnvironment("baseAccount__id", baseAccountId);
+            runner.WithEnvironment("baseAccount__id", baseAccountId);
         }
 
         var sets = Directory.Exists(dataSetsDirectory)
@@ -76,10 +79,10 @@ internal static class DbSeedCommands
         dbSeed.WithCommand(
             name: "seed-with-options",
             displayName: "Seed with options…",
-            executeCommand: context => SeedAsync(context, dbSeed.Resource, pending, sets),
+            executeCommand: context => SeedAsync(context, runner.Resource, pending, sets, folderBaseDirectory),
             commandOptions: new CommandOptions
             {
-                Description = "Runs 2sInitDb seed with the data sets and options you pick.",
+                Description = $"Runs 2sInitDb seed with the data sets and options you pick, as {runner.Resource.Name}.",
                 IconName = "DatabaseArrowRight",
                 IconVariant = IconVariant.Regular,
                 Arguments = CreateSeedInputs(sets, defaultOwner),
@@ -92,14 +95,17 @@ internal static class DbSeedCommands
                         context.AddValidationError(folder ?? context.Inputs[0], "Pick at least one data set, or give a folder.");
                     }
 
-                    if (folder?.Value is { Length: > 0 } path && !Directory.Exists(path))
+                    if (folder?.Value is { } path && !string.IsNullOrWhiteSpace(path))
                     {
-                        context.AddValidationError(folder, $"The folder '{path}' does not exist.");
+                        var resolved = ResolveFolder(path, folderBaseDirectory);
+                        if (!Directory.Exists(resolved))
+                        {
+                            context.AddValidationError(folder, $"The folder '{resolved}' does not exist.");
+                        }
                     }
 
                     return Task.CompletedTask;
                 },
-                UpdateState = IdleOnly,
             });
 
         return dbSeed;
@@ -107,25 +113,22 @@ internal static class DbSeedCommands
 
     /// <summary>
     /// The environment of <c>db-creator</c> (<c>stagingSeed__enabled</c>, <c>baseAccount__id</c>) and its
-    /// <c>Create with options…</c> command, whose base account id is prefilled with <paramref name="baseAccountId"/>,
-    /// else <paramref name="suggestedBaseAccountId"/>.
+    /// <c>Create with options…</c> command, which runs <paramref name="runner"/> with the options of the dialog; the base
+    /// account id is prefilled with <paramref name="baseAccountId"/>, else <paramref name="suggestedBaseAccountId"/>.
     /// </summary>
     public static IResourceBuilder<ProjectResource> WithCreateOptions(
         this IResourceBuilder<ProjectResource> dbCreator,
+        IResourceBuilder<ProjectResource> runner,
         string? baseAccountId,
         bool seedStagingAccounts,
         string? suggestedBaseAccountId)
     {
+        var defaults = new CreateOptions(baseAccountId, seedStagingAccounts);
+        ApplyCreateOptions(dbCreator, () => defaults);
+
         var pending = new PendingInvocation<CreateOptions>();
-        dbCreator.WithEnvironment(context =>
-        {
-            var options = pending.Value ?? new CreateOptions(baseAccountId, seedStagingAccounts);
-            context.EnvironmentVariables["stagingSeed__enabled"] = options.SeedStagingAccounts ? "true" : "false";
-            if (options.BaseAccountId is not null)
-            {
-                context.EnvironmentVariables["baseAccount__id"] = options.BaseAccountId;
-            }
-        });
+        ApplyCreateOptions(runner, () => pending.Value ?? defaults);
+        runner.WithParentRelationship(dbCreator).WithExplicitStart();
 
         dbCreator.WithCommand(
             name: "create-with-options",
@@ -135,11 +138,11 @@ internal static class DbSeedCommands
                 var options = new CreateOptions(
                     Text(context.Arguments, BaseAccountInput),
                     Checked(context.Arguments, StagingSeedInput));
-                return StartWithAsync(context, dbCreator.Resource, pending, options);
+                return StartWithAsync(context, runner.Resource, pending, options);
             },
             commandOptions: new CommandOptions
             {
-                Description = "Runs 2sInitDb with the base account and the staging accounts you pick.",
+                Description = $"Runs 2sInitDb with the base account and the staging accounts you pick, as {runner.Resource.Name}.",
                 IconName = "DatabaseArrowRight",
                 IconVariant = IconVariant.Regular,
                 Arguments =
@@ -160,10 +163,22 @@ internal static class DbSeedCommands
                         Value = seedStagingAccounts ? "true" : "false",
                     },
                 ],
-                UpdateState = IdleOnly,
             });
 
         return dbCreator;
+    }
+
+    private static void ApplyCreateOptions(IResourceBuilder<ProjectResource> resource, Func<CreateOptions> options)
+    {
+        resource.WithEnvironment(context =>
+        {
+            var current = options();
+            context.EnvironmentVariables["stagingSeed__enabled"] = current.SeedStagingAccounts ? "true" : "false";
+            if (current.BaseAccountId is not null)
+            {
+                context.EnvironmentVariables["baseAccount__id"] = current.BaseAccountId;
+            }
+        });
     }
 
     private static List<InteractionInput> CreateSeedInputs(string[] sets, string? defaultOwner)
@@ -180,7 +195,7 @@ internal static class DbSeedCommands
 
         inputs.AddRange(
         [
-            TextInput(FolderInput, "Folder (--path)", "A folder with set.json, or a folder of such folders; its sets join the built-in ones. Without a picked set, its sets are seeded."),
+            TextInput(FolderInput, "Folder (--path)", "A folder with set.json, or a folder of such folders; its sets join the built-in ones. Without a picked set, its sets are seeded. A relative folder is under the repository root."),
             TextInput(OwnerInput, "Owner (--owner)", "The account that owns a created organization and project. Empty: baseAccount:id.", defaultOwner),
             TextInput(OrganizationInput, "Organization (--organization)", "Empty: the Organization of the sets' set.json."),
             TextInput(ProjectInput, "Project (--project)", "Empty: the Project of the sets' set.json."),
@@ -196,15 +211,18 @@ internal static class DbSeedCommands
 
     private static Task<ExecuteCommandResult> SeedAsync(
         ExecuteCommandContext context,
-        IResource dbSeed,
+        IResource runner,
         PendingInvocation<string[]> pending,
-        string[] sets)
+        string[] sets,
+        string folderBaseDirectory)
     {
         var inputs = context.Arguments;
         var arguments = new List<string> { "seed" };
         arguments.AddRange(sets.Where(set => Checked(inputs, SetInputPrefix + set)));
 
-        AddOption(arguments, "--path", Text(inputs, FolderInput));
+        // DbCreator resolves a relative --path against its own working directory, so it gets the folder the host checked.
+        var folder = Text(inputs, FolderInput);
+        AddOption(arguments, "--path", folder is null ? null : ResolveFolder(folder, folderBaseDirectory));
         AddOption(arguments, "--owner", Text(inputs, OwnerInput));
         AddOption(arguments, "--organization", Text(inputs, OrganizationInput));
         AddOption(arguments, "--project", Text(inputs, ProjectInput));
@@ -215,14 +233,14 @@ internal static class DbSeedCommands
         AddFlag(arguments, "--public-pairs-only", Checked(inputs, PublicPairsOnlyInput));
 
         context.Logger.LogInformation("Seeding with: {Arguments}", string.Join(' ', arguments));
-        return StartWithAsync(context, dbSeed, pending, arguments.ToArray());
+        return StartWithAsync(context, runner, pending, arguments.ToArray());
     }
 
-    // Keeps the options for the start, starts the resource and waits until its process has started (its arguments
-    // and environment are evaluated then), so the plain Start that follows gets the defaults again.
+    // Keeps the options for the start of the runner, starts it and waits until its process has started (its arguments
+    // and environment are evaluated then). Only the runner reads the options, so no other start can take them.
     private static async Task<ExecuteCommandResult> StartWithAsync<T>(
         ExecuteCommandContext context,
-        IResource resource,
+        IResource runner,
         PendingInvocation<T> pending,
         T options)
         where T : class
@@ -231,43 +249,44 @@ internal static class DbSeedCommands
         var notifications = context.Services.GetRequiredService<ResourceNotificationService>();
         var cancellationToken = context.CancellationToken;
 
-        if (notifications.TryGetCurrentState(resource.Name, out var current) && IsBusy(current.Snapshot.State?.Text))
+        if (notifications.TryGetCurrentState(runner.Name, out var current) && IsBusy(current.Snapshot.State?.Text))
         {
-            return CommandResults.Failure($"{resource.Name} is running; wait for it to finish or stop it first.");
+            return CommandResults.Failure($"{runner.Name} is running; wait for it to finish or stop it first.");
         }
 
         if (!pending.TrySet(options))
         {
-            return CommandResults.Failure($"{resource.Name} is being started with options already.");
+            return CommandResults.Failure($"{runner.Name} is being started with options already.");
         }
 
+        // One timeout for the start and for the wait: Aspire waits for the dependencies (Cosmos DB, the vault) inside
+        // the start, and a start that never returns would keep the options pending.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(StartTimeout);
         try
         {
             var requestedAt = DateTime.UtcNow;
-            var started = await commands.ExecuteCommandAsync(resource, KnownResourceCommands.StartCommand, cancellationToken);
+            var started = await commands.ExecuteCommandAsync(runner, KnownResourceCommands.StartCommand, timeout.Token);
             if (!started.Success)
             {
-                return CommandResults.Failure($"{resource.Name} did not start: {started.Message}");
+                return CommandResults.Failure($"{runner.Name} did not start: {started.Message}");
             }
 
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(StartTimeout);
-            try
-            {
-                await notifications.WaitForResourceAsync(
-                    resource.Name,
-                    e => e.Snapshot.State?.Text is { } state
-                        && (state == KnownResourceStates.FailedToStart
-                            || (e.Snapshot.StartTimeStamp?.ToUniversalTime() >= requestedAt.AddSeconds(-1)
-                                && (state == KnownResourceStates.Running || state == KnownResourceStates.Finished || state == KnownResourceStates.Exited))),
-                    timeout.Token);
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                return CommandResults.Failure($"{resource.Name} did not start within {StartTimeout.TotalMinutes} minutes; see its console log.");
-            }
+            var reached = await notifications.WaitForResourceAsync(
+                runner.Name,
+                e => e.Snapshot.State?.Text is { } state
+                    && (state == KnownResourceStates.FailedToStart
+                        || (e.Snapshot.StartTimeStamp?.ToUniversalTime() >= requestedAt.AddSeconds(-1)
+                            && (state == KnownResourceStates.Running || state == KnownResourceStates.Finished || state == KnownResourceStates.Exited))),
+                timeout.Token);
 
-            return CommandResults.Success();
+            return reached.Snapshot.State?.Text == KnownResourceStates.FailedToStart
+                ? CommandResults.Failure($"{runner.Name} failed to start; see its console log.")
+                : CommandResults.Success();
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return CommandResults.Failure($"{runner.Name} did not start within {StartTimeout.TotalMinutes} minutes; see its console log.");
         }
         finally
         {
@@ -275,11 +294,13 @@ internal static class DbSeedCommands
         }
     }
 
-    private static ResourceCommandState IdleOnly(UpdateCommandStateContext state)
-        => IsBusy(state.ResourceSnapshot.State?.Text) ? ResourceCommandState.Disabled : ResourceCommandState.Enabled;
-
     private static bool IsBusy(string? state)
         => state == KnownResourceStates.Running || state == KnownResourceStates.Starting || state == KnownResourceStates.Waiting;
+
+    // A folder of the dialog: an absolute path as it is, a relative one under the repository root, so the host checks
+    // and DbCreator reads the same folder whatever their working directories are.
+    private static string ResolveFolder(string folder, string baseDirectory)
+        => Path.GetFullPath(folder.Trim(), baseDirectory);
 
     private static InteractionInput TextInput(string name, string label, string description, string? value = null)
         => new() { Name = name, Label = label, Description = description, InputType = InputType.Text, Value = value };
