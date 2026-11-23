@@ -239,7 +239,9 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
       // With minReplicas 0, zero replicas cooldownSeconds after the last call, and a call starts one, a cold start of 10
       // to 30 seconds; with 1 or more, that many always run and the cool-down has no effect (it applies only from the last
       // replica to zero). Every 20 concurrent calls one more; those go after the platform's scale-down window of 300
-      // seconds. With minReplicas 0 a running replica is billed at the active rate, with 1 at the idle rate between calls.
+      // seconds. With minReplicas 0 a running replica is billed at the active rate; with 1 the minimum replica is billed at
+      // the idle rate only while it is idle (no request, CPU under 0.01 vCPU, little network), and replicas above the
+      // minimum always at the active rate.
       scale: {
         minReplicas: minReplicas
         maxReplicas: maxReplicas
