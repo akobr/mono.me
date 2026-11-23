@@ -242,7 +242,7 @@ The **Import** section:
 - **Store schemas and configurations that break each other** writes them with a warning. Without it, they fail, and the rest is imported.
 - **Check** shows the outcome of every file without writing anything; **Import now** in its result then imports the same file with the same options. **Import** imports at once. Leaving the page doesn't stop an import: a toast reports its end, with a link back to the result.
 
-An export or an import that ends also leaves an item in the [Inbox](#inbox) of the view, for your other tabs and for the other Administrators of the project; the one this tab showed you is there under **Done**.
+An export or an import that ends also leaves an item in the [Inbox](#inbox) of the view, for your other tabs and for the other Administrators of the project. When this tab showed you the end of the job, it dismisses that item, so you find it under **Done**; if the dismissal does not get through, the item stays under **Open**.
 
 An import writes the annotations first, ancestors before their descendants, then the schemas, templates and configurations. It checks a schema against the configurations the archive brings, so an archive can change both together. It never deletes what the archive lacks, and it never replays versions: only the current document of each file is imported.
 
@@ -272,7 +272,7 @@ An Administrator or Owner finds an item for the exports, imports and checks of t
 - **Show the result**, on an import or a check that ran, opens its result as the Export & Import page shows it, without **Import now**.
 - **How long it stays.** A result stays as long as the server keeps its job, with the zip or the report: 24 hours unless the deployment sets another time, from 1 hour to 7 days. Then the item is gone. A failure stays longer, 30 days by default: it is complete in itself.
 - **Dismiss** moves an item to **Done**. An item has one state for everybody: it is open for everyone who sees it, and done for everyone once one person dismisses it. Under **Done** it keeps its **Download** or **Show the result** until it expires.
-- **What your tab showed you is under Done.** An export or import that this browser tab followed to its end was reported to you already, by its toast, its download or its result on the page. The tab dismisses that item for you, so you find it under **Done**. **Open** holds what nobody was shown: the jobs of other people and of machines, and of a tab that was closed before its job ended.
+- **What your tab showed you is under Done.** An export or import that this browser tab followed to its end was reported to you already, by its toast, its download or its result on the page. The tab dismisses that item for you, so you usually find it under **Done**; when the tab stopped waiting for a job, could not download the archive of an export, or could not reach the inbox, the item stays under **Open**. **Open** holds what nobody was shown: the jobs of other people and of machines, and of a tab that was closed before its job ended.
 
 **The mark.** A dot on the icon of **Inbox** in the sidebar says that the view has open items for your role. It is there on every page whose sidebar lists the view, the pages of the project and the organization included. The sidebar reads it when it opens a view. While the Inbox page is open, it reads the open items again every 20 seconds, and **Refresh** reads them at once; on the other pages a new item can mark the entry later, after a reload at the latest.
 

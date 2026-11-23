@@ -36,6 +36,30 @@ An item's `ttl` counts from the commit of its write and is rounded up to a secon
 
 `dismissJobItem` reads the 50 newest open items, twice at most. The item of a job that just ended is among the newest; with more than 50 newer open items it stays open, which costs a mark, not a result. Following the continuation tokens would read the whole open list of a view after every job.
 
+## Second round (2026-11-23)
+
+The rebase onto main brought in its rule for the menu (424-272: a lock means read-only, a page the role must not open has `minRole`) and the refusal of a client app that may only read on every write (424-302). CodeRabbit's second review and the comments outside the diff of its first one gave five more findings: four fixed, one in the docs only.
+
+### 7. Fixed: an item that expired between its read and its write could still be accepted
+
+`GetVisibleAsync` checks `ExpiresAt` against the time of the read; `CloseAsync` took the time again for the write and did not look. An item that expired in between was replaced with a time to live of one second, and an accept ran its handler. `CloseAsync` now checks `ExpiresAt` against its own time before every replace and answers "not found". Test: `AcceptAndDismiss_OfAnItemThatExpiresAfterItWasRead_AreNotFound_AndRunNothing`, with a clock that passes the end between the two reads; without the check both cases fail.
+
+### 8. Fixed: the 409 of accept promised that the item stays open
+
+When a handler throws, the item is opened again on a best effort; a failed reopening leaves it accepted. The OpenAPI description of the `409` of accept and the table of `inbox.md` now say so, and tell a client to read the item again before it offers another try.
+
+### 9. Fixed: the 400 of the list did not say which tokens it refuses
+
+A token of the inbox of another view is well formed and is not refused: it pages the view below the item it names. The description of the `400` of the list and `inbox.md` (Listing) now say that only a token the inbox does not issue is refused, and that a client starts again without a token after a change of the view. Binding a token to its view would refuse a case that does no harm.
+
+### 10. Fixed: the public page promised that the item of a job the tab showed is under Done
+
+The tab dismisses that item only when the end it showed is the server's end and the inbox answers. `docs/42for.net/platform/admin-ui.md` now says that the item is usually under **Done**, and stays under **Open** when the tab stopped waiting, could not download the archive or could not reach the inbox.
+
+### 11. Changed by the rebase: the Inbox entry is hidden from a Reader
+
+Main removed `lockedHint` and made the lock of an entry mean read-only. The inbox is closed to a Reader, so its entry now has `minRole: 'Contributor'`: a Reader does not see it, and the page at its address still shows the lock "Contributors only". This changes section 7.1 of the spec (a locked entry for a Reader); the menu's tests, the e2e test of a Reader and the docs follow.
+
 ### Checks
 
 | Suite | Result |

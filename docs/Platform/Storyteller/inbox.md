@@ -200,7 +200,7 @@ var item = await inbox.PushAsync(new ViewInboxPush
 - **Order.** Newest first, by the id. The `Done` list has the same order: by the time the items arrived, not by the time they were closed.
 - **Pages.** 50 items (`ViewInboxQuery.PageSize`). The service reads one item more to know whether a page follows, and then answers with a `ContinuationToken`.
 - **The token** is the base64url text, without padding, of `1:` and the id of the last item of the page. The next page holds the items just below that id, so nothing is repeated. An item whose id is above it (a new item, or one pushed later with the time of an earlier event) shows when the list is read again from the start. The token is not tied to the filter or the role: send the same ones with it.
-- **A token this inbox did not issue** is `InvalidInputException` with `InvalidQuery` and "The continuation token is not one of the inbox; start again without it." It is checked first, for every role. A blank token is the first page.
+- **A token this inbox did not issue** is `InvalidInputException` with `InvalidQuery` and "The continuation token is not one of the inbox; start again without it." It is checked first, for every role. A blank token is the first page. A token of the inbox of another view is not refused: it pages this view below the item it names, so a client starts again without a token when the view changes.
 - **`Count`** is the number of items of the page. **`OpenCount`** is every open item the caller sees, whatever the page and the filter. It is a count query of its own, run next to the list.
 - **A role below `Contributor`** gets an empty answer with `OpenCount` 0; the store is not asked. A caller of the API never gets that answer: the route refuses the role first (`403`).
 - **The view is not checked.** The inbox of a view that does not exist is empty.
@@ -442,7 +442,7 @@ This page is the last one, so it has no `ContinuationToken`. A page that another
 | `409` | `InboxItemNotAction` | accept | The item is a notification or a message: "The inbox item is not an action; only an action can be accepted." |
 | `409` | `InboxItemClosed` | both | The item was already accepted or dismissed: "The inbox item was already accepted." or "The inbox item was already dismissed." |
 | `409` | `Conflict` | both | The item kept changing while the call saved it: "The inbox item changed; try again." |
-| `409` | the handler's own | accept | What the action starts could not start, such as `TransferLimit` of a job. The exception of the handler goes out as it is and is answered by its type, so another type is another status. The item is open again. |
+| `409` | the handler's own | accept | What the action starts could not start, such as `TransferLimit` of a job. The exception of the handler goes out as it is and is answered by its type, so another type is another status. The item is opened again on a best effort: when that write fails too, it stays accepted, so read it again before offering another try. |
 | `501` | `InboxActionNotAvailable` | accept | No handler is registered for the action of the item: "The action '{code}' of the inbox item is not available in this deployment." The item stays open. |
 
 The checks of the item come in the order of the service, and the first failure answers: visible (`404`), an action (`409 InboxItemNotAction`, accept only), open (`409 InboxItemClosed`), a handler (`501`, accept only).
