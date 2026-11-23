@@ -207,20 +207,24 @@ describe('AnnotationForm: what a save is the difference from', () => {
     screen.host.unmount()
   })
 
-  it('drops a member typed in the JSON mode once its line is deleted again', async () => {
-    const loaded = await seed({ Title: 'Northwind' })
+  it('applies only the members of the annotation from the JSON mode, never another name as a path', async () => {
+    const loaded = await seed({ Title: 'Northwind', Values: { plan: 'basic' } })
+    const writes = recordWrites()
     const screen = await mountForm(loaded, '/acme/billing/default/annotations/sbt.northwind?format=json')
     const editor = () => screen.host.findComponent({ name: 'DocumentEditor' })
 
-    editor().vm.$emit('update:modelValue', { ...toAnnotationDraft(loaded), Titel: 'typo' })
+    // a typo and a dotted name: neither is a member, and "Values.plan" must not reach Values.plan
+    editor().vm.$emit('update:modelValue', { ...toAnnotationDraft(loaded), Titel: 'typo', 'Values.plan': 'pro' })
     await settle()
-    expect(screen.host.text()).toContain('Unsaved changes')
-    editor().vm.$emit('update:modelValue', toAnnotationDraft(loaded))
-    await settle()
-
     expect(screen.host.text()).not.toContain('Unsaved changes')
-    // an undefined member, which the editor's JSON (and YAML) leaves out
-    expect(JSON.stringify(editor().props('modelValue'))).not.toContain('Titel')
+    expect(editor().props('modelValue')).toMatchObject({ Values: { plan: 'basic' } })
+
+    editor().vm.$emit('update:modelValue', { ...toAnnotationDraft(loaded), Title: 'Edited', 'Values.plan': 'pro' })
+    await settle()
+    await save(screen)
+
+    expect(writes.map((write) => write.body)).toEqual([{ Title: 'Edited' }])
+    expect((await read('sbt.northwind')).Values).toEqual({ plan: 'basic' })
     screen.host.unmount()
   })
 

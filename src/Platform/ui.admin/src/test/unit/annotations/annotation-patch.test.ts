@@ -38,6 +38,16 @@ describe('toAnnotationPatch: a merge patch of the changed members', () => {
     ).toBeUndefined()
   })
 
+  it('compares dates to 100 ns, as the API holds them, whatever their offset', () => {
+    const precise = toAnnotationDraft({ ...loaded, ValidFrom: '2026-11-01T08:30:00.1234567Z' })
+
+    expect(toAnnotationPatch({ ...precise, ValidFrom: '2026-11-01T08:30:00.1234568Z' }, precise)).toEqual({
+      ValidFrom: '2026-11-01T08:30:00.1234568Z',
+    })
+    expect(toAnnotationPatch({ ...precise, ValidFrom: '2026-11-01T09:30:00.1234567+01:00' }, precise)).toBeUndefined()
+    expect(toAnnotationPatch({ ...precise, ValidFrom: '2026-11-01T08:30:00.12345670Z' }, precise)).toBeUndefined()
+  })
+
   it('sends each changed member with its new value, an emptied one as null', () => {
     expect(patchOf({ Title: 'Northwind Traders' })).toEqual({ Title: 'Northwind Traders' })
     expect(patchOf({ Description: '', DocumentationLink: '  ', TimeZone: '' })).toEqual({

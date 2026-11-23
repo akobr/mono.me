@@ -83,11 +83,24 @@ export function sameValue(first: unknown, second: unknown): boolean {
   return false
 }
 
+/**
+ * The instant of a date as the API's DateTimeOffset holds it, to 100 ns: Date.parse keeps whole milliseconds, so the
+ * fraction below one is compared too (its digits after the third, padded to seven). Undefined when it does not parse.
+ */
+function instantOf(value: string): string | undefined {
+  const milliseconds = Date.parse(value)
+  if (Number.isNaN(milliseconds)) {
+    return undefined
+  }
+  const fraction = /T\d{2}:\d{2}:\d{2}\.(\d+)/i.exec(value)?.[1] ?? ''
+  return `${milliseconds}.${fraction.slice(3, 7).padEnd(4, '0')}`
+}
+
 /** Two dates are the same when they are the same instant, whatever their offset (the API compares them so). */
 function sameScalar(member: Scalar, first: unknown, second: unknown): boolean {
   if ((member === 'ValidFrom' || member === 'ExpiresAt') && typeof first === 'string' && typeof second === 'string') {
-    const [a, b] = [Date.parse(first), Date.parse(second)]
-    return first === second || (!Number.isNaN(a) && a === b)
+    const instant = instantOf(first)
+    return first === second || (instant !== undefined && instant === instantOf(second))
   }
   return first === second
 }

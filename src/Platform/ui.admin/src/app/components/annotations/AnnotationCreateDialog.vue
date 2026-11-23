@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { setAnnotation, type Annotation, type AnnotationMergePatch } from '@42for.net/2splatform.sdk'
 import { useCatalogStore } from '@/stores/catalog'
-import { useContextStore } from '@/stores/context'
+import { useContextStore, type Scope } from '@/stores/context'
 import { useProjectSettingsStore } from '@/stores/project-settings'
 import {
   buildAnnotationKey,
@@ -159,7 +159,7 @@ async function create() {
     }
 
     if (restored) {
-      await updateRestored(restored)
+      await updateRestored(restored, { org, project, view })
       return
     }
 
@@ -197,9 +197,10 @@ async function create() {
 /**
  * A merge patch of what the dialog sets over the restored record: the title when it is given and differs, and the
  * time zone when the record has none (a restored annotation keeps its own zone). An empty patch writes nothing. The key
- * is restored whether the patch succeeds or not, so the dialog closes on it either way.
+ * is restored whether the patch succeeds or not, so the dialog closes on it either way. The patch goes to `target`,
+ * the view of the restore, also when the user opened another view meanwhile.
  */
-async function updateRestored(restored: Annotation) {
+async function updateRestored(restored: Annotation, target: Scope) {
   const restoredKey = restored.AnnotationKey
   const patch: AnnotationMergePatch = {}
   const newTitle = title.value.trim()
@@ -212,7 +213,7 @@ async function updateRestored(restored: Annotation) {
 
   try {
     if (Object.keys(patch).length) {
-      await actions.patch(restoredKey, patch)
+      await actions.patch(restoredKey, patch, target)
     }
     toast.add({ title: `${restoredKey} restored and updated`, color: 'success', icon: 'i-lucide-archive-restore' })
   } catch (error) {

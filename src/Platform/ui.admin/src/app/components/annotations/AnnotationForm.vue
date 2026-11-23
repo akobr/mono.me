@@ -104,9 +104,9 @@ function reset(annotation: Annotation) {
 }
 
 /**
- * The text modes edit the whole document: each member is set whole (setValues would merge, keeping a removed value
- * name or a deleted line), a member of the annotation the text leaves out takes its unset value, and any other member
- * the text no longer has (one typed there before) is dropped.
+ * The text modes edit the whole document: each member of the annotation is set whole (setValues would merge, keeping a
+ * removed value name or a deleted line), and one the text leaves out takes its unset value. Other names of the text
+ * are not applied: a save never sends them, and VeeValidate would read a name such as "Values.plan" as a path.
  */
 function setDocument(document: unknown) {
   // the editor reports anything else as an issue (readOnlyIssues), so it changes nothing
@@ -121,8 +121,7 @@ function setDocument(document: unknown) {
     Name: props.annotation.Name,
     AnnotationType: props.annotation.AnnotationType,
   }) as Record<string, unknown>
-  for (const member of new Set([...Object.keys(unset), ...Object.keys(text), ...Object.keys(values)])) {
-    // undefined drops the member: VeeValidate's dirty check and the editor's JSON leave undefined members out
+  for (const member of Object.keys(unset)) {
     const value = Object.hasOwn(text, member) ? text[member] : unset[member]
     setFieldValue(member as keyof AnnotationForm, value as never, false)
   }
