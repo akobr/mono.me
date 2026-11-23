@@ -350,6 +350,8 @@ const savedDescription = computed(() => projects.summaryOf(context.projectKey)?.
 // Leave project (424-271), for every member: the only Owner may not. Only an Owner can be that, and an Owner reads the
 // access point; until it is loaded the API decides (409 LastOwner).
 const exhibition = useExhibition()
+const comeBack = (isExhibition: boolean | undefined) =>
+  isExhibition === undefined ? undefined : isExhibition ? ('exhibition' as const) : ('invitation' as const)
 const lastOwner = computed(
   () => role.projectRole.value === 'Owner' && (ownerCount(accessPoint.data.value?.AccessMap) ?? Infinity) <= 1,
 )
@@ -521,7 +523,7 @@ async function downloadCa() {
               :project-key="context.projectKey"
               :role="role.projectRole.value"
               :last-owner="lastOwner"
-              :exhibition="exhibition.isExhibition(context.projectKey)"
+              :come-back="comeBack(exhibition.isExhibition(context.projectKey))"
             />
           </template>
         </UCard>

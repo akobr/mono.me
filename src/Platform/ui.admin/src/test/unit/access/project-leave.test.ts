@@ -278,6 +278,34 @@ describe('Leave project in Settings', () => {
     expect(body()).not.toContain('Discard changes?')
   })
 
+  it('says nothing about coming back while the exhibition is not known', async () => {
+    server.use(http.get('*/api/v1/access/exhibition', () => HttpResponse.json({ Message: 'Down' }, { status: 503 })))
+    await mountSettings('acme', 'shipping')
+    await eventually(() => expect(requests).toContain('GET /access/exhibition'))
+    await settle()
+
+    leaveButton()!.click()
+    await eventually(() => expect(dialog()).toBeTruthy())
+
+    expect(text(dialog())).toContain('You lose your Contributor role on acme.shipping.')
+    expect(text(dialog())).not.toContain('To come back')
+    expect(text(dialog())).not.toContain('join the exhibition again')
+  })
+
+  it('forgets the project once its page is gone, without reading it again as a non-member', async () => {
+    const view = await mountSettings('acme', 'shipping')
+    const cachedOf = () => view.queryClient.getQueryCache().findAll({ queryKey: ['v1', 'acme', 'shipping'] })
+    await eventually(() => expect(cachedOf().length).toBeGreaterThan(0))
+
+    await confirmLeave()
+    await eventually(() => expect(view.route().path).toBe('/orgs'))
+    await settle()
+
+    const removal = requests.indexOf(deletes()[0]!)
+    expect(requests.slice(removal).filter((request) => request.includes('/acme/shipping'))).toEqual([])
+    expect(cachedOf()).toEqual([])
+  })
+
   it('names the long role as the badge does', async () => {
     await mountSettings('acme', 'shipping', (db) => {
       db.accessPoints['acme.shipping']!.AccessMap![mockUser.id] = 'ContributorWithSecrets'

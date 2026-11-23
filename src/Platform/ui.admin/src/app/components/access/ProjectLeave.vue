@@ -14,8 +14,11 @@ const props = defineProps<{
   role: AccountRoleName
   /** The caller is the project's only Owner: the button is disabled, and the text says why. */
   lastOwner?: boolean
-  /** The project is the deployment's exhibition, which the user can join again on Organizations. */
-  exhibition?: boolean
+  /**
+   * How the user comes back: a new invitation, or a new join of the deployment's exhibition on Organizations; nothing is
+   * said while it is not known (the answer about the exhibition is pending, or failed).
+   */
+  comeBack?: 'invitation' | 'exhibition'
 }>()
 
 const { leaving, leave } = useLeaveProject()
@@ -25,13 +28,18 @@ const confirming = ref(false)
  * What the confirmation was opened for. It stays as it was while the leave ends, when the role is gone already, and when
  * the context switcher moves on while the dialog is open: the leave is for the project of the click.
  */
-const opened = ref<{ projectKey: string; role: AccountRoleName; exhibition: boolean; unsaved: boolean }>()
+const opened = ref<{
+  projectKey: string
+  role: AccountRoleName
+  comeBack?: 'invitation' | 'exhibition'
+  unsaved: boolean
+}>()
 
 function open() {
   opened.value = {
     projectKey: props.projectKey,
     role: props.role,
-    exhibition: !!props.exhibition,
+    comeBack: props.comeBack,
     // the draft of the project settings, or a dialog with input: a leave ends the page and them
     unsaved: hasUnsavedChanges(),
   }
@@ -46,9 +54,8 @@ const description = computed(() => {
   }
   return [
     `You lose your ${roleLabel(target.role)} role on ${target.projectKey}.`,
-    target.exhibition
-      ? 'You can join the exhibition again from Organizations.'
-      : 'To come back, you need a new invitation.',
+    ...(target.comeBack === 'exhibition' ? ['You can join the exhibition again from Organizations.'] : []),
+    ...(target.comeBack === 'invitation' ? ['To come back, you need a new invitation.'] : []),
     ...(target.unsaved ? ['Your unsaved changes on this page are lost.'] : []),
   ].join(' ')
 })

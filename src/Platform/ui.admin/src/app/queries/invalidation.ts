@@ -139,6 +139,15 @@ export async function invalidateProject(client: QueryClient, key: string): Promi
   ])
 }
 
+/**
+ * A project the caller left (424-271): its cached data goes, as nothing may show it any more, and the caller's projects,
+ * the access point and the organization's audit are read again.
+ */
+export async function forgetProject(client: QueryClient, org: string, project: string): Promise<void> {
+  removeByPath(client, `/v1/${org}/${project}`)
+  await invalidateProject(client, `${org}.${project}`)
+}
+
 /** The settings of a project (424-266), and the caller's projects, whose summaries carry them. */
 export async function invalidateProjectSettings(client: QueryClient, org: string, project: string): Promise<void> {
   await Promise.all([
@@ -154,7 +163,8 @@ export async function invalidateProjectSettings(client: QueryClient, org: string
 export async function invalidateKeyValues(client: QueryClient, scope: Scope): Promise<void> {
   const policyPath = `${projectKeyValues(scope.org, scope.project)}/policy`
   const policy = client.getQueryData<KeyValuePolicy>(pathToQueryKey(policyPath))
-  const awaitsStandardKey = !!policy && !policy.Standard && (policy.AllowedProtections ?? ['Standard']).includes('Standard')
+  const awaitsStandardKey =
+    !!policy && !policy.Standard && (policy.AllowedProtections ?? ['Standard']).includes('Standard')
   await Promise.all([
     invalidateByPath(client, `${base(scope)}/key-values`),
     awaitsStandardKey ? invalidateByPath(client, policyPath) : undefined,
