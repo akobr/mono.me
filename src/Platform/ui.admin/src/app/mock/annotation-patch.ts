@@ -248,6 +248,50 @@ function bare(value: unknown): unknown {
   return copy
 }
 
+/** The value at a JSON Pointer (RFC 6901), by own members only; an array index has no leading zero. */
+function valueAt(document: unknown, pointer: string): { exists: boolean; value?: unknown } {
+  let value = document
+  for (const segment of pointer === '' ? [] : pointer.slice(1).split('/')) {
+    const name = segment.replaceAll('~1', '/').replaceAll('~0', '~')
+    if (Array.isArray(value)) {
+      if (!/^(0|[1-9]\d*)$/.test(name) || Number(name) >= value.length) {
+        return { exists: false }
+      }
+      value = value[Number(name)]
+    } else if (typeof value === 'object' && value !== null && Object.hasOwn(value, name)) {
+      value = (value as Document)[name]
+    } else {
+      return { exists: false }
+    }
+  }
+  return { exists: true, value }
+}
+
+/** Deep equality of JSON values by own members, whatever the order of names or the prototype of an object. */
+function sameJson(first: unknown, second: unknown): boolean {
+  if (first === second) {
+    return true
+  }
+  if (Array.isArray(first) || Array.isArray(second)) {
+    return (
+      Array.isArray(first) &&
+      Array.isArray(second) &&
+      first.length === second.length &&
+      first.every((item, index) => sameJson(item, second[index]))
+    )
+  }
+  if (typeof first !== 'object' || typeof second !== 'object' || first === null || second === null) {
+    return false
+  }
+  const names = Object.keys(first)
+  return (
+    names.length === Object.keys(second).length &&
+    names.every(
+      (name) => Object.hasOwn(second, name) && sameJson((first as Document)[name], (second as Document)[name]),
+    )
+  )
+}
+
 /** Plain objects again; JSON.parse makes a `__proto__` name an own member. */
 const plain = (value: unknown): unknown => JSON.parse(JSON.stringify(value))
 
@@ -261,6 +305,18 @@ function applyJsonPatch(document: Document, patch: Operation[]): { document: Doc
     })
     if (operation.op === 'move' && operation.path.startsWith(`${operation.from}/`)) {
       return failed(`The value at '${operation.from}' cannot be moved into itself ('${operation.path}').`)
+    }
+    if (operation.op === 'test') {
+      // compared here, by own members: fast-json-patch's comparison calls hasOwnProperty on the expected value, which a
+      // prototype-free object has not
+      const found = valueAt(result, operation.path)
+      if (!found.exists) {
+        return failed(`The path '${operation.path}' does not exist.`)
+      }
+      if (!sameJson(found.value, operation.value)) {
+        return failed(`The value at '${operation.path}' is not the expected value.`)
+      }
+      continue
     }
     try {
       // every object of the document and of the operation's value has no prototype, so the guard can be off; the

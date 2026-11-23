@@ -356,6 +356,25 @@ describe('the mock PatchAnnotation: a JSON Patch', () => {
     expect((await read()).Labels).toEqual(['eu'])
   })
 
+  it('tests an object value by its members, also inside an array', async () => {
+    await seedSubject({ Values: { limits: { cpu: 2, memory: 4 }, zones: [{ name: 'eu', weight: 1 }] } })
+
+    const equal = await patch('sbt.northwind', [
+      { op: 'test', path: '/Values/limits', value: { memory: 4, cpu: 2 } },
+      { op: 'test', path: '/Values/zones', value: [{ weight: 1, name: 'eu' }] },
+      { op: 'replace', path: '/Title', value: 'Tested' },
+    ])
+    expect(equal.status).toBe(200)
+    expect(equal.body).toMatchObject({ Title: 'Tested' })
+
+    for (const value of [{ cpu: 2 }, { cpu: 2, memory: 8 }, [{ name: 'eu' }]]) {
+      const path = Array.isArray(value) ? '/Values/zones' : '/Values/limits'
+      const unequal = await patch('sbt.northwind', [{ op: 'test', path, value }])
+      expect(unequal.status, JSON.stringify(value)).toBe(412)
+      expect(unequal.body).toMatchObject({ ErrorCode: 'PatchTestFailed' })
+    }
+  })
+
   it('removes a label guarded by its test', async () => {
     await seedSubject({ Labels: ['eu', 'pci', 'EU'] })
 

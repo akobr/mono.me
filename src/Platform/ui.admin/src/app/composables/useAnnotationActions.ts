@@ -248,10 +248,14 @@ export function useAnnotationActions() {
   /**
    * RestoreAnnotations, up to 100 keys per request. The restored annotations (and the ancestors created for them)
    * go back into the catalog; a failure of one key does not stop the others. Only the deleted lists (the Deleted page's
-   * own data) are awaited; the queries of the restored keys refresh in the background.
+   * own data) are awaited; the queries of the restored keys refresh in the background. `target` is the view to restore
+   * in (default the current one); the catalog takes the results only while it holds that view.
    */
-  async function restoreMany(keys: string[], options: { descendants?: boolean } = {}): Promise<RestoreOutcome> {
-    const target = scope()
+  async function restoreMany(
+    keys: string[],
+    options: { descendants?: boolean; target?: Scope } = {},
+  ): Promise<RestoreOutcome> {
+    const target = options.target ?? scope()
     const outcome: RestoreOutcome = { restored: [], created: [], failed: [] }
 
     for (const batch of chunk([...new Set(keys)], restoreBatchSize)) {
@@ -260,7 +264,9 @@ export function useAnnotationActions() {
         Descendants: options.descendants ?? true,
       })
       for (const annotation of result.Annotations ?? []) {
-        catalog.upsert(annotation)
+        if (catalogHolds(target)) {
+          catalog.upsert(annotation)
+        }
         outcome.restored.push(annotation)
       }
       outcome.created.push(...(result.CreatedKeys ?? []))
