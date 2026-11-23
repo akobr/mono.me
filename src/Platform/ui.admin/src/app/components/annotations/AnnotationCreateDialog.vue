@@ -14,6 +14,7 @@ import {
   type AnnotationTypeCode,
 } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
+import { sameView } from '@/utils/context-paths'
 import { errorMessage, writeFailureTitle } from '@/utils/errors'
 
 /**
@@ -136,7 +137,10 @@ async function create() {
 
   saving.value = true
   failure.value = undefined
+  // the view of the whole create: the deleted-key check reads it at the same moment, and the restore, the patch and
+  // the POST use it too, also when the user opens another view while the dialog waits for a choice
   const { org, project, view } = context.scope
+  const target: Scope = { org, project, view }
 
   try {
     const { choice, deleted } = await deletedCheck.check(key.value)
@@ -150,7 +154,7 @@ async function create() {
     if (choice === 'restore') {
       const outcome = await actions.restoreMany(
         deleted.map((annotation: Annotation) => annotation.AnnotationKey),
-        { descendants: false },
+        { descendants: false, target },
       )
       if (outcome.failed.length) {
         throw new Error(outcome.failed.map((failed) => `${failed.Key}: ${failed.Message}`).join(' '))
@@ -159,7 +163,7 @@ async function create() {
     }
 
     if (restored) {
-      await updateRestored(restored, { org, project, view })
+      await updateRestored(restored, target)
       return
     }
 
@@ -180,10 +184,13 @@ async function create() {
         TimeZone: timeZone.value || undefined,
       }),
     )
-    catalog.upsert(created)
-    // The API created (or re-created) the missing ancestors; a background refresh brings them into the catalog.
-    if (missingAncestors.value.length) {
-      void catalog.load(context.scope, { force: true })
+    // The API created (or re-created) the missing ancestors; a background refresh brings them into the catalog, while
+    // it still holds the dialog's view.
+    if (catalog.scope && sameView(catalog.scope, target)) {
+      catalog.upsert(created)
+      if (missingAncestors.value.length) {
+        void catalog.load(target, { force: true })
+      }
     }
     toast.add({ title: `${created.AnnotationKey} created`, color: 'success', icon: 'i-lucide-plus' })
     finish(created.AnnotationKey)

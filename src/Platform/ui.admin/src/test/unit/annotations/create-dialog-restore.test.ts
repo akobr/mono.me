@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node'
 import { deleteAnnotation, getAnnotation, getAnnotationHistory, setAnnotation } from '@42for.net/2splatform.sdk'
 import AnnotationCreateDialog from '@/components/annotations/AnnotationCreateDialog.vue'
 import { mockHandlers } from '@/mock/all-handlers'
+import { useContextStore } from '@/stores/context'
 import { mountScreen, settle } from '../../helpers'
 
 // Restore and update of New annotation (424-225): the deleted key is restored with its content, and only what the
@@ -27,7 +28,12 @@ function recordWrites(): { method: string; key: string; body: unknown }[] {
 }
 
 /** Opens New annotation for a subject and fills its name and title, then presses Create and answers the deleted keys. */
-async function createSubject(name: string, title: string, answer: 'Restore and update' | 'Create new') {
+async function createSubject(
+  name: string,
+  title: string,
+  answer: 'Restore and update' | 'Create new',
+  beforeAnswer: () => void = () => {},
+) {
   const screen = await mountScreen(AnnotationCreateDialog, { open: true }, { accessMap: { 'acme.billing': 'Owner' } })
   await settle()
   const type = screen.host.findAllComponents({ name: 'Select' })[0]!
@@ -49,6 +55,7 @@ async function createSubject(name: string, title: string, answer: 'Restore and u
     [...document.body.querySelectorAll('button')].find((candidate) => candidate.textContent?.trim() === label)
   button('Create')!.click()
   await vi.waitFor(() => expect(button(answer)).toBeDefined(), { timeout: 5000 })
+  beforeAnswer()
   button(answer)!.click()
   await vi.waitFor(() => expect(screen.inner().emitted('created')).toBeDefined(), { timeout: 5000 })
   await settle()
@@ -56,6 +63,24 @@ async function createSubject(name: string, title: string, answer: 'Restore and u
 }
 
 describe('New annotation over a deleted key', () => {
+  it('restores and patches in the view the dialog started in, when the user opens another view meanwhile', async () => {
+    await deleteAnnotation(org, project, view, 'sbt.contoso')
+    const views: string[] = []
+    const record = ({ params }: { params: Record<string, unknown> }) => void views.push(String(params.view))
+    server.use(
+      http.post('*/api/v1/:org/:project/:view/annotations/deleted/restore', record),
+      http.patch(keyUrl, record),
+    )
+
+    const screen = await createSubject('contoso', 'Contoso Ltd', 'Restore and update', () =>
+      useContextStore().set({ org, project, view: 'staging' }),
+    )
+
+    expect(views).toEqual([view, view])
+    expect(await getAnnotation(org, project, view, 'sbt.contoso')).toMatchObject({ Title: 'Contoso Ltd' })
+    screen.host.unmount()
+  })
+
   it('Restore and update restores the key with its content and patches only the title', async () => {
     const current = await getAnnotation(org, project, view, 'sbt.contoso', { includeInactive: true })
     await setAnnotation(org, project, view, 'sbt.contoso', {
