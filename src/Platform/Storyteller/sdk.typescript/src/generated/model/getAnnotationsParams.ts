@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.58.22722
+ * OpenAPI spec version: 0.10.58.33196
  */
 
 export type GetAnnotationsParams = {
