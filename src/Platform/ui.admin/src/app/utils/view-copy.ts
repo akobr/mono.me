@@ -41,6 +41,8 @@ export interface ViewCopyItem {
   outcome: ViewCopyOutcome
   /** Why it was skipped or failed, or what a created annotation was needed for. */
   message?: string
+  /** A failed row whose write reached the target all the same, for example a first write merged into another. */
+  written?: true
 }
 
 export interface ViewCopyRequest {
@@ -70,6 +72,12 @@ export interface ViewCopyRequest {
    * nothing that its check did not show.
    */
   checkedTargets?: Readonly<Record<string, string | number | null>>
+  /**
+   * What a check read in the source of each annotation that it would create for another key (`ViewCopyResult.
+   * prerequisites` of the check): a missing ancestor, or the annotation of a configuration. One that changed since is
+   * not created, and nothing below it is written.
+   */
+  checkedPrerequisites?: Readonly<Record<string, string>>
   /** Decide and report, write nothing. */
   dryRun?: boolean
 }
@@ -94,6 +102,11 @@ export interface ViewCopyResult {
    * `checkedTargets`.
    */
   targets: Record<string, string | number | null>
+  /**
+   * The source text (`annotationText`) of each annotation that the run created, or would create, for another key. A
+   * copy after a check passes those of the check as `checkedPrerequisites`.
+   */
+  prerequisites: Record<string, string>
 }
 
 export interface ViewCopyOptions {
@@ -110,6 +123,22 @@ const inexactMessage = `It holds a number beyond 2^53. ${exactTools}`
 const changedMessage = (target: string) => `It changed in ${target} meanwhile. Copy it again.`
 const comparedMessage = (target: string) => `It changed in ${target} since it was compared.`
 const checkedMessage = (view: string) => `It changed in ${view} since it was checked.`
+const uncheckedMessage = 'The check did not show what a copy would do with it. Check again.'
+
+/**
+ * How a value that the run read compares with what the check read: a copy after a check writes only what the check
+ * showed, so a key that the check did not get to (it failed there, or it was not needed) is not written either.
+ */
+type Seen = 'same' | 'changed' | 'unchecked'
+function seenBy<T>(checked: Readonly<Record<string, T>> | undefined, key: string, value: T): Seen {
+  if (!checked) {
+    return 'same'
+  }
+  if (!(key in checked)) {
+    return 'unchecked'
+  }
+  return checked[key] === value ? 'same' : 'changed'
+}
 export const stoppedMessage = 'Not copied, the copy was stopped.'
 
 const mergeOrder = (key: string) => metaOf(key.slice(0, key.indexOf('.')))?.mergeOrder ?? 99
@@ -150,7 +179,15 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
   const { client, signal } = options
   const dryRun = !!request.dryRun
   const targetScope: Scope = { ...source, view: target }
-  const result: ViewCopyResult = { target, dryRun, items: [], stopped: false, sources: {}, targets: {} }
+  const result: ViewCopyResult = {
+    target,
+    dryRun,
+    items: [],
+    stopped: false,
+    sources: {},
+    targets: {},
+    prerequisites: {},
+  }
   const keys = inMergeOrder(request.keys)
 
   /** Whether the target has the annotation: read once, then kept up to date by the writes of the run. */
@@ -166,17 +203,25 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
    * Records what the run read in the source for a selected key, and whether it is what the check read. A copy writes
    * only what its check showed: a source changed since is skipped.
    */
-  function sourceRead(key: string, text: string | null): boolean {
+  function sourceRead(key: string, text: string | null): Seen {
     result.sources[key] = text
-    return !request.checked || !(key in request.checked) || request.checked[key] === text
+    return seenBy(request.checked, key, text)
   }
 
-  /** Records the stamp of the target that the run read for a selected key, and whether it is what the check read. */
-  function targetRead(key: string, stamp: string | number | null): boolean {
+  /** Records the stamp of the target that the run read for a selected key, and how it compares with the check. */
+  function targetRead(key: string, stamp: string | number | null): Seen {
     result.targets[key] = stamp
-    const checked = request.checkedTargets
-    return !checked || !(key in checked) || checked[key] === stamp
+    return seenBy(request.checkedTargets, key, stamp)
   }
+
+  /** Records the source of an annotation that the run creates for another key, and how it compares with the check. */
+  function prerequisiteRead(annotation: Annotation): Seen {
+    const text = annotationText(annotation)
+    result.prerequisites[annotation.AnnotationKey] = text
+    return seenBy(request.checkedPrerequisites, annotation.AnnotationKey, text)
+  }
+
+  const seenMessage = (seen: Seen, view: string) => (seen === 'changed' ? checkedMessage(view) : uncheckedMessage)
 
   /**
    * Looks the key up among the deleted ones of the target right before it is created. The lookup at the start of the
@@ -247,6 +292,14 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
           // The source lacks it too: the API creates it with the descendant, as it did in the source.
           continue
         }
+        const seen = prerequisiteRead(parent)
+        if (seen !== 'same') {
+          notCopied.add(ancestor)
+          add('Annotation', ancestor, 'Skipped', seenMessage(seen, source.view))
+          notCopied.add(key)
+          add('Annotation', key, 'Skipped', `Its ancestor ${ancestor} was not copied.`)
+          return false
+        }
         try {
           if (hasInexactNumber(parent.Values)) {
             throw new Error(inexactMessage)
@@ -294,9 +347,10 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
     }
 
     const annotation = (await readAnnotation(source, key)).annotation
-    if (role.selected && !sourceRead(key, annotation ? annotationText(annotation) : null)) {
+    const sourceSeen = role.selected ? sourceRead(key, annotation ? annotationText(annotation) : null) : 'same'
+    if (sourceSeen !== 'same') {
       notCopied.add(key)
-      add('Annotation', key, 'Skipped', checkedMessage(source.view))
+      add('Annotation', key, 'Skipped', seenMessage(sourceSeen, source.view))
       return false
     }
     if (!annotation) {
@@ -313,9 +367,9 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
     }
     const same = !!stored && annotationText(annotation) === annotationText(stored.value)
     const stamp = annotationStamp(stored?.value)
-    const moved =
-      role.selected && !!request.expected && key in request.expected && request.expected[key] !== stamp
-    const movedSinceCheck = role.selected && !targetRead(key, stamp)
+    const moved = role.selected && !!request.expected && key in request.expected && request.expected[key] !== stamp
+    const targetSeen = role.selected ? targetRead(key, stamp) : 'same'
+    const movedSinceCheck = targetSeen !== 'same'
     if (moved || movedSinceCheck) {
       // The comparison page or the check showed something else: the section reads the target again, whatever the
       // run does.
@@ -327,7 +381,7 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
       if (!stored) {
         notCopied.add(key)
       }
-      add('Annotation', key, 'Skipped', moved ? comparedMessage(target) : checkedMessage(target))
+      add('Annotation', key, 'Skipped', moved ? comparedMessage(target) : seenMessage(targetSeen, target))
       return !!stored
     }
 
@@ -336,6 +390,13 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
         throw new Error(inexactMessage)
       }
       if (!stored) {
+        // The annotation of a configuration is created only as the check read it.
+        const seen = role.selected ? 'same' : prerequisiteRead(annotation)
+        if (seen !== 'same') {
+          notCopied.add(key)
+          add('Annotation', key, 'Skipped', seenMessage(seen, source.view))
+          return false
+        }
         return await create(annotation, role.reason)
       }
       if (same) {
@@ -369,8 +430,9 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
     }
 
     const document = (await readConfiguration(source, key)).own
-    if (!sourceRead(key, document ? canonicalJson(document) : null)) {
-      add('Configuration', key, 'Skipped', checkedMessage(source.view))
+    const sourceSeen = sourceRead(key, document ? canonicalJson(document) : null)
+    if (sourceSeen !== 'same') {
+      add('Configuration', key, 'Skipped', seenMessage(sourceSeen, source.view))
       return
     }
     if (!document) {
@@ -404,6 +466,16 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
         add('Configuration', key, 'Skipped', `Its annotation is not in ${target}.`)
         return
       }
+      // Without its annotation the target has no configuration for the key (version 0). What the comparison page or
+      // the check showed is checked before the annotation and its ancestors are created, so that a configuration that
+      // is then skipped leaves no annotation behind.
+      const moved = !!request.expected && key in request.expected && request.expected[key] !== 0
+      const seen = seenBy(request.checkedTargets, key, 0)
+      if (moved || seen !== 'same') {
+        void invalidateConfiguration(client, targetScope, key)
+        add('Configuration', key, 'Skipped', moved ? comparedMessage(target) : seenMessage(seen, target))
+        return
+      }
       if (!(await copyAnnotation(key, { selected: false, reason: 'Needed by its configuration.' }))) {
         add('Configuration', key, 'Skipped', 'Its annotation was not copied.')
         return
@@ -414,12 +486,13 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
     const stored = await readConfiguration(targetScope, key)
     const same = !!stored.own && canonicalJson(stored.own) === canonicalJson(document)
     const moved = !!request.expected && key in request.expected && request.expected[key] !== stored.version
-    const movedSinceCheck = !targetRead(key, stored.version)
+    const targetSeen = targetRead(key, stored.version)
+    const movedSinceCheck = targetSeen !== 'same'
     if (moved || movedSinceCheck) {
       void invalidateConfiguration(client, targetScope, key)
     }
     if ((moved || movedSinceCheck) && !same) {
-      add('Configuration', key, 'Skipped', moved ? comparedMessage(target) : checkedMessage(target))
+      add('Configuration', key, 'Skipped', moved ? comparedMessage(target) : seenMessage(targetSeen, target))
       return
     }
 
@@ -446,16 +519,33 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
           // Nothing is written yet, and PATCH needs a written version: POST replaces a missing document, but it has
           // no condition and merges into one that another client wrote meanwhile. Read back, that shows.
           await setConfiguration(source.org, source.project, target, key, document)
-          const written = (await readConfiguration(targetScope, key)).own
-          if (!written || canonicalJson(written) !== canonicalJson(document)) {
-            wrote = true
-            void invalidateConfiguration(client, targetScope, key)
-            add(
-              'Configuration',
+          // Written: whatever the read back says, the target changed and its queries read again.
+          wrote = true
+          void invalidateConfiguration(client, targetScope, key)
+          let written
+          try {
+            written = (await readConfiguration(targetScope, key)).own
+          } catch (error) {
+            if (endsRun(error)) {
+              throw error
+            }
+            result.items.push({
+              kind: 'Configuration',
               key,
-              'Failed',
-              `${target} got its own configuration meanwhile, and the copy was merged into it. Check it there.`,
-            )
+              outcome: 'Failed',
+              message: `It was written to ${target}, but it could not be read back: ${errorMessage(error)}`,
+              written: true,
+            })
+            return
+          }
+          if (!written || canonicalJson(written) !== canonicalJson(document)) {
+            result.items.push({
+              kind: 'Configuration',
+              key,
+              outcome: 'Failed',
+              message: `${target} got its own configuration meanwhile, and the copy was merged into it. Check it there.`,
+              written: true,
+            })
             return
           }
         }
@@ -565,6 +655,10 @@ export const copyWrites = (items: readonly ViewCopyItem[]): number => {
   const counts = copyCounts(items)
   return counts.Created + counts.Updated
 }
+
+/** Whether a copy changed the target: a document written, also one whose row failed after its write. */
+export const copyChangedTarget = (items: readonly ViewCopyItem[]): boolean =>
+  copyWrites(items) > 0 || items.some((item) => item.written)
 
 /**
  * "2 created, 1 updated, 5 unchanged, 1 skipped, 1 failed" of a copy, "To create 2 · To update 3 · Unchanged 5" of a

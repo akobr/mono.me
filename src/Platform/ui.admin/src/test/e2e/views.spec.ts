@@ -3,8 +3,11 @@ import { goto, isMobile, openApp } from './support'
 
 declare global {
   interface Window {
-    /** The milliseconds every request of the page waits before it is sent; the test of Stop sets it. */
-    slowRequests?: number
+    /** The next write of a configuration waits until the test releases it; the test of Stop sets it. */
+    holdWrite?: boolean
+    /** The key whose write waits. */
+    heldWrite?: string
+    releaseWrite?: () => void
   }
 }
 
@@ -856,12 +859,18 @@ test('Stop ends a copy after the key that is under way, and Try again copies the
   test.skip(isMobile(testInfo), 'The list below md has no checkboxes.')
   test.slow()
   // The mock answers at once, so a copy would be over before a click. page.route sees none of its requests (the
-  // service worker of the mock answers them), so the fetch of the page waits instead, while the test tells it to.
+  // service worker of the mock answers them), so the fetch of the page holds the first write of a configuration
+  // until the test releases it.
   await page.addInitScript(() => {
     const send = window.fetch
     window.fetch = async (...request) => {
-      if (window.slowRequests) {
-        await new Promise((resolve) => setTimeout(resolve, window.slowRequests))
+      const [input, init] = request
+      const url = input instanceof Request ? input.url : String(input)
+      const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
+      if (window.holdWrite && method !== 'GET' && url.includes('/configuration/')) {
+        window.holdWrite = false
+        window.heldWrite = decodeURIComponent(url.split('/configuration/')[1]!.split(/[/?]/)[0]!)
+        await new Promise<void>((resolve) => (window.releaseWrite = resolve))
       }
       return send(...request)
     }
@@ -878,7 +887,8 @@ test('Stop ends a copy after the key that is under way, and Try again copies the
   const dialog = copyDialog(page, `Copy ${shown} configurations to another view`)
   await expect(dialog.getByRole('combobox', { name: 'Copy to', exact: true })).toHaveText('staging')
 
-  await page.evaluate(() => (window.slowRequests = 100))
+  // The first write of a configuration waits: Stop comes while it is under way.
+  await page.evaluate(() => (window.holdWrite = true))
   await dialog.getByRole('button', { name: 'Copy', exact: true }).click()
 
   // While it runs the dialog stays: no Close, no Escape, no options, only Stop and the progress.
@@ -889,19 +899,28 @@ test('Stop ends a copy after the key that is under way, and Try again copies the
   await expect(dialog.getByRole('combobox', { name: 'Copy to', exact: true })).toBeDisabled()
   await expect(dialog.getByRole('radio', { name: 'Skip', exact: true })).toBeDisabled()
   await page.keyboard.press('Escape')
-  await expect(dialog.getByRole('status')).toHaveText(new RegExp(`^Copied [1-9]\\d* of ${shown}…$`))
+  await expect(dialog.getByRole('status')).toHaveText(new RegExp(`^Copied \\d+ of ${shown}…$`))
   await expect(dialog.getByRole('progressbar')).toBeVisible()
+  await page.waitForFunction(() => !!window.heldWrite)
+  const held = (await page.evaluate(() => window.heldWrite))!
+  // Stopped while the write of the held key waits: the run goes on with it, and ends after it.
   await stop.click()
-  await page.evaluate(() => (window.slowRequests = 0))
+  await page.evaluate(() => window.releaseWrite!())
 
-  // The key under way is finished, and the keys after it are rows that say so.
-  await expectSummary(dialog, 'The copy to staging was stopped', /^\d+ created(, \d+ updated)?, \d+ skipped\.$/)
+  // The key under way is finished, and the keys after it are rows that say so: the next key does not start.
+  await expectSummary(dialog, 'The copy to staging was stopped', /^(\d+ (created|updated|unchanged), )+\d+ skipped\.$/)
   const rows = documents(dialog, 'Copied documents')
   const notReached = rows.filter({ hasText: 'Not copied, the copy was stopped.' })
   await expect(rows.last()).toHaveText(/^\s*Configuration\s*exe\.\S+Skipped\s*Not copied, the copy was stopped\.\s*$/)
+  const texts = (await rows.allTextContents()).map((each) => each.replace(/\s+/g, '').trim())
+  const at = texts.findIndex((each) => each.startsWith(`Configuration${held}`))
+  expect(at).toBeGreaterThanOrEqual(0)
+  expect(texts[at]).toMatch(/(Created|Updated)$/)
+  expect(texts.slice(0, at).filter((each) => each.includes('copywasstopped'))).toEqual([])
+  expect(texts.slice(at + 1).every((each) => each.endsWith('Notcopied,thecopywasstopped.'))).toBe(true)
   const left = await notReached.count()
+  expect(left).toBe(texts.length - at - 1)
   expect(left).toBeGreaterThan(0)
-  expect(left).toBeLessThan(shown)
   await expect(dialog.getByRole('status')).toHaveText('')
   await expect(dialog.getByRole('button', { name: /^Compare with/ })).toHaveCount(0)
 

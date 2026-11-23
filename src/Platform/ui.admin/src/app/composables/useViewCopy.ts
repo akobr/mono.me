@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useCatalogStore } from '@/stores/catalog'
 import { sameView } from '@/utils/context-paths'
-import { copyToView, copyWrites, type ViewCopyRequest, type ViewCopyResult } from '@/utils/view-copy'
+import { copyChangedTarget, copyToView, type ViewCopyRequest, type ViewCopyResult } from '@/utils/view-copy'
 
 /**
  * The copy of annotations or configurations to another view of the project, with its progress (spec "Copy and
@@ -28,7 +28,7 @@ export function useViewCopy() {
       // The catalog holds the source view, which a copy does not change. When it holds the target by the end of the
       // run (the user went there meanwhile), what was written is in none of its lists.
       const target = { ...request.source, view: request.target }
-      if (!result.dryRun && copyWrites(result.items) > 0) {
+      if (!result.dryRun && copyChangedTarget(result.items)) {
         if (catalog.scope && sameView(catalog.scope, target)) {
           void catalog.load(target, { force: true })
         } else {

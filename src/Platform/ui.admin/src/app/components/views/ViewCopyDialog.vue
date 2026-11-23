@@ -207,6 +207,8 @@ async function start(dryRun: boolean): Promise<void> {
         checked: dryRun ? undefined : plan.value?.sources,
         // It overwrites only what the check showed of the target: a document changed there since is skipped too.
         checkedTargets: dryRun ? undefined : plan.value?.targets,
+        // ... and creates the annotations it needs only as the check read them.
+        checkedPrerequisites: dryRun ? undefined : plan.value?.prerequisites,
         dryRun,
       },
       controller.signal,
@@ -271,8 +273,12 @@ async function compareNow(): Promise<void> {
     return
   }
   const set = fitsInAddress(selection.keys) ? undefined : store.remember(selection.keys)
-  open.value = false
-  await router.push(compareLocation(source, { ...selection, to, set }))
+  // The dialog closes once the navigation went through: a guard that cancels it (unsaved changes of a form) leaves
+  // the result on the screen.
+  const failure = await router.push(compareLocation(source, { ...selection, to, set }))
+  if (!failure) {
+    open.value = false
+  }
 }
 
 // The page was left while a copy ran: it ends after the key that is under way.

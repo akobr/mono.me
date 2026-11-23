@@ -970,6 +970,21 @@ describe('readConfiguration', () => {
     expect(await readConfiguration(scope, key)).toMatchObject({ version: 2, own: { region: 'eu-west', retries: 3 } })
   })
 
+  it('answers a key deleted between its two reads as deleted, not with the effective document read before', async () => {
+    const key = await createSubject('fresh')
+    await setConfiguration(org, project, view, key, { region: 'eu-west' })
+    server.use(
+      http.get(`*${configurationUrl}/${key}/versions/1`, () =>
+        HttpResponse.json(
+          { Message: `The annotation ${key} is deleted.`, ErrorCode: 'AnnotationDeleted' },
+          { status: 404 },
+        ),
+      ),
+    )
+
+    expect(await readConfiguration(scope, key)).toEqual({ readable: false, deleted: true, version: 0 })
+  })
+
   it('answers no own document for a key without one, and asks for version 0', async () => {
     const key = await createSubject('fresh')
     await setConfiguration(org, project, view, 'sbt.northwind', { region: 'eu-west' })

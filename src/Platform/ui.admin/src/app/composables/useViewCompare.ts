@@ -34,6 +34,8 @@ export interface CompareFile {
   notes: string[]
   /** What the target held when it was read: the stamp of the annotation or the version of the configuration. */
   expected: string | number | null
+  /** A side is read again while its last result shows: what is shown may be older than the view. */
+  refreshing: boolean
   retry: () => void
 }
 
@@ -157,6 +159,7 @@ function sameFile(a: CompareFile, b: CompareFile): boolean {
     a.deleted === b.deleted &&
     a.inexact === b.inexact &&
     a.expected === b.expected &&
+    a.refreshing === b.refreshing &&
     a.notes.length === b.notes.length &&
     a.notes.every((note, index) => note === b.notes[index])
   )
@@ -286,6 +289,7 @@ export function useViewCompare(options: ViewCompareOptions): {
       inexact: false,
       notes: [],
       expected: null,
+      refreshing: false,
       retry: kept.retry,
     }
 
@@ -297,6 +301,7 @@ export function useViewCompare(options: ViewCompareOptions): {
       return { ...file, loading: true }
     }
 
+    file.refreshing = source.isFetching || target.isFetching
     kept.own = compared(kept.own, source.data, target.data, false)
     const own = kept.own.result
     if (running.kind === 'annotations') {
@@ -320,8 +325,12 @@ export function useViewCompare(options: ViewCompareOptions): {
     kept.effective = sameTexts ? kept.own : compared(kept.effective, source.data, target.data, true)
     const effective = kept.effective.result
     const showsEffective = content === 'effective'
-    // The effective documents differ, and the own ones are not the reason.
-    const inherited = effective.status === 'different' && (own.status === 'identical' || own.status === 'absent')
+    // The effective documents differ, and the own ones are not the reason. Texts that are the same but hold a number
+    // beyond 2^53 are not identical, but nothing shows that they differ.
+    const inherited =
+      effective.status === 'different' &&
+      kept.effective.source !== kept.effective.target &&
+      (own.status === 'identical' || own.status === 'absent')
     const inexact = kept.own.inexact || (showsEffective && kept.effective.inexact)
 
     const notes: string[] = []

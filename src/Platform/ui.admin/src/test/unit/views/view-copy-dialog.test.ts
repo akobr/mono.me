@@ -957,6 +957,21 @@ describe('ViewCopyDialog: Copy', () => {
     expect(route.query).toEqual({ kind: 'annotations', to: 'staging', key: annotations.toSorted() })
   })
 
+  it('stays open with its result when a guard cancels the way to the comparison', async () => {
+    const view = await openDialog({ keys: annotations })
+    await copy()
+    // a form with unsaved changes asks before it is left, and the answer is to stay
+    const remove = view.router.beforeEach(() => false)
+
+    await click('Compare with staging')
+
+    expect(view.state.open).toBe(true)
+    expect(view.router.currentRoute.value.fullPath).toBe('/acme/billing/default')
+    expect(footer()).toEqual(['Compare with staging', 'Done'])
+    expect(rows('Copied documents').length).toBeGreaterThan(0)
+    remove()
+  })
+
   it('keeps a long selection for the comparison, which has no room for it in its address', async () => {
     // none of them is in default, so each is one read
     const keys = Array.from({ length: 60 }, (_, index) => `sbt.customer-of-the-long-selection-${index}`)

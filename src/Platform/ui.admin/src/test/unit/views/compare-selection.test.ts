@@ -12,6 +12,7 @@ import {
   getConfigurationVersion,
   patchConfiguration,
   setAnnotation,
+  setConfiguration,
   type View,
 } from '@42for.net/2splatform.sdk'
 import DiffEditor from '@/components/editor/DiffEditor.vue'
@@ -1767,5 +1768,40 @@ describe('DiffEditor', () => {
     await view.setProps({ layout: 'unified' })
     expect(names()).toEqual(['sbt.contoso in default, compared with sbt.contoso in staging'])
     expect(document.body.querySelector('.cm-mergeView')).toBeNull()
+  })
+})
+
+describe('A comparison whose documents are read again', () => {
+  it('offers no copy while a side is read again, and offers it once the side is read', async () => {
+    const view = await mountSelection(`kind=annotations&to=staging&${keysQuery('sbt.northwind')}`)
+    await compared()
+    await copyOn('Copy 1 to staging')
+    // the cached documents show while the target is read again, as when a comparison is opened again
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    server.use(
+      http.get('*/api/v1/acme/billing/staging/annotations/sbt.northwind', async () => {
+        await held
+        return undefined
+      }),
+    )
+    void view.queryClient.invalidateQueries()
+
+    await eventually(() => expect(copyButton().disabled).toBe(true))
+    release()
+    await copyOn('Copy 1 to staging')
+  })
+})
+
+describe('Effective documents that are the same, with a number beyond 2^53', () => {
+  it('does not say that the effective documents differ', async () => {
+    // an ancestor configures the same number in both views: the browser rounds it, so the texts are not exact
+    for (const each of ['default', 'staging']) {
+      await setConfiguration(org, project, each, 'sbt.northwind', { limit: 9007199254740992 })
+    }
+    await mountSelection(`kind=configurations&to=staging&${keysQuery('usg.northwind.invoicing')}`)
+
+    await compared()
+    expect(heading('usg.northwind.invoicing')).toBe('Usage usg.northwind.invoicing Identical')
   })
 })
