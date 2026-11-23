@@ -350,8 +350,8 @@ The exhibition is the demo project that the onboarding of the admin UI offers to
 
 ```sh
 az functionapp config appsettings set -g "$RG" -n "$FUNC" --output none --settings \
-  Exhibition__Organization=exhibition \
-  Exhibition__Project=exhibition \
+  Exhibition__Organization=fourth-wall \
+  Exhibition__Project=toons-and-tyrants \
   Exhibition__Owner="<the account id of the seed's --owner>"
 ```
 
