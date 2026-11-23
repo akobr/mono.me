@@ -657,7 +657,7 @@ az monitor diagnostic-settings create --name log-analytics \
 
 # The server. The template also sets TCP startup, readiness and liveness probes on 8080.
 az containerapp create -g "$RG" -n "$MCP_APP" --environment "$CAE" --workload-profile-name Consumption \
-  --image "$MCP_IMAGE" --cpu 0.25 --memory 0.5Gi --min-replicas 0 --max-replicas 3 \
+  --image "$MCP_IMAGE" --cpu 0.25 --memory 0.5Gi --min-replicas 1 --max-replicas 3 \
   --scale-rule-name http --scale-rule-http-concurrency 20 \
   --ingress external --target-port 8080 --transport auto \
   --user-assigned "$MCP_MI_ID" --revisions-mode single --tags $TAGS \
@@ -706,7 +706,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 
 **The custom domain:** the records `mcp.2s` (CNAME to the app's `properties.configuration.ingress.fqdn`) and `asuid.mcp.2s` (TXT, its `properties.customDomainVerificationId`) in the zone `42for.net` (step 12). A CAA record of the zone, if there is one, must allow `digicert.com`. Then `az containerapp hostname bind -g "$RG" -n "$MCP_APP" --hostname "$MCP_HOST" --environment "$CAE" --validation-method CNAME`. The template binds it with `mcpCustomDomain`: the host name with the binding type `Auto` and the managed certificate.
 
-**The budget** is easiest in the portal, as in step 2: **Cost Management → Budgets → Add**, scope the subscription, the filter **Service name** (the meter category) `Azure Container Apps`, amount 12 with `mcpMinReplicas = 1` (1 with scale to zero), monthly, alerts at 50 and 100 % of the actual cost and at 100 % of the forecasted cost to `$OWNER_EMAIL`. The `az containerapp create` above leaves the cool-down at the platform's 300 seconds; the CLI sets `cooldownPeriod` only through `--yaml`, and it acts only with `--min-replicas 0`.
+**The budget** is easiest in the portal, as in step 2: **Cost Management → Budgets → Add**, scope the subscription, the filter **Service name** (the meter category) `Azure Container Apps`, amount 12 with `mcpMinReplicas = 1` (1 with scale to zero), monthly, alerts at 50 and 100 % of the actual cost and at 100 % of the forecasted cost to `$OWNER_EMAIL`. The `az containerapp create` above leaves the cool-down at the platform's 300 seconds; the CLI sets `cooldownPeriod` only through `--yaml`, and it acts only with `--min-replicas 0` (scale to zero instead of production's always-on replica).
 
 **WorkOS production** (step 13): dynamic client registration on, and the resource indicator `https://mcp.2s.42for.net/mcp`, the default one only if staging showed that it leaves the `aud` of the admin UI's tokens alone (runbook, phase 1).
 
@@ -725,8 +725,8 @@ Check: `curl -s -i -X POST https://mcp.2s.42for.net/mcp` answers `401` with `WWW
 | Key Vault (keys and operations; HSM keys only when a project allows them) | under 1 USD |
 | Log Analytics, Application Insights (capped) | 0 |
 | Sentry Developer (5k errors a month for both projects; the API sends at most 40 a day per instance) | 0 |
-| Container Apps, the MCP server (step 17a: one replica always on, `mcpMinReplicas = 1`, at the idle rate between calls beyond the monthly free grant of 180,000 vCPU-seconds and 360,000 GiB-seconds; 0 USD with scale to zero; its logs under the workspace's cap; the managed certificate is free) | about 4–6 USD |
-| **Total** | **about 4–7 USD** (0–2 USD with the MCP server scaled to zero) |
+| Container Apps, the MCP server (step 17a: one replica always on, `mcpMinReplicas = 1`, at the idle rate between calls beyond the monthly free grant of 180,000 vCPU-seconds and 360,000 GiB-seconds; with scale to zero 0 USD only while it stays inside the grant (about 200 hours of a replica a month; more, e.g. a scanner's request every 5 minutes, about 7.60 USD); its logs under the workspace's cap; the managed certificate is free) | about 4–6 USD |
+| **Total** | **about 4–7 USD** (0–2 USD with the MCP server scaled to zero and inside its free grant) |
 
 What raises it: Cosmos DB throughput above 1000 RU/s, a second region or zone redundancy, an always-ready instance, a busy MCP replica (about 14 USD a month busy all the time, about 53 USD with three, plus 0.40 USD per million requests past 2 million, which no setting caps), HSM keys (about 1 USD per key a month), a NAT gateway (about 35 USD), a Managed HSM (thousands of USD). The budget of step 2 (5 USD) warns at 2.50 USD, so with the MCP server's replica always on its first alert comes every month; raise `budgetAmount` or scale the server to zero. The MCP server's budget of step 17a warns at 6 USD of Container Apps cost (`mcpBudgetAmount = 12`).
 
