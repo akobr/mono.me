@@ -125,8 +125,8 @@ The review corrected three statements (`311b9d71e`): the fallback, the attempts,
 ### Test results
 
 - `npm run typecheck` passes. `npm run lint` reports one warning, the existing `no-shadow` in `app/mock/key-value-handlers.ts`.
-- `npm test`: 131 files, 2522 tests passed.
-- `npm run test:e2e`, before the review fixes: 461 passed, 15 skipped (one form factor by design). After the fixes, `annotations.spec.ts` and `deleted.spec.ts`: 36 passed, 4 skipped.
+- `npm test`: 131 files, 2522 tests passed; after the CodeRabbit fixes 2527.
+- `npm run test:e2e`, before the review fixes: 461 passed, 15 skipped (one form factor by design). After the fixes, `annotations.spec.ts` and `deleted.spec.ts`: 36 passed, 4 skipped. After the CodeRabbit fixes: 460 passed, 15 skipped, and one accessibility check timed out under load (the mobile trusted issuer dialog); it passed on three reruns, as did `accessibility.spec.ts` and `access.spec.ts` (196 passed).
 - `dotnet build src/Platform/UI.Admin.AutomationTests/src` passes, with no new warning. The deployed-UI automation tests were not run, because they need a target. ANN-FRM-01..07, ANN-CAT-02, ANN-NEW-04, ANN-DET-05 and ANN-ROL-02 do not check the method (`IsWriteOf` matches any write) and should pass unchanged.
 
 ### Reviews
@@ -141,6 +141,19 @@ The review corrected three statements (`311b9d71e`): the fallback, the attempts,
   - (low) the e2e flow checked only the method;
   - (low) three doc statements.
 - **Not completed.** The reviewer of the mock dimension, and the skeptics of three form findings, did not run: the review hit a usage limit. The mock was then checked by hand: `storeAnnotation` stamps for new, existing and re-created keys; `withDb` with async handlers; the link rule against the seeds, the showcase links and the import.
+- **CodeRabbit on PR #217** (2026-11-23), twelve comments. Fixed:
+  - Restore and update patches the view the restore ran in (`updateRestored(restored, target)`), not the view open when the patch is sent.
+  - The JSON and YAML modes apply only the members of the annotation. VeeValidate read a name such as `"Values.plan"` as a path and changed the real value.
+  - Dates compare to 100 ns, as a `DateTimeOffset` holds them (`instantOf`). `Date.parse` keeps whole milliseconds, so a change below one was dropped.
+  - `withDb` runs the handlers' database sections one at a time (a promise chain). A restore that awaited its body after loading the database saved its old copy over a patch made meanwhile. A test holds the restore's body back until the patch is sent; it fails with the previous `withDb`.
+  - The mock checks the whole `Content-Type` (`mediaTypeOf`: `415` for `application/merge-patch+json; =`), an operation whose `op` is not a string (`400 PatchInvalid` before the key is looked up), and a JSON Patch at `/Values/__proto__` (applied on objects without a prototype, then made plain again).
+  - The mock's PATCH no longer creates the view's empty overrides when it looks for a deleted key, so a patch that writes nothing leaves the stored database as it was.
+  - The test of a request without `Content-Type` sends bytes and checks that no header went out.
+  - `admin-ui.md` says that a save with a value set to `null` writes each changed value whole.
+- **CodeRabbit, not changed:**
+  - *Validate `ValidFrom` before `ExpiresAt` on the merged annotation, on the server.* Two patches can now each move one end of the window and leave it inverted, which two whole writes could not. The fix belongs in `AnnotationRules` and changes creates and imports too, so it is left for a follow-up of the API.
+  - *Do not re-create a nested object for a deletion-only edit.* A merge patch `{"Values":{"limits":{"cpu":null}}}` over a `limits` someone removed meanwhile stores `limits: {}`. One request cannot express "remove if the parent still exists" (a JSON Patch `remove` fails on a missing parent), so this stays a known limit.
+  - *Keep the JSON Patch fallback at nested paths.* Already a known limit (below); the guide now says so.
 
 ### Deviations from the spec
 
