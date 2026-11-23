@@ -306,6 +306,39 @@ describe('Leave project in Settings', () => {
     expect(cachedOf()).toEqual([])
   })
 
+  it('keeps a save of the project settings that ends after the leave out of the cache', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    let saved = false
+    // the API took the save before the leave, and its answer arrives after it
+    server.use(
+      http.put('*/api/v1/acme/shipping/settings', async () => {
+        await held
+        saved = true
+        return HttpResponse.json({ DefaultTimeZone: 'Asia/Tokyo', Version: 1 })
+      }),
+    )
+    const view = await mountSettings('acme', 'shipping', (db) => {
+      db.accessPoints['acme.shipping']!.AccessMap![mockUser.id] = 'Administrator'
+      db.account!.AccessMap!['acme.shipping'] = 'Administrator'
+    })
+    const cachedOf = () => view.queryClient.getQueryCache().findAll({ queryKey: ['v1', 'acme', 'shipping'] })
+    await eventually(() => expect(view.host.findComponent(TimeZoneSelect).props('disabled')).toBe(false))
+    view.host.findComponent(TimeZoneSelect).vm.$emit('update:modelValue', 'Asia/Tokyo')
+    await settle()
+    button('Save project settings')!.click()
+    await eventually(() => expect(requests).toContain('PUT /acme/shipping/settings'))
+
+    await confirmLeave()
+    await eventually(() => expect(view.route().path).toBe('/orgs'))
+    await eventually(() => expect(cachedOf()).toEqual([]))
+    release()
+    await eventually(() => expect(saved).toBe(true))
+    await settle()
+
+    expect(cachedOf()).toEqual([])
+  })
+
   it('names the long role as the badge does', async () => {
     await mountSettings('acme', 'shipping', (db) => {
       db.accessPoints['acme.shipping']!.AccessMap![mockUser.id] = 'ContributorWithSecrets'

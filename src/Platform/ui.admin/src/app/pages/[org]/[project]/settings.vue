@@ -7,6 +7,7 @@ import {
   isPreconditionFailed,
   isStorytellerError,
   projectSettingsEntityTag,
+  roleRank,
   setMachineAuthentication,
   setProjectSettings,
   updateAccessPoint,
@@ -25,6 +26,7 @@ import { useProjectSettingsQuery } from '@/queries/project-settings'
 import { useProjectSummaries } from '@/queries/projects'
 import { useKeyValuePolicy } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
+import { useSessionStore } from '@/stores/session'
 import { usePreferencesStore } from '@/stores/preferences'
 import { dateFormatItems, defaultDateFormat, type DateFormat } from '@/utils/dates'
 import { errorMessage, writeFailureTitle } from '@/utils/errors'
@@ -58,6 +60,8 @@ const preferences = usePreferencesStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const role = useRole()
+const session = useSessionStore()
+const isMember = (projectKey: string) => roleRank(session.accessMap[projectKey]) > 0
 const canAdmin = useCan('manageAccess')
 const canManageSettings = useCan('manageProject')
 
@@ -187,7 +191,11 @@ async function saveSettings() {
     })
     // A read still on its way would put the settings before this save back into the cache.
     await queryClient.cancelQueries({ queryKey: getGetProjectSettingsQueryKey(org, project) })
-    queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
+    // Not for a project the caller left meanwhile (424-271): the leave dropped its cache, and a save that ends after it
+    // must not bring it back. Another project opened meanwhile still gets the saved settings.
+    if (isMember(projectKey)) {
+      queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
+    }
     // The fields show what is stored, unless the user went on editing; further changes start from the stored settings.
     if (context.projectKey === projectKey) {
       const stored = fromApi(answer)
@@ -310,7 +318,11 @@ async function saveLegacySettings() {
       legacySettings.value = undefined
     }
     await queryClient.cancelQueries({ queryKey: getGetProjectSettingsQueryKey(org, project) })
-    queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
+    // Not for a project the caller left meanwhile (424-271): the leave dropped its cache, and a save that ends after it
+    // must not bring it back. Another project opened meanwhile still gets the saved settings.
+    if (isMember(projectKey)) {
+      queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
+    }
     toast.add({ title: 'Project settings saved', color: 'success', icon: 'i-lucide-check' })
     await invalidateProject(queryClient, projectKey)
   } catch (error) {
