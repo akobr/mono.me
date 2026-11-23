@@ -38,6 +38,8 @@ public static class StorytellerCallFilter
     // ingress drops a request after 240 seconds in which nothing was sent (a fixed idle timeout of the Consumption
     // profile), the start of a replica after scale to zero included, and the API's front end answers 502 after 230
     // seconds while the function goes on. 40 seconds stay for the start of a replica, the authentication and the result.
+    // The deadline starts here, after the authentication; production keeps a replica running (mcpMinReplicas = 1), so a
+    // start counts only when the app is scaled to zero, where the startup probe allows about 31 seconds.
     public static readonly TimeSpan ToolCallTimeout = TimeSpan.FromSeconds(200);
 
     public static readonly string ToolCallTimeoutMessage =
@@ -112,12 +114,14 @@ public static class StorytellerCallFilter
                 }
                 catch (Exception exception) when (IsUnfinishedCall(exception, cancellationToken))
                 {
+                    // A transport failure just before the deadline is reported as the deadline too: both say the call may
+                    // have completed.
                     if (deadline.IsCancellationRequested)
                     {
                         logger.LogWarning(
                             "Tool {Tool}: stopped at the deadline of a tool call, {Seconds} seconds ({ExceptionType}).",
                             tool,
-                            ToolCallTimeout.TotalSeconds,
+                            (int)ToolCallTimeout.TotalSeconds,
                             exception.GetType().Name);
                         return ToolResults.Error(ToolCallTimeoutMessage);
                     }
@@ -166,13 +170,14 @@ public static class StorytellerCallFilter
 
     // The resilience handler's timeout, a transport failure, or a cancellation the caller did not ask for (the deadline of
     // the tool call, HttpClient's own timeout). A response body that breaks while it is read is a transport failure too:
-    // an HttpIOException when the connection ends early, a plain IOException when it is reset. No tool reads a file. The
-    // caller's cancellation stays a cancellation.
+    // an HttpIOException when the connection ends early, an IOException over a SocketException when it is reset. Other
+    // IOExceptions are not taken for the network. The caller's cancellation stays a cancellation.
     internal static bool IsUnfinishedCall(Exception exception, CancellationToken cancellationToken)
     {
         return exception switch
         {
-            TimeoutRejectedException or HttpRequestException or IOException => true,
+            TimeoutRejectedException or HttpRequestException => true,
+            _ when IsTransportFailure(exception) => true,
             OperationCanceledException => !cancellationToken.IsCancellationRequested,
             Sdk.ApiException => FindBrokenBody(exception) is not null,
             _ => false,
@@ -186,12 +191,18 @@ public static class StorytellerCallFilter
     {
         for (var inner = exception; inner is not null; inner = inner.InnerException)
         {
-            if (inner is IOException or OperationCanceledException)
+            if (IsTransportFailure(inner) || inner is OperationCanceledException)
             {
                 return inner;
             }
         }
 
         return null;
+    }
+
+    // The two shapes SocketsHttpHandler gives a broken connection.
+    private static bool IsTransportFailure(Exception exception)
+    {
+        return exception is HttpIOException or IOException { InnerException: System.Net.Sockets.SocketException };
     }
 }

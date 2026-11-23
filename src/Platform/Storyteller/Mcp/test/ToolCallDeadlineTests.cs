@@ -1,5 +1,6 @@
 using System.Diagnostics;
 
+using _42.Platform.Storyteller.Mcp.Authentication;
 using _42.Platform.Storyteller.Mcp.Tools;
 using _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
@@ -101,6 +102,23 @@ public sealed class ToolCallDeadlineTests : IDisposable
         _host.Api.Requests.Count.ShouldBe(1);
     }
 
+    // A deadline that ends a waiting exchange is a sign-in that did not finish, not an unfinished tool call: no tool ran.
+    [Fact]
+    public async Task DeadlineDuringTheExchange_IsASignInThatIsUnavailable()
+    {
+        _host.Tokens.Pending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var client = await _host.ConnectAsync();
+
+        var call = client.CallAsync("get_annotation", Arguments("get_annotation"));
+        await WaitForAsync(() => !_host.Tokens.UserTokens.IsEmpty);
+        _clock.Advance(StorytellerCallFilter.ToolCallTimeout - ExchangeTime);
+        var result = await call.WaitAsync(Wait, TestContext.Current.CancellationToken);
+
+        result.IsError.ShouldBe(true);
+        result.Text().ShouldBe(new StorytellerSignInUnavailableException().Message);
+        _host.Api.Requests.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task CallsThatEachFit_EndAtTheDeadlineOfTheWholeToolCall()
     {
@@ -170,6 +188,17 @@ public sealed class ToolCallDeadlineTests : IDisposable
     public void Dispose()
     {
         _host.Dispose();
+    }
+
+    private static async Task WaitForAsync(Func<bool> condition)
+    {
+        var until = DateTime.UtcNow + Wait;
+
+        while (!condition())
+        {
+            DateTime.UtcNow.ShouldBeLessThan(until);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
     }
 
     private static object Arguments(string tool) => tool switch
