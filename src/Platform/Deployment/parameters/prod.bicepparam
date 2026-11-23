@@ -91,7 +91,8 @@ param mcpMinReplicas = 1
 // audit trail), never one read from a decoded token, and only of a client whose document lists only web redirects,
 // none on loopback (any local process can present such a client's URL). Never a dynamically registered id (client_01…): it is random per registration.
 // mcpDeniedClientIds cuts off one client with a stable id; mcpAllowedClientIds set to the trusted list cuts off every
-// other client, dynamically registered ones too.
+// other client, dynamically registered ones too. That needs at least one trusted client: an empty list accepts every
+// client, so with none turn the exchange off instead (mcpEnabled = false).
 param mcpAllowedClientIds = []
 param mcpTrustedClientIds = []
 param mcpUntrustedClientRestrictions = [

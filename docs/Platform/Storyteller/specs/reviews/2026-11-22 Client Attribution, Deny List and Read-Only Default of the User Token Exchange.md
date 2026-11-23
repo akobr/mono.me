@@ -137,6 +137,23 @@ Three reviewers read the diff, one each for the API's policy, the API's HTTP lay
 - **A notice that narrowed nothing.** `TokenExchangeActorNotice` took any non-empty `UntrustedClientRestrictions` as a narrowing. `['NoSecretReveal']` without `AllowSecrets` only repeats the actor's own restriction, so every client kept full write rights while the warning stayed silent. Both warnings now ask whether `GetRestrictions(null)` adds to `GetRestrictions()`. The trust warning ends "…without UntrustedClientRestrictions that add to the actor's own restrictions." A test covers the case, and `authentication.md`'s table follows.
 - **A switch that did nothing while the trust list is empty.** The README and the `@description` of `mcpAllowedClientIds` said that setting it to the trusted list refuses every DCR client. With no trusted client the list is empty, which writes no setting and accepts every client. Both now say so, and point to `mcpEnabled = false`, as the runbook already did.
 
+### 8. Rebase and the CodeRabbit review (2026-11-23)
+
+The branch was rebased onto `main`, which in the meantime turned the MCP server on in production (`mcpEnabled = true`, `mcpMinReplicas = 1`). So the read-only default now applies to the live server the first time this branch is deployed: every MCP client reads only until it is trusted. The conflicts in `main.bicep`, `prod.bicepparam` and the Deployment README kept both sides. The OpenAPI document was exported again: still `0.10.58`, only its build number changed, and both SDKs were regenerated.
+
+CodeRabbit's comments, and what was done with them:
+
+- **A sign-in without a client passed the deny list.** It did: `IsDeniedClient(null)` was false. Now a token that names no client, and a Storyteller token issued before `subject_client_id`, counts as denied while `DeniedClientIds` has an entry. This applies at the exchange and on live tokens, and three tests are flipped.
+- **The race in `Forget`.** A `Lock` now guards the compare-and-remove of `Forget` and the publication of an answer, so a stale `Forget` cannot remove the fresh token another call cached.
+- **The runbook:**
+  - the bearer-token check of phase 1 runs against a Release build, because a Debug build (`DEV_AUTH`) decodes tokens without the audience check;
+  - a new verify row writes to the API directly with a read-only token and expects `403 ActorReadOnly`;
+  - the cut-off times add the 30-second clock skew, here and in the README.
+- **`development.md`.** The `AllowSecrets` example says that `NoSecretReveal` in `UntrustedClientRestrictions` keeps the secret tools hidden.
+- **`prod.bicepparam`.** The comment says that cutting off unlisted clients needs a trusted client.
+- **The OpenAPI 400 of `POST v1/access/token`.** It names the blocked-client refusal.
+- **Not done: a `PUT` operation of `SetAnnotation` in the OpenAPI document.** The generator emits one operation per function, and that gap predates this change. The middleware refuses `PUT` like `POST`, and the catalog test checks every method of every function.
+
 ## Verification
 
 | Project | Result |
