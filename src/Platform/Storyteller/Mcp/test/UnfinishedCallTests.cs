@@ -100,6 +100,10 @@ public sealed class UnfinishedCallTests : IDisposable
     public void OtherFailures_AreNotUnfinishedCalls()
     {
         StorytellerCallFilter.IsUnfinishedCall(new InvalidOperationException(), CancellationToken.None).ShouldBeFalse();
+
+        // Only the network's IOExceptions: one of a file is not a call that did not finish.
+        StorytellerCallFilter.IsUnfinishedCall(new FileNotFoundException(), CancellationToken.None).ShouldBeFalse();
+        StorytellerCallFilter.IsUnfinishedCall(new IOException("disk"), CancellationToken.None).ShouldBeFalse();
         StorytellerCallFilter.IsUnfinishedCall(ToolFixtures.NotFound(), CancellationToken.None).ShouldBeFalse();
     }
 

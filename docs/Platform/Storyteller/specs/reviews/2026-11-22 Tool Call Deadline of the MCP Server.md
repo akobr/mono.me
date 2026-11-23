@@ -88,3 +88,19 @@ CodeRabbit pointed out that a body that stalls after its headers held the tool c
 - `ToolCallDeadlineTests.AnswerWhoseBodyStalls_EndsAtTheDeadline` sends the headers and the start of a body, then stalls. It fails without the handler. The MCP unit tests pass (808, after the rebase onto `main`).
 
 The rest of section 7 stands. With the gap closed, the docs' promise of an answer at 200 seconds holds, so they were not qualified.
+
+### 9. A second review of the pull request
+
+A further review of #213 approved it. What it raised, and what was done:
+
+- **Only the network's `IOException`s.** `IsUnfinishedCall` and `FindBrokenBody` now match the two shapes `SocketsHttpHandler` gives a broken connection, `HttpIOException` and an `IOException` over a `SocketException`, not any `IOException`. A test checks that the `IOException` of a file is not an unfinished call.
+- **The exchange's timeout runs on the host's `TimeProvider`** (`new CancellationTokenSource(_exchangeTimeout, _timeProvider)` in `StorytellerTokenExchangeProvider`), like the deadline.
+- **A deadline during the exchange.** `ToolCallDeadlineTests.DeadlineDuringTheExchange_IsASignInThatIsUnavailable` holds the stubbed exchange until the deadline. The answer is the sign-in text, and no call reaches the API.
+- **The log's seconds are an integer.**
+- **Comments only:**
+  - A transport failure just before the deadline is reported as the deadline, which is harmless because both texts say "may have completed".
+  - GETs are retried only after quick failures. A shorter attempt for reads, with a second try, was not adopted: a slow read such as a resolved configuration with its vault reads would then fail on every attempt.
+  - The deadline starts after the authentication. Production keeps one replica running (`mcpMinReplicas = 1`), so a replica's start counts only when the app is scaled to zero. A middleware that starts the deadline when the request arrives was left out for that reason.
+- **Not done:** a test of the client's own cancellation in the hosted server. `UnfinishedCallTests.CallersCancellation_StaysACancellation` covers the rule, and in stateless mode the cancellation comes from the SDK's disposal of the request, which an in-memory test cannot trigger reliably.
+
+The MCP unit tests pass: 809 tests.

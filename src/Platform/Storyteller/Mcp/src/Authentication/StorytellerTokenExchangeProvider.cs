@@ -258,7 +258,7 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
 
     private async Task<StorytellerToken> ExchangeAsync(string userToken)
     {
-        using var timeout = new CancellationTokenSource(_exchangeTimeout);
+        using var timeout = new CancellationTokenSource(_exchangeTimeout, _timeProvider);
         int status;
         string? body;
 

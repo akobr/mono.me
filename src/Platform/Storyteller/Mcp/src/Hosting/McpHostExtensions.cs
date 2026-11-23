@@ -124,7 +124,9 @@ public static class McpHostExtensions
     // ingress waits and the 230 seconds of the API's front end, so the tool answers before either cuts the call. The
     // standard handler's 10-second attempt (and HttpClient's 100-second) timeout would drop the answer of a write the
     // API still completes, the one-time credentials of a new machine among them. The circuit breaker samples at least
-    // two attempts, which its options validator requires.
+    // two attempts, which its options validator requires. The deadline of the tool call ends first, so a GET is retried
+    // only after a quick failure (a 5xx, a broken connection), never after an attempt that hung: a slow read, such as a
+    // resolved configuration with its vault reads, gets the whole budget instead of a shorter attempt.
     public static IServiceCollection AddStorytellerClients(this IServiceCollection services)
     {
         services.AddScoped<StorytellerAccessToken>();
