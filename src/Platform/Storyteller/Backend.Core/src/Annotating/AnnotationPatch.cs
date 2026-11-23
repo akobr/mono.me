@@ -412,15 +412,27 @@ public sealed class AnnotationPatch
                && index < limit;
     }
 
-    // The unescaped segments of a pointer (RFC 6901: ~1 is '/', then ~0 is '~'). JsonPatch.Net 5.0.3 does not unescape
-    // the last segment of a path, so add /Values/a~1b would write the member "a~1b": the operations are applied here.
+    // The unescaped segments of a pointer (RFC 6901: ~1 is '/', then ~0 is '~'). JsonPatch.Net 5.0.3 did not unescape
+    // the last segment of a path (add /Values/a~1b wrote the member "a~1b"), so the operations are applied here. The
+    // segments come from the pointer's text, which is always escaped: what a segment's ToString gives changed between
+    // JsonPointer.Net 7.0 (escaped) and 7.1 (unescaped), and unescaping twice would read ~01 as a slash.
     private static string[] GetSegments(JsonPointer pointer)
     {
-        var segments = new string[pointer.SegmentCount];
+        if (pointer.SegmentCount == 0)
+        {
+            return [];
+        }
+
+        var segments = pointer.ToString()[1..].Split('/');
+
+        if (segments.Length != pointer.SegmentCount)
+        {
+            throw new JsonPatchException($"The path '{pointer}' is not a JSON Pointer.", JsonPatchFailureKind.Invalid);
+        }
 
         for (var index = 0; index < segments.Length; index++)
         {
-            segments[index] = pointer[index].ToString()
+            segments[index] = segments[index]
                 .Replace("~1", "/", StringComparison.Ordinal)
                 .Replace("~0", "~", StringComparison.Ordinal);
         }
