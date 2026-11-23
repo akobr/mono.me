@@ -77,3 +77,14 @@ Polly's `BrokenCircuitException` and `RateLimiterRejectedException` stay unmappe
 ### 7. Not changed
 
 The items of the spec's section 7 stay as planned: premium ingress, keep-alives on the SSE stream, the mapping of a front end's `502`/`504` without the API's error body, a body that stalls after its headers, and the JWT bearer's metadata fetch. Of these, a follow-up could map the `502`/`504`: the deadline now ends a call before the front end's 230 seconds, so only a front end that fails for another reason still answers "Try again later" to a write.
+
+### 8. The CodeRabbit review of the pull request
+
+CodeRabbit pointed out that a body that stalls after its headers held the tool call past the deadline, as section 7 had left it. That item is now covered instead:
+
+- `Mcp/src/Tools/DeadlineBodyHandler.cs`, a delegating handler of the SDK clients outside the resilience handler, wraps the body of every answer. Its stream is closed when the tool call's token is cancelled, and a read that waits, or a later one, throws an `OperationCanceledException` of that token.
+- The handler finds the token through `StorytellerCallFilter.CurrentCall`, an `AsyncLocal` that the filter sets before it runs the tool. The tokens a handler gets from `HttpClient` and Polly no longer reach past the headers.
+- `FindBrokenBody` also matches an `OperationCanceledException` inside the SDK's `ApiException`, where Newtonsoft can wrap the read's failure.
+- `ToolCallDeadlineTests.AnswerWhoseBodyStalls_EndsAtTheDeadline` sends the headers and the start of a body, then stalls. It fails without the handler. The MCP unit tests pass (808, after the rebase onto `main`).
+
+The rest of section 7 stands. With the gap closed, the docs' promise of an answer at 200 seconds holds, so they were not qualified.
