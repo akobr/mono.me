@@ -237,6 +237,9 @@ export async function readConfiguration(
   } catch (error) {
     if (!isNotFound(error)) {
       throw error
+    }    // Deleted between the two reads: the effective document read before is gone too.
+    if (hasErrorCode(error, 'AnnotationDeleted')) {
+      return { readable: false, deleted: true, version: 0 }
     }
   }
   return { readable: true, deleted: false, version, effective: effective.Content ?? {}, own }

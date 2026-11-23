@@ -186,9 +186,11 @@ const shown = computed(() =>
 
 /**
  * Whether a copy from the source would change the key in the target: its annotations differ, or its own
- * configurations do, whatever is shown. A key that is deleted in the target is never copied over.
+ * configurations do, whatever is shown. A key that is deleted in the target is never copied over, and one whose sides
+ * are read again (a comparison opened again shows its cached documents meanwhile) waits for what the views hold now.
  */
-const copies = (file: CompareFile) => !file.deleted && file.error === undefined && copyChanges(file.own)
+const copies = (file: CompareFile) =>
+  !file.deleted && !file.refreshing && file.error === undefined && copyChanges(file.own)
 /** What the active filter shows and a copy would change. */
 const copyable = computed(() => shown.value.filter(copies))
 

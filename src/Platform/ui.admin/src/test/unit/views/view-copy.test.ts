@@ -21,6 +21,7 @@ import {
   copyCounts,
   copySummary,
   copyToView,
+  copyChangedTarget,
   copyWrites,
   stoppedMessage,
   viewCopyOutcomes,
@@ -177,6 +178,7 @@ describe('copyToView: annotations', () => {
       // what the run read in the source, which a copy after a check compares with
       sources: { [onlySource]: annotationText(original) },
       targets: { [onlySource]: null },
+      prerequisites: {},
     })
     // the views, the deleted keys, two reads, the deleted state of the key right before its create, and one write
     expect(await requests.lines()).toEqual([
@@ -681,6 +683,7 @@ describe('copyToView: annotations', () => {
       stopped: false,
       sources: expect.any(Object),
       targets: expect.any(Object),
+      prerequisites: expect.any(Object),
     })
     // the deleted keys at the start, and the deleted state of the one key it creates right before its create
     expect((await requests.lookups()).map(line)).toEqual([
@@ -776,6 +779,7 @@ describe('copyToView: configurations', () => {
       stopped: false,
       sources: { [differing]: canonicalJson(document) },
       targets: { [differing]: 0 },
+      prerequisites: {},
     })
     // POST has no condition, so the copy reads the document back: one written meanwhile would be merged into
     expect(await requests.lines()).toEqual([
@@ -838,11 +842,15 @@ describe('copyToView: configurations', () => {
     const result = await copy({ kind: 'configurations', keys: [differing] })
 
     expect(result.items).toEqual([
-      configuration(
-        differing,
-        'Failed',
-        'staging got its own configuration meanwhile, and the copy was merged into it. Check it there.',
-      ),
+      {
+        ...configuration(
+          differing,
+          'Failed',
+          'staging got its own configuration meanwhile, and the copy was merged into it. Check it there.',
+        ),
+        // the write reached the target: the catalog and the queries of the target read again
+        written: true,
+      },
     ])
     expect(await ownOf('staging', differing)).toEqual({ ...document, concurrent: 'value' })
   })
@@ -1371,6 +1379,114 @@ describe('copyToView: what a check showed, and what changed since', () => {
   })
 })
 
+describe('copyToView: a copy writes only what its check and its comparison showed', () => {
+  const uncheckedMessage = 'The check did not show what a copy would do with it. Check again.'
+  const checkedOf = (plan: { sources: object; targets: object; prerequisites: object }) => ({
+    checked: plan.sources as Record<string, string | null>,
+    checkedTargets: plan.targets as Record<string, string | number | null>,
+    checkedPrerequisites: plan.prerequisites as Record<string, string>,
+  })
+
+  it('does not write a key that failed in its check, and writes the others', async () => {
+    let failing = true
+    server.use(http.get(`*${root}/default/configuration/${differing}`, () => (failing ? busy() : undefined)))
+    const plan = await copy({ kind: 'configurations', keys: [differing, 'usg.northwind.invoicing'], dryRun: true })
+    expect(plan.items).toContainEqual(expect.objectContaining({ key: differing, outcome: 'Failed' }))
+    // the read works again by the copy: the check showed nothing for the key, so the copy writes nothing for it
+    failing = false
+    const requests = recordRequests()
+
+    const result = await copy({
+      kind: 'configurations',
+      keys: [differing, 'usg.northwind.invoicing'],
+      ...checkedOf(plan),
+    })
+
+    expect(result.items).toEqual([
+      configuration(differing, 'Skipped', uncheckedMessage),
+      configuration('usg.northwind.invoicing', 'Unchanged'),
+    ])
+    expect(await requests.writes()).toEqual([])
+  })
+
+  it('checks what the comparison showed before it creates the annotation of a configuration', async () => {
+    const requests = recordRequests()
+
+    // the comparison saw a written configuration, and the target has not even the annotation any more
+    const result = await copy({ kind: 'configurations', keys: [unannotated], expected: { [unannotated]: 5 } })
+
+    expect(result.items).toEqual([configuration(unannotated, 'Skipped', comparedMessage)])
+    expect(await requests.writes()).toEqual([])
+    expect(await inStaging(unannotated)).toBe(false)
+    expect(await inStaging('cnt.northwind.test')).toBe(false)
+  })
+
+  it('does not create the annotation of a configuration that changed in the source since the check', async () => {
+    const plan = await copy({ kind: 'configurations', keys: [unannotated], dryRun: true })
+    expect(Object.keys(plan.prerequisites).toSorted()).toEqual(['cnt.northwind.test', unannotated].toSorted())
+    const changed = await annotationOf('default', unannotated)
+    await setAnnotation(org, project, 'default', unannotated, { ...changed, Title: 'Changed after the check' })
+    const requests = recordRequests()
+
+    const result = await copy({ kind: 'configurations', keys: [unannotated], ...checkedOf(plan) })
+
+    expect(result.items).toEqual([
+      annotation(unannotated, 'Skipped', 'It changed in default since it was checked.'),
+      configuration(unannotated, 'Skipped', 'Its annotation was not copied.'),
+    ])
+    expect(await requests.writes()).toEqual([])
+  })
+
+  it('does not create a missing ancestor that changed in the source since the check', async () => {
+    const plan = await copy({ kind: 'configurations', keys: [unannotated], dryRun: true })
+    const ancestor = await annotationOf('default', 'cnt.northwind.test')
+    await setAnnotation(org, project, 'default', 'cnt.northwind.test', {
+      ...ancestor,
+      Title: 'Changed after the check',
+    })
+    const requests = recordRequests()
+
+    const result = await copy({ kind: 'configurations', keys: [unannotated], ...checkedOf(plan) })
+
+    expect(result.items).toEqual([
+      annotation('cnt.northwind.test', 'Skipped', 'It changed in default since it was checked.'),
+      annotation(unannotated, 'Skipped', ancestorMessage('cnt.northwind.test')),
+      configuration(unannotated, 'Skipped', 'Its annotation was not copied.'),
+    ])
+    expect(await requests.writes()).toEqual([])
+  })
+
+  it('reports a first write whose read back failed as written, so the target is read again', async () => {
+    await deleteConfiguration(org, project, 'staging', differing)
+    const document = (await ownOf('default', differing))!
+    let posted = false
+    server.use(
+      http.post(stagingConfiguration(differing), () => {
+        posted = true
+        return undefined
+      }),
+      http.get(stagingConfiguration(differing), () => (posted ? busy() : undefined)),
+    )
+
+    const result = await copy({ kind: 'configurations', keys: [differing] })
+
+    expect(result.items).toEqual([
+      {
+        ...configuration(
+          differing,
+          'Failed',
+          expect.stringMatching(/^It was written to staging, but it could not be read back: /) as unknown as string,
+        ),
+        written: true,
+      },
+    ])
+    expect(copyWrites(result.items)).toBe(0)
+    expect(copyChangedTarget(result.items)).toBe(true)
+    posted = false
+    expect(await ownOf('staging', differing)).toEqual(document)
+  })
+})
+
 describe('copyToView: the run', () => {
   const selection = ['sbt.contoso', 'sbt.fabrikam', onlySource, differs]
 
@@ -1438,7 +1554,15 @@ describe('copyToView: the run', () => {
       { onProgress: (done, total) => progress.push([done, total]) },
     )
 
-    expect(result).toEqual({ target: 'staging', dryRun: false, items: [], stopped: false, sources: {}, targets: {} })
+    expect(result).toEqual({
+      target: 'staging',
+      dryRun: false,
+      items: [],
+      stopped: false,
+      sources: {},
+      targets: {},
+      prerequisites: {},
+    })
     // no lookup without keys: the API refuses an empty list
     expect(await requests.lines()).toEqual(['GET /views'])
     expect(progress).toEqual([[0, 0]])
