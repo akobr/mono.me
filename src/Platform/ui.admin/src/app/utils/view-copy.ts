@@ -59,6 +59,11 @@ export interface ViewCopyRequest {
    * holds the content of the source by now: then it is unchanged.
    */
   expected?: Readonly<Record<string, string | number | null>>
+  /**
+   * What a check read in the source, by key (`ViewCopyResult.sources` of the check): a key whose source is not that
+   * any more is skipped, so a copy writes only what its check showed.
+   */
+  checked?: Readonly<Record<string, string | null>>
   /** Decide and report, write nothing. */
   dryRun?: boolean
 }
@@ -72,6 +77,11 @@ export interface ViewCopyResult {
   stopped: boolean
   /** Why the run ended as a whole; the items hold what was handled before. */
   error?: unknown
+  /**
+   * The text of the source document of each selected key that the run read (`annotationText`, or `canonicalJson` of
+   * the own configuration), null for none. A copy after a check passes those of the check as `checked`.
+   */
+  sources: Record<string, string | null>
 }
 
 export interface ViewCopyOptions {
@@ -87,6 +97,7 @@ const exactTools = 'Copy it with Export & Import or sform.'
 const inexactMessage = `It holds a number beyond 2^53. ${exactTools}`
 const changedMessage = (target: string) => `It changed in ${target} meanwhile. Copy it again.`
 const comparedMessage = (target: string) => `It changed in ${target} since it was compared.`
+const checkedMessage = (source: string) => `It changed in ${source} since it was checked.`
 export const stoppedMessage = 'Not copied, the copy was stopped.'
 
 const mergeOrder = (key: string) => metaOf(key.slice(0, key.indexOf('.')))?.mergeOrder ?? 99
@@ -127,7 +138,7 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
   const { client, signal } = options
   const dryRun = !!request.dryRun
   const targetScope: Scope = { ...source, view: target }
-  const result: ViewCopyResult = { target, dryRun, items: [], stopped: false }
+  const result: ViewCopyResult = { target, dryRun, items: [], stopped: false, sources: {} }
   const keys = inMergeOrder(request.keys)
 
   /** Whether the target has the annotation: read once, then kept up to date by the writes of the run. */
@@ -135,7 +146,35 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
   /** Annotations that the run did not bring to the target: nothing below them is written. */
   const notCopied = new Set<string>()
   const deleted = new Set<string>()
+  /** Annotations that a check would create: their configurations read as none until then. */
+  const planned = new Set<string>()
   let wrote = false
+
+  /**
+   * Records what the run read in the source for a selected key, and whether it is what the check read. A copy writes
+   * only what its check showed: a source changed since is skipped.
+   */
+  function sourceRead(key: string, text: string | null): boolean {
+    result.sources[key] = text
+    return !request.checked || !(key in request.checked) || request.checked[key] === text
+  }
+
+  /**
+   * Looks the key up among the deleted ones of the target right before it is created. The lookup at the start of the
+   * run is older than this write by every key before it, and a create under If-None-Match: * re-creates a deleted key
+   * with an empty configuration. The window that is left is the one between this lookup and the write.
+   */
+  async function deletedNow(key: string): Promise<boolean> {
+    if (dryRun) {
+      return false
+    }
+    const found = await findDeletedAnnotations(source.org, source.project, target, { Keys: [key] })
+    if (found.some((annotation) => annotation.AnnotationKey === key)) {
+      deleted.add(key)
+      return true
+    }
+    return false
+  }
 
   const add = (kind: ViewCopyItem['kind'], key: string, outcome: ViewCopyOutcome, message?: string) =>
     void result.items.push({ kind, key, outcome, ...(message ? { message } : {}) })
@@ -162,6 +201,8 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
       await setAnnotationVersioned(source.org, source.project, target, key, annotation, condition)
       wrote = true
       void invalidateAnnotation(client, targetScope, key)
+    } else if (condition.ifNoneMatch) {
+      planned.add(key)
     }
     inTarget.set(key, true)
   }
@@ -191,6 +232,13 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
           if (hasInexactNumber(parent.Values)) {
             throw new Error(inexactMessage)
           }
+          if (await deletedNow(ancestor)) {
+            notCopied.add(ancestor)
+            add('Annotation', ancestor, 'Skipped', `${ancestor} is deleted in ${target}. Restore it there first.`)
+            notCopied.add(key)
+            add('Annotation', key, 'Skipped', `Its ancestor ${ancestor} was not copied.`)
+            return false
+          }
           await writeAnnotation(parent, { ifNoneMatch: '*' })
           add('Annotation', ancestor, 'Created', `Missing ancestor of ${key}.`)
           continue
@@ -207,6 +255,11 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
       return false
     }
 
+    if (await deletedNow(key)) {
+      notCopied.add(key)
+      add('Annotation', key, 'Skipped', `${key} is deleted in ${target}. Restore it there first.`)
+      return false
+    }
     await writeAnnotation(annotation, { ifNoneMatch: '*' })
     add('Annotation', key, 'Created', reason)
     return true
@@ -222,6 +275,11 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
     }
 
     const annotation = (await readAnnotation(source, key)).annotation
+    if (role.selected && !sourceRead(key, annotation ? annotationText(annotation) : null)) {
+      notCopied.add(key)
+      add('Annotation', key, 'Skipped', checkedMessage(source.view))
+      return false
+    }
     if (!annotation) {
       notCopied.add(key)
       add('Annotation', key, 'Skipped', `It is no longer in ${source.view}.`)
@@ -292,6 +350,10 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
     }
 
     const document = (await readConfiguration(source, key)).own
+    if (!sourceRead(key, document ? canonicalJson(document) : null)) {
+      add('Configuration', key, 'Skipped', checkedMessage(source.view))
+      return
+    }
     if (!document) {
       add('Configuration', key, 'Skipped', `${source.view} has no own configuration for it.`)
       return
@@ -338,11 +400,41 @@ export async function copyToView(request: ViewCopyRequest, options: ViewCopyOpti
       return
     }
 
+    // The annotation went from the target since the run found it there: a write would store a configuration without
+    // an annotation. A check reads none for an annotation it would create.
+    if (!stored.readable && !(dryRun && planned.has(key))) {
+      add('Configuration', key, 'Skipped', `Its annotation is not in ${target} any more.`)
+      return
+    }
+
     try {
-      if (!stored.own) {
+      if (!stored.own && stored.version > 0) {
+        // A written version without members: the patch of a whole document replaces it, and its test fails with
+        // 412 when the target got members since it was read.
         if (!dryRun) {
-          // POST replaces a missing or an empty own document; it merges only into one with members.
+          await patchConfiguration(source.org, source.project, target, key, [
+            { op: 'test', path: '', value: {} },
+            { op: 'replace', path: '', value: document },
+          ])
+        }
+        add('Configuration', key, 'Created')
+      } else if (!stored.own) {
+        if (!dryRun) {
+          // Nothing is written yet, and PATCH needs a written version: POST replaces a missing document, but it has
+          // no condition and merges into one that another client wrote meanwhile. Read back, that shows.
           await setConfiguration(source.org, source.project, target, key, document)
+          const written = (await readConfiguration(targetScope, key)).own
+          if (!written || canonicalJson(written) !== canonicalJson(document)) {
+            wrote = true
+            void invalidateConfiguration(client, targetScope, key)
+            add(
+              'Configuration',
+              key,
+              'Failed',
+              `${target} got its own configuration meanwhile, and the copy was merged into it. Check it there.`,
+            )
+            return
+          }
         }
         add('Configuration', key, 'Created')
       } else if (same) {

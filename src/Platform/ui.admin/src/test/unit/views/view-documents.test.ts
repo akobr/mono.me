@@ -714,9 +714,14 @@ describe('hasInexactNumber', () => {
     for (const value of [0, -0, 1, -1, 2 ** 53 - 1, -(2 ** 53 - 1), 1.5, 0.1, 1e-7, 2 ** 53 + 0.5 - 2 ** 53]) {
       expect(hasInexactNumber(value), String(value)).toBe(false)
     }
-    // no numbers of JSON, and no integers
-    expect(hasInexactNumber(Number.NaN)).toBe(false)
-    expect(hasInexactNumber(Number.POSITIVE_INFINITY)).toBe(false)
+  })
+
+  it('takes a number too large for a double as inexact: JSON.parse reads it as Infinity', () => {
+    expect(JSON.parse('{"a": 1e400}')).toEqual({ a: Number.POSITIVE_INFINITY })
+    expect(hasInexactNumber(JSON.parse('{"a": 1e400}'))).toBe(true)
+    expect(hasInexactNumber(JSON.parse('[-1e400]'))).toBe(true)
+    // JSON writes it as null, so it must never compare equal to a document that has null there
+    expect(hasInexactNumber({ a: null })).toBe(false)
   })
 
   it('looks into arrays and objects at every level', () => {

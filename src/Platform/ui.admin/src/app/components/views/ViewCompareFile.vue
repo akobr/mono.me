@@ -82,7 +82,8 @@ const lines = computed(() => {
 })
 
 /** The annotation or the configuration detail of the key in a view. */
-const detail = (view: string) => `/${props.source.org}/${props.source.project}/${view}/${props.kind}/${props.file.key}`
+const detail = (view: string) =>
+  `/${props.source.org}/${props.source.project}/${view}/${props.kind}/${encodeURIComponent(props.file.key)}`
 const deletedPath = computed(() => modelingPath({ ...props.source, view: props.target }, 'deleted'))
 
 // An editor is built when its open section first comes near the visible part of the page, and it stays from then

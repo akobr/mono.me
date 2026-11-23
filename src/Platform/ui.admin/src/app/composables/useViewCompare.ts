@@ -311,7 +311,13 @@ export function useViewCompare(options: ViewCompareOptions): {
       }
     }
 
-    kept.effective = compared(kept.effective, source.data, target.data, true)
+    // A key whose effective documents are its own ones (no ancestor or template adds a value) is compared once.
+    const sameTexts =
+      source.data.effective === source.data.own &&
+      target.data.effective === target.data.own &&
+      source.data.effectiveInexact === source.data.inexact &&
+      target.data.effectiveInexact === target.data.inexact
+    kept.effective = sameTexts ? kept.own : compared(kept.effective, source.data, target.data, true)
     const effective = kept.effective.result
     const showsEffective = content === 'effective'
     // The effective documents differ, and the own ones are not the reason.

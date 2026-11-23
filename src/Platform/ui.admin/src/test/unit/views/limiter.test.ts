@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createLimiter } from '@/utils/limiter'
 
 // The limiter of the reads of a comparison across views (spec "Copy and Compare Annotations and Configurations Between
@@ -35,6 +35,39 @@ const tick = async () => {
 }
 
 describe('createLimiter', () => {
+  it('does not start a waiting task whose signal aborted between its slot and its start', async () => {
+    const limit = createLimiter(1)
+    let releaseFirst!: () => void
+    const first = limit(() => new Promise<void>((resolve) => (releaseFirst = resolve)))
+
+    // a signal that aborts the moment its waiting task gets the slot: the listener is gone by then
+    const reason = new Error('aborted')
+    let aborted = false
+    const signal = {
+      get aborted() {
+        return aborted
+      },
+      reason,
+      addEventListener: () => {},
+      removeEventListener: () => (aborted = true),
+      throwIfAborted: () => {
+        if (aborted) {
+          throw reason
+        }
+      },
+    } as unknown as AbortSignal
+    const task = vi.fn(async () => 'ran')
+    const second = limit(task, signal)
+    const third = limit(async () => 'third')
+
+    releaseFirst()
+    await first
+    await expect(second).rejects.toBe(reason)
+    expect(task).not.toHaveBeenCalled()
+    // and its slot goes on to the next task
+    await expect(third).resolves.toBe('third')
+  })
+
   it('returns what the task returns', async () => {
     const limit = createLimiter(2)
 
