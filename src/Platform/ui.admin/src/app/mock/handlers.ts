@@ -46,25 +46,29 @@ export function requireRole(db: MockDb, key: string, minimal: AccountRole) {
 
 type ResolverInfo<Params extends PathParams> = Parameters<HttpResponseResolver<Params, DefaultBodyType>>[0]
 
-/**
- * Runs a handler against the stored database and saves it afterwards. A synchronous handler loads, changes and saves
- * the database with no await in between, so concurrent requests cannot overwrite each other's writes; a handler that
- * awaits (its body, for example) after the load can, so a write that runs concurrently reads its body first.
- */
+// The handlers' sections over the stored database run one at a time: a handler that awaits (its body, for example)
+// between its load and its save would otherwise let a concurrent request load the same old state, and the later
+// save would erase the earlier write (424-225: the bulk bar sends four patches at once).
+let section: Promise<unknown> = Promise.resolve()
+
+/** Runs a handler against the stored database and saves it afterwards, one handler at a time. */
 export const withDb =
   <Params extends PathParams = PathParams>(
     handler: (db: MockDb, info: ResolverInfo<Params>) => Response | Promise<Response>,
   ): HttpResponseResolver<Params, DefaultBodyType> =>
-  async (info) => {
-    const db = loadDb()
-    const before = JSON.stringify(db)
-    const answer = handler(db, info)
-    const response = answer instanceof Promise ? await answer : answer
-    // Only writes persist: a read that finishes late must not overwrite a newer write.
-    if (JSON.stringify(db) !== before) {
-      saveDb(db)
-    }
-    return response
+  (info) => {
+    const run = section.then(async () => {
+      const db = loadDb()
+      const before = JSON.stringify(db)
+      const response = await handler(db, info)
+      // Only writes persist: a read that finishes late must not overwrite a newer write.
+      if (JSON.stringify(db) !== before) {
+        saveDb(db)
+      }
+      return response
+    })
+    section = run.catch(() => undefined)
+    return run
   }
 
 const namePattern = /^[a-z0-9][a-z0-9-]{1,62}$/
