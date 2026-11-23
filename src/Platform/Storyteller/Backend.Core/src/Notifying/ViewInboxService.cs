@@ -231,6 +231,13 @@ public sealed class ViewInboxService : IViewInboxService
         while (true)
         {
             var now = _time.GetUtcNow();
+
+            // an item that expired since it was read is missing, also for its handler
+            if (current.Item.ExpiresAt <= now)
+            {
+                throw new NotFoundException($"The inbox item '{current.Item.Id}' does not exist or has expired.");
+            }
+
             var saved = await _store.TryReplaceAsync(
                 current with { Item = current.Item with { State = state, Closed = AuditStamp.Of(actor, now) } },
                 current.Item.ExpiresAt - now,

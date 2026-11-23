@@ -188,6 +188,26 @@ public class ViewInboxServiceTests
         closed.State.ShouldBe(accept ? ViewInboxItemState.Accepted : ViewInboxItemState.Dismissed);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AcceptAndDismiss_OfAnItemThatExpiresAfterItWasRead_AreNotFound_AndRunNothing(bool accept)
+    {
+        var item = await _publisher.PushAsync(Push(ViewInboxItemKind.Action) with { ExpiresAt = Start.AddHours(1) });
+
+        // the item is seen a tick before its end, and the clock has passed it when the write is made
+        var service = new ViewInboxService(_store, [_handler], new PassingClock(Start.AddHours(1).AddTicks(-1), Start.AddHours(1)), _logger);
+
+        var exception = await Should.ThrowAsync<NotFoundException>(() => accept
+            ? service.AcceptAsync("acme", "main", "default", item.Id, AccountRole.Administrator, Actor)
+            : service.DismissAsync("acme", "main", "default", item.Id, AccountRole.Administrator, Actor));
+
+        exception.Message.ShouldBe($"The inbox item '{item.Id}' does not exist or has expired.");
+        _store.Replaces.ShouldBeEmpty();
+        _handler.Runs.ShouldBeEmpty();
+        _store.Stored(item.Id).ShouldBe(item);
+    }
+
     [Fact]
     public async Task GetItems_ReturnsTheNewestFirst()
     {
@@ -816,5 +836,13 @@ public class ViewInboxServiceTests
     private Task<ViewInboxItem> CloseAsync(bool accept, string id)
     {
         return accept ? AcceptAsync(id) : DismissAsync(id);
+    }
+
+    // The time of the first read, then the time of every later one.
+    private sealed class PassingClock(DateTimeOffset first, DateTimeOffset later) : TimeProvider
+    {
+        private int _reads;
+
+        public override DateTimeOffset GetUtcNow() => _reads++ == 0 ? first : later;
     }
 }
