@@ -69,6 +69,14 @@ param logDailyCapGb = '1'
 // The month of the first run; if that is a later month, set its first day before the run, then never change it.
 param budgetStartDate = '2026-11-01'
 
+// The exhibition, the demo project that the onboarding of the admin UI offers to a new user (runbook, "Turning the
+// exhibition on"): the set exhibit of DbCreator, seeded with its own names and with the operator's production account
+// as its --owner. All three or none; the API offers it only while that account is the only Administrator or Owner of
+// the project. Removing the three turns it off again.
+param exhibitionOrganization = 'fourth-wall'
+param exhibitionProject = 'toons-and-tyrants'
+param exhibitionOwner = 'user_01M75BRGA307NA3QWSH3JYZ8G3'
+
 // The MCP server on Container Apps (docs/Platform/Deployment/runbook-mcp-server.md), off until its phase 4. Then:
 // mcpEnabled = true, mcpExchangeAppId the application id that New-TokenExchangeApplication.ps1 prints (phase 2) and
 // mcpInitialImage the image of the first build (phase 3). Once the app exists and its DNS records too (phase 6):
