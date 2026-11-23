@@ -12,7 +12,10 @@ export interface NavigationEntry {
   exact?: boolean
   /** Hidden below this role. */
   minRole?: AccountRoleName
-  /** Shown with a lock icon below this role (read-only for the caller). */
+  /**
+   * Shown with a lock icon below this role: the page is read-only for the caller, never closed, so the command palette
+   * lists its tabs too (424-272). A page the role must not open takes minRole instead.
+   */
   editRole?: AccountRoleName
   /** The tabs of the page, each with its own path; the command palette lists them after the entry (424-38). */
   tabs?: { label: string; icon: string; to: string }[]

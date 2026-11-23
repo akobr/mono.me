@@ -221,6 +221,7 @@ const selectedRows = computed(() => rows.value.filter((row) => selected.value.ha
           >
         </div>
       </UDashboardToolbar>
+      <!-- Below Contributor there is no selection; canEdit also hides one left from before the role was lowered. -->
       <div
         v-if="canEdit && selected.size > 0"
         class="flex flex-wrap items-center gap-2 border-b border-default bg-elevated/50 px-4 py-2 text-sm"
