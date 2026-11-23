@@ -151,9 +151,9 @@ Not run: the deployed-UI automation suite, and anything against a real API. The 
 9. Three tests of the API's JSON Patch stand in for the run against a real API.
 10. The embedded diff tints its old side red and draws a one-sided document whole in the unified layout; Configurations and Annotations lose the strip below their bulk bar.
 
-### Merge with read-only Modeling for Readers
+### Read-only Modeling for Readers
 
-Before the pull request was merged, `main` opened Modeling to Readers, read-only ([424-272](https://linear.app/424fun/issue/424-272/admin-ui-read-only-modeling-schemas-templates-deleted-for-readers), PR #216). The comparison of a selection is a page of Modeling and had no role check of its own, so it would have shown its copy buttons to a Reader. The branch merges `main` and follows the new rule: a comparison only reads, so every member compares; a copy writes, so it stays with Contributors.
+Before the pull request was merged, `main` opened Modeling to Readers, read-only ([424-272](https://linear.app/424fun/issue/424-272/admin-ui-read-only-modeling-schemas-templates-deleted-for-readers), PR #216). The comparison of a selection is a page of Modeling and had no role check of its own, so it would have shown its copy buttons to a Reader. The branch is rebased on `main` and follows the new rule: a comparison only reads, so every member compares; a copy writes, so it stays with Contributors.
 
 - `useViewTransfer` has `canCopy` (`useCan('edit')`): its menu items hold **Copy to view** only from Contributor up. Both **More actions** menus show **Compare with view** to every role, also disabled with its reason in a project with one view.
 - `compare.selection.vue` shows the copy of the page and of each section, and mounts its `ViewCopyDialog`, only from Contributor up. For a Reader its legend says nothing of a copy, the caption of the source side is "this view" instead of "after a copy", and the empty state points to **More actions** of a detail.
@@ -161,7 +161,31 @@ Before the pull request was merged, `main` opened Modeling to Readers, read-only
 - Tests: two Reader tests of the menus are rewritten and one added (`view-transfer-menu.test.ts`), three Reader tests of the page (`compare-selection.test.ts`), and the end-to-end case "a Reader compares, and gets no copy" (`views.spec.ts`, desktop and mobile).
 - Docs: the role rules in `admin-ui.md` and the README.
 
-After the merge: `npm test` 2,935 passed in 140 files, `npm run test:e2e` 542 passed and 26 skipped, `npm run test:visual:docker` 88 passed, lint, type check and build pass, and the automation project builds.
+After the change: `npm test` 2,935 passed in 140 files, `npm run test:e2e` 542 passed and 26 skipped, `npm run test:visual:docker` 88 passed, lint, type check and build pass, and the automation project builds.
+
+### CodeRabbit review
+
+CodeRabbit reviewed the pull request with 20 comments. The branch was rebased on `main` first (with the annotation writes as `PATCH`, 424-225); only the guide and the README conflicted. Fixed:
+
+- **The copy after a check copies what the check showed.** Every run answers `sources`, the source text of each key; the dialog passes those of its check as `checked`, and a key whose source changed since is `Skipped` ("It changed in {source} since it was checked.").
+- **A key deleted while the run goes.** A live run looks a key up again (`findDeletedAnnotations` of one key) right before it creates an annotation or an ancestor; the lookup at the start stays for the rest.
+- **A configuration whose annotation went from the target** after the run found it is `Skipped`; a dry run takes the annotations it would create as there (`planned`).
+- **The first own configuration.** A target whose own document was written empty gets the patch with a `test` of `{}`, not a `POST`, which would merge into a document written meanwhile. A target that never had one still gets a `POST` (the patch needs a document), read back: a document that is not the source's fails the row, "{target} got its own configuration meanwhile, and the copy was merged into it."
+- **A fixed target that is not another view** (the comparison's `?to=`, or a view removed meanwhile) gives the dialog no destination and an alert, instead of the preselected view, for which `expected` would not hold.
+- **A reopened dialog** does not show the result of a run that a closed opening started, nor emit it as `copied` (`opening`).
+- **The page's `copied` handler** that pruned `expected` is gone: `expected` stays as the dialog was opened with it, so **Try again** finds a written key `Unchanged` and skips one that changed again.
+- **The catalog snapshot of the target** is forgotten after a write when the catalog holds another view, so the next visit does not show the old list.
+- **The line count** is bounded: exact up to 2,000 changes (was 8,000) and up to `searchBudget` (2,500,000 steps) per pair, else without the order. A hundred pairs near the old cap blocked the UI thread for seconds.
+- **The effective comparison** of a key whose effective documents are its own ones reuses the own result.
+- **A number too large for a double** (`1e400`, read as `Infinity`) counts as inexact.
+- **The limiter** does not start a task whose signal aborted while it waited for its slot.
+- **Keys in links** (the result of the dialog, **Open in {view}**) are encoded.
+- **The views of the project that cannot be read** show an error with **Retry** on the page, not "Pick the view to compare with".
+- **Docs:** the colors of **Effective**, the duplicated tab that keeps a long selection, what **Check** does not run (the API's checks of a write), the gaps of the guard, and the new reasons.
+
+Declined: the light-theme contrast exclusions in the a11y cases. They are older than this change and hold for every `DiffEditor`, so they stay under "Left for later". Left as it is: a first own configuration that another client writes with the same members as the copy, into a target that never had one, is not detected; the API has no conditional create of a configuration.
+
+Tests, new or changed: `view-copy.test.ts` (a changed source of both kinds, a key deleted meanwhile, an annotation gone meanwhile, the merged first write, the written empty document), `view-copy-dialog.test.ts` (the lost target, the reopened dialog, the changed source, `forgetSnapshot`), `limiter.test.ts`, `compare-selection.test.ts` (**Retry**), `line-diff.test.ts` (the cap and the budget) and `view-documents.test.ts` (`1e400`). After the fixes: `npm test` 3,028 passed in 145 files, `npm run test:e2e` 543 passed and 27 skipped, `npm run test:visual:docker` 88 passed; lint, type check and build pass, and the automation project builds.
 
 ### Left for later
 
