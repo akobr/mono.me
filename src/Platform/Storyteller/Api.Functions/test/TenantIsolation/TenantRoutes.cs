@@ -28,9 +28,9 @@ public static class TenantRoutes
         Api(nameof(ViewsHttp.UpdateView), "views", usersOnly: true, body: "{}"),
         Api(nameof(BindingsHttp.GetBindingCatalog), "bindings"),
         Api(nameof(AccessHttp.GetMachines), "machines", usersOnly: true),
-        Api(nameof(AccessHttp.PostMachines), "machines", usersOnly: true, body: """{"name":"m","scopes":["ConfigurationRead"]}"""),
-        Api(nameof(AccessHttp.GetMachine), "machines", usersOnly: true),
-        Api(nameof(AccessHttp.PutMachine), "machines", usersOnly: true),
+        Api(nameof(AccessHttp.PostMachines), "machines", usersOnly: true, body: """{"name":"m","scopes":["ConfigurationRead"]}""") with { ControlStatus = 400 },
+        Api(nameof(AccessHttp.GetMachine), "machines", usersOnly: true) with { ControlStatus = 404 },
+        Api(nameof(AccessHttp.PutMachine), "machines", usersOnly: true) with { ControlStatus = 404 },
         Api(nameof(AccessHttp.DeleteMachine), "machines", usersOnly: true),
         new(nameof(CertificatesHttp.PostRenewCertificate), "machine-certificate-renew", TenantGate.Service, TenantAddress.Route),
         Api(nameof(FederationHttp.PutMachineFederationRules), "machine-federation-rules", usersOnly: true, body: "[]"),
@@ -50,10 +50,10 @@ public static class TenantRoutes
         Api(nameof(KeyValuePolicyHttp.SetKeyValuePolicy), "key-value-policy", usersOnly: true, body: "{}"),
         Api(nameof(KeyValuePolicyHttp.GetByokSetup), "key-value-policy", usersOnly: true),
         Api(nameof(KeyValuePolicyHttp.VerifyByok), "key-value-policy", usersOnly: true, body: "{}"),
-        Api(nameof(KeyValuePolicyHttp.RotateKeyValueKey), "key-value-policy", usersOnly: true, body: "{}"),
+        Api(nameof(KeyValuePolicyHttp.RotateKeyValueKey), "key-value-policy", usersOnly: true, body: "{}") with { ControlStatus = 400 },
         Api(nameof(KeyValuePolicyHttp.GetRecipients), "key-value-recipients"),
-        Api(nameof(KeyValuePolicyHttp.AddRecipient), "key-value-recipients", usersOnly: true, body: "{}"),
-        Api(nameof(KeyValuePolicyHttp.UpdateRecipient), "key-value-recipients", usersOnly: true, body: "{}"),
+        Api(nameof(KeyValuePolicyHttp.AddRecipient), "key-value-recipients", usersOnly: true, body: "{}") with { ControlStatus = 400 },
+        Api(nameof(KeyValuePolicyHttp.UpdateRecipient), "key-value-recipients", usersOnly: true, body: "{}") with { ControlStatus = 400 },
         Api(nameof(KeyValuePolicyHttp.RemoveRecipient), "key-value-recipients", usersOnly: true),
         Api(nameof(KeyValueUsageHttp.GetKeyValueAudit), "key-value-audit", usersOnly: true),
         Api(nameof(KeyValueUsageHttp.GetKeyValueUsage), "key-value-usage", usersOnly: true),
@@ -141,11 +141,11 @@ public static class TenantRoutes
         Api(nameof(KeyValuesHttp.PurgeKeyValues), "key-value-bulk", usersOnly: true, body: """{"keys":["sample"]}"""),
         Api(nameof(KeyValuesHttp.ProtectKeyValues), "key-value-bulk", body: """{"keys":["sample"],"protection":"Public"}"""),
         Api(nameof(KeyValuesHttp.ExportKeyValues), "key-value-bulk", body: "{}"),
-        Api(nameof(KeyValuesHttp.ImportKeyValues), "key-value-bulk", body: """{"format":"2s.key-values.v1","pairs":[]}"""),
+        Api(nameof(KeyValuesHttp.ImportKeyValues), "key-value-bulk", body: """{"format":"2s.key-values.v1","pairs":[]}""") with { ControlStatus = 400 },
         Api(nameof(ViewTransferHttp.StartViewExport), "view-transfers", body: "{}"),
         Api(nameof(ViewTransferHttp.GetViewExport), "view-transfers"),
         Api(nameof(ViewTransferHttp.GetViewExportArchive), "view-transfers"),
-        Api(nameof(ViewTransferHttp.StartViewImport), "view-transfers", body: "{}"),
+        Api(nameof(ViewTransferHttp.StartViewImport), "view-transfers", body: "{}") with { ControlStatus = 400 },
         Api(nameof(ViewTransferHttp.GetViewImport), "view-transfers"),
 
         // An access point in the route: v1/access/points/{key}/...
@@ -186,7 +186,7 @@ public static class TenantRoutes
 
     // Every [Function] method of the API with an HTTP trigger, by its function name.
     public static IReadOnlyDictionary<string, MethodInfo> Functions { get; } = typeof(AccessHttp).Assembly.GetTypes()
-        .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+        .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly))
         .Where(method => method.GetCustomAttribute<FunctionAttribute>() is not null && Trigger(method) is not null)
         .ToDictionary(method => method.GetCustomAttribute<FunctionAttribute>()!.Name, StringComparer.Ordinal);
 

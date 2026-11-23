@@ -36,6 +36,11 @@ public class TenantIsolationHttpTests
         new("a project named B in A", TenantWorld.OrganizationA, "globex", "acme.globex"),
     ];
 
+    // The parameters of the services that name who acts, and those that name the tenant it acts in.
+    private static readonly string[] CallerParameters = ["caller", "actorId"];
+
+    private static readonly string[] TenantParameters = ["accessPointKey", "model", "organization"];
+
     public static TheoryData<string, TenantCaller> ApiFunctions => Matrix(TenantGate.Api);
 
     public static TheoryData<string, TenantCaller> ServiceFunctions => Matrix(TenantGate.Service);
@@ -62,10 +67,11 @@ public class TenantIsolationHttpTests
             }
             else
             {
-                // Past the gate: a service was reached, or the function answered on its own (not with an error of the harness).
+                // Past the gate: a service was reached, or the function answered with the one status its representative
+                // request gets from its own check (TenantRoute.ControlStatus); any other answer is a fault of the request.
                 control.ShouldSatisfyAllConditions(
                     () => control.IsRefused.ShouldBeFalse($"{caller} of A on {function} of A: {control}"),
-                    () => (control.Reached.Count > 0 || control.Status < 500).ShouldBeTrue($"{caller} of A on {function} of A: {control}"));
+                    () => (control.Reached.Count > 0 || control.Status == route.ControlStatus).ShouldBeTrue($"{caller} of A on {function} of A: {control}"));
             }
 
             var failures = new List<string>();
@@ -169,11 +175,12 @@ public class TenantIsolationHttpTests
             return "the user's request reaches the service";
         }
 
-        var values = outcome.Reached.SelectMany(call => call.Values).ToList();
+        // The caller and the tenant at their own parameters, so a call that swaps the caller with the account it acts on fails.
+        var callers = outcome.Reached.SelectMany(call => CallerParameters.SelectMany(call.Of)).ToList();
 
-        if (!values.Contains(TenantWorld.UserA))
+        if (!callers.Contains(TenantWorld.UserA) || callers.Contains(TenantWorld.UserB))
         {
-            return "the service gets the caller's own account";
+            return "the service gets the caller's own account as its caller";
         }
 
         // A {key} is trimmed and lower-cased by the API; a body is handed over as it is.
@@ -183,6 +190,7 @@ public class TenantIsolationHttpTests
             TenantAddress.Body => [target.Key, target.Organization],
             _ => [target.Organization],
         };
+        var values = outcome.Reached.SelectMany(call => TenantParameters.SelectMany(call.Of)).ToList();
         return values.Any(value => tenants.Contains(value, StringComparer.Ordinal)) ? null : $"the service gets the tenant '{string.Join("' or '", tenants)}'";
     }
 
