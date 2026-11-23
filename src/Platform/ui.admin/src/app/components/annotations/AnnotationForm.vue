@@ -142,7 +142,8 @@ useUnsavedChanges(() => meta.value.dirty)
 
 const save = handleSubmit(async () => {
   // The form's own values, not the schema's output: both sides of the difference must be read alike, and Zod's record
-  // leaves out a value named __proto__, which the diff would then remove. A copy without the form's proxies.
+  // leaves out a value named __proto__, which the diff would then remove. A copy without the form's proxies. So a
+  // transform added to the schema later does not change what is saved: put such a rule into editableOf instead.
   const draft = JSON.parse(JSON.stringify(values)) as AnnotationForm
   const patch = toAnnotationPatch(draft, toAnnotationDraft(base.value))
   if (!patch) {

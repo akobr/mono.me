@@ -234,7 +234,7 @@ describe('useAnnotationActions: bulk edits as PATCH', () => {
     const writes = recordWrites()
 
     await expect(actions.setDisabled(['sbt.northwind', 'sbt.contoso'], true)).rejects.toThrow(
-      '1 of 2 annotations were not saved: sbt.contoso',
+      '1 of 2 annotations were deleted meanwhile and left the list: sbt.contoso.',
     )
 
     expect(writes.every((write) => write.method === 'PATCH')).toBe(true)
@@ -243,6 +243,26 @@ describe('useAnnotationActions: bulk edits as PATCH', () => {
     // a delete would have taken it from the catalog: the bulk action does too
     expect(entry('sbt.contoso')).toBeUndefined()
     expect(actions.progress.value).toBeUndefined()
+    await settle()
+    unmount()
+  })
+
+  it('tells a failed write apart from a key deleted meanwhile', async () => {
+    const { actions, unmount } = await actionsOver()
+    await deleteAnnotation(org, project, view, 'sbt.contoso')
+    server.use(
+      http.patch(keyUrl, ({ params }) =>
+        params.key === 'sbt.fabrikam' ? HttpResponse.json({ Message: 'Busy.' }, { status: 409 }) : undefined,
+      ),
+    )
+
+    await expect(actions.setDisabled(['sbt.northwind', 'sbt.contoso', 'sbt.fabrikam'], true)).rejects.toThrow(
+      '1 of 3 annotations were not saved: sbt.fabrikam. 1 of 3 annotations were deleted meanwhile and left the list: sbt.contoso.',
+    )
+
+    // the failed key stays in the list, to be tried again
+    expect(entry('sbt.fabrikam')).toBeDefined()
+    expect(entry('sbt.contoso')).toBeUndefined()
     await settle()
     unmount()
   })
@@ -278,7 +298,7 @@ describe('useAnnotationActions: bulk edits against a catalog that moved on', () 
     server.use(http.get(keyUrl, () => new HttpResponse(null, { status: 404 })))
 
     await expect(actions.addLabel(['sbt.northwind'], 'beta')).rejects.toThrow(
-      '1 of 1 annotations were not saved: sbt.northwind',
+      '1 of 1 annotations were deleted meanwhile and left the list: sbt.northwind.',
     )
     expect(entry('sbt.northwind')).toBeUndefined()
     unmount()

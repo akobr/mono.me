@@ -134,21 +134,22 @@ export function useAnnotationActions() {
   ): Promise<void> {
     const target = scope()
     const failed: string[] = []
-    let gone = false
+    const gone: string[] = []
     progress.value = { done: 0, total: annotations.length }
     try {
       await runLimited(annotations, writeConcurrency, async (annotation) => {
         try {
           await write(annotation, target)
         } catch (error) {
-          failed.push(annotation.AnnotationKey)
-          if (isNotFound(error)) {
-            if (catalogHolds(target)) {
-              catalog.remove(annotation.AnnotationKey)
-            }
-            forgetAnnotation(queryClient, target, annotation.AnnotationKey)
-            gone = true
+          if (!isNotFound(error)) {
+            failed.push(annotation.AnnotationKey)
+            return
           }
+          if (catalogHolds(target)) {
+            catalog.remove(annotation.AnnotationKey)
+          }
+          forgetAnnotation(queryClient, target, annotation.AnnotationKey)
+          gone.push(annotation.AnnotationKey)
         } finally {
           progress.value = { done: progress.value!.done + 1, total: annotations.length }
         }
@@ -156,13 +157,18 @@ export function useAnnotationActions() {
     } finally {
       progress.value = undefined
     }
-    if (gone) {
+    if (gone.length) {
       void invalidateDeleted(queryClient, target)
     }
-    if (failed.length) {
-      throw new Error(
-        `${failed.length} of ${annotations.length} annotations were not saved: ${failed.slice(0, 5).join(', ')}`,
-      )
+    // the keys deleted meanwhile apart from the failed writes: they are not an error to retry, they left the list
+    const problems = [
+      failed.length &&
+        `${failed.length} of ${annotations.length} annotations were not saved: ${failed.slice(0, 5).join(', ')}.`,
+      gone.length &&
+        `${gone.length} of ${annotations.length} annotations were deleted meanwhile and left the list: ${gone.slice(0, 5).join(', ')}.`,
+    ].filter(Boolean)
+    if (problems.length) {
+      throw new Error(problems.join(' '))
     }
   }
 
@@ -183,9 +189,11 @@ export function useAnnotationActions() {
       const labels = patchableLabels(current.Labels)
       const operations = build(labels) ?? (current === annotation ? [labelGuard(labels)] : undefined)
       if (!operations) {
+        // a fresh copy that needs no change: the list and the detail show it
         if (catalogHolds(target)) {
           catalog.upsert(current)
         }
+        await invalidateAnnotation(queryClient, target, current.AnnotationKey)
         return undefined
       }
       try {
