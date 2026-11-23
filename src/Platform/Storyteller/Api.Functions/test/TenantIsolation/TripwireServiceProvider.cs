@@ -55,7 +55,10 @@ internal sealed class TripwireServiceProvider(IServiceProvider gate) : IServiceP
 
         if (serviceType.IsGenericType && serviceType.GetGenericTypeDefinition() == typeof(IOptions<>))
         {
-            var options = Activator.CreateInstance(serviceType.GetGenericArguments()[0]);
+            var optionsType = serviceType.GetGenericArguments()[0];
+            var options = optionsType.GetConstructor(Type.EmptyTypes) is not null
+                ? Activator.CreateInstance(optionsType)
+                : throw new InvalidOperationException($"The options {optionsType.Name} of a handler have no parameterless constructor; give them to TripwireServiceProvider.");
             return typeof(Options).GetMethod(nameof(Options.Create))!.MakeGenericMethod(serviceType.GetGenericArguments()).Invoke(null, [options]);
         }
 
@@ -73,8 +76,14 @@ internal sealed class TripwireServiceProvider(IServiceProvider gate) : IServiceP
         return null;
     }
 
+    // Without creating anything: what GetService answers, except an optional class of the platform without a public
+    // constructor, which ActivatorUtilities then reports itself.
     public bool IsService(Type serviceType)
     {
-        return GetService(serviceType) is not null;
+        return serviceType == typeof(IServiceProvider)
+            || serviceType == typeof(IServiceProviderIsService)
+            || serviceType == typeof(TimeProvider)
+            || serviceType.IsInterface
+            || (serviceType is { IsClass: true, IsAbstract: false } && serviceType.Namespace?.StartsWith("_42.", StringComparison.Ordinal) == true);
     }
 }

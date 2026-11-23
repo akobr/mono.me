@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 
 using _42.Platform.Storyteller.Api.Security;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
@@ -129,10 +130,11 @@ public class DevelopmentAuthenticationGuardTests
             Assert.Skip("A Release build starts: the entry point would run the host.");
         }
 
-        if (IsDevelopment(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT"))
-            && DevelopmentAuthenticationGuard.HostingVariables.All(name => string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name))))
+        // The environment as the worker resolves it, from a throwaway host built the way Program.cs builds its own: where the
+        // guard would let the build start, the entry point would go on to run the host, so the check is skipped there.
+        if (DevelopmentAuthenticationGuard.GetRefusal(WorkerEnvironmentName(), Environment.GetEnvironmentVariable, developmentAuthentication: true) is null)
         {
-            Assert.Skip("The test process runs in Development, where a Debug build starts.");
+            Assert.Skip("The test process runs in Development outside the hosting platforms, where a Debug build starts.");
         }
 
         var entryPoint = typeof(DevelopmentAuthenticationGuard).Assembly.EntryPoint.ShouldNotBeNull();
@@ -144,9 +146,10 @@ public class DevelopmentAuthenticationGuardTests
         exception.StackTrace.ShouldNotBeNull().ShouldContain(nameof(DevelopmentAuthenticationGuard));
     }
 
-    private static bool IsDevelopment(string? environment)
+    private static string WorkerEnvironmentName()
     {
-        return string.Equals(environment, Environments.Development, StringComparison.OrdinalIgnoreCase);
+        using var host = new HostBuilder().ConfigureFunctionsWebApplication().Build();
+        return host.Services.GetRequiredService<IHostEnvironment>().EnvironmentName;
     }
 
     // The entry point of top-level statements with await waits for them; what they throw comes out of reflection wrapped.
