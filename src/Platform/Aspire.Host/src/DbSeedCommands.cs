@@ -9,7 +9,8 @@ namespace _42.Platform.Aspire.Host;
 /// start its own resource: it starts a second DbCreator resource under it (<c>db-seed-options</c>,
 /// <c>db-creator-options</c>), whose arguments and environment are callbacks that read the options of the invocation,
 /// and clears them once that start has begun. The plain Start of <c>db-seed</c> and <c>db-creator</c> never reads them,
-/// so it always runs with the defaults, also while an invocation with options is starting.
+/// so it always runs with the defaults, also while an invocation with options is starting. Started on its own, a
+/// runner only lists the data sets.
 /// </summary>
 internal static class DbSeedCommands
 {
@@ -30,6 +31,12 @@ internal static class DbSeedCommands
 
     private static readonly TimeSpan StartTimeout = TimeSpan.FromMinutes(2);
 
+    // What a runner does when it is started without an invocation, by its own Start in the dashboard: it lists the data
+    // sets, which reads files only. A runner exists for the options of its command, and its Start carries no
+    // invocation, so it never runs the defaults and never writes. A Start of the runner while an invocation is pending
+    // runs those options, which the same dialog has just chosen, once; the command then reports the runner as busy.
+    private static readonly string[] IdleRunnerArguments = ["sets"];
+
     /// <summary>
     /// The arguments of <c>db-seed</c> (<c>seed showcase</c>, with <paramref name="defaultOwner"/> as <c>--owner</c>
     /// when there is no base account) and its <c>Seed with options…</c> command, which runs <paramref name="runner"/>
@@ -49,12 +56,11 @@ internal static class DbSeedCommands
             : ["seed", DefaultSet];
         dbSeed.WithArgs(defaults);
 
-        // The runner's own Start, without an invocation, runs the defaults too.
         var pending = new PendingInvocation<string[]>();
         runner
             .WithArgs(context =>
             {
-                foreach (var argument in pending.Value ?? defaults)
+                foreach (var argument in pending.Value ?? IdleRunnerArguments)
                 {
                     context.Args.Add(argument);
                 }
@@ -128,7 +134,19 @@ internal static class DbSeedCommands
 
         var pending = new PendingInvocation<CreateOptions>();
         ApplyCreateOptions(runner, () => pending.Value ?? defaults);
-        runner.WithParentRelationship(dbCreator).WithExplicitStart();
+        runner
+            .WithArgs(context =>
+            {
+                if (pending.Value is null)
+                {
+                    foreach (var argument in IdleRunnerArguments)
+                    {
+                        context.Args.Add(argument);
+                    }
+                }
+            })
+            .WithParentRelationship(dbCreator)
+            .WithExplicitStart();
 
         dbCreator.WithCommand(
             name: "create-with-options",
