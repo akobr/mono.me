@@ -1564,6 +1564,25 @@ describe('The views of a comparison', () => {
   })
 })
 
+describe('The views of the project that cannot be read', () => {
+  it('says so with Retry instead of asking to pick a view from an empty list', async () => {
+    let failing = true
+    server.use(
+      http.get('*/api/v1/acme/billing/views', () =>
+        failing ? HttpResponse.json({ Message: 'The database is busy.' }, { status: 500 }) : undefined,
+      ),
+    )
+    await mountSelection(`kind=annotations&${keysQuery('sbt.northwind')}`)
+
+    await eventually(() => expect(text()).toContain('The views of the project could not be loaded'))
+    expect(text()).not.toContain('Pick the view to compare with')
+
+    failing = false
+    await click(button('Retry'))
+    await eventually(() => expect(keys()).toEqual(['sbt.northwind']))
+  })
+})
+
 describe('The comparison for a Reader', () => {
   // Modeling is open to every member (424-272), and a comparison only reads; a copy writes to the target, which needs
   // the Contributor role.

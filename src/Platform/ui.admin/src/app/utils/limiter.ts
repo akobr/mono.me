@@ -35,6 +35,8 @@ export function createLimiter(limit: number): Limiter {
     }
 
     try {
+      // The slot may have been handed over after the signal aborted: a task that has not started does not start.
+      signal?.throwIfAborted()
       return await task()
     } finally {
       const next = waiting.shift()

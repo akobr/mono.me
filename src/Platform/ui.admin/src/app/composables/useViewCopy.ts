@@ -28,8 +28,14 @@ export function useViewCopy() {
       // The catalog holds the source view, which a copy does not change. When it holds the target by the end of the
       // run (the user went there meanwhile), what was written is in none of its lists.
       const target = { ...request.source, view: request.target }
-      if (!result.dryRun && copyWrites(result.items) > 0 && catalog.scope && sameView(catalog.scope, target)) {
-        void catalog.load(target, { force: true })
+      if (!result.dryRun && copyWrites(result.items) > 0) {
+        if (catalog.scope && sameView(catalog.scope, target)) {
+          void catalog.load(target, { force: true })
+        } else {
+          // The snapshot of the target's catalog misses what was written: it would show the old list at the next
+          // visit, and keep it if that visit's refresh fails.
+          void catalog.forgetSnapshot(target)
+        }
       }
       return result
     } finally {

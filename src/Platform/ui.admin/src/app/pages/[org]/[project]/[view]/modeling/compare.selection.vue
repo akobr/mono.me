@@ -13,7 +13,6 @@ import {
   viewTransferLimit,
   type CompareFilter,
 } from '@/utils/view-compare'
-import type { ViewCopyResult } from '@/utils/view-copy'
 import { countOf } from '@/utils/view-documents'
 import { defaultViewBadge, isDefaultView } from '@/utils/views'
 
@@ -210,7 +209,8 @@ const copyKeys = ref<string[]>([])
 /**
  * What this page showed of the target when the copy was opened, by key: the copy skips a key whose target changed
  * since. Not what it shows by now: a check makes the page read a changed key again, and the copy that follows the
- * check has to skip that key, as the check said it would.
+ * check has to skip that key, as the check said it would. It stays for Try again too: a key that the first run wrote
+ * holds the content of the source, so the retry finds it unchanged, and one that changed again since is skipped.
  */
 const expected = shallowRef<Record<string, string | number | null>>({})
 
@@ -229,17 +229,6 @@ function copy(keys: string[]) {
     files.value.filter((file) => keys.includes(file.key)).map((file) => [file.key, file.expected]),
   )
   copying.value = true
-}
-
-/** What the copy wrote is its own change: run again after it ended early, it finds those keys unchanged. */
-function copied(result: ViewCopyResult) {
-  const selected = kind.value === 'annotations' ? 'Annotation' : 'Configuration'
-  const written = new Set(
-    result.items
-      .filter((item) => item.kind === selected && (item.outcome === 'Created' || item.outcome === 'Updated'))
-      .map((item) => item.key),
-  )
-  expected.value = Object.fromEntries(Object.entries(expected.value).filter(([key]) => !written.has(key)))
 }
 
 // --- sections ---
@@ -444,6 +433,13 @@ onMounted(() => {
               />
 
               <LoadingState v-if="!target && others.views.isPending.value" />
+              <!-- Without the views there is nothing to pick from: their error, with Retry. -->
+              <ErrorState
+                v-else-if="!target && others.views.isError.value"
+                :error="others.views.error.value"
+                title="The views of the project could not be loaded"
+                @retry="others.views.refetch()"
+              />
               <EmptyState v-else-if="!target" icon="i-lucide-git-compare" title="Pick the view to compare with" />
 
               <template v-else>
@@ -535,7 +531,6 @@ onMounted(() => {
                   :target="target"
                   :expected="expected"
                   :compare="false"
-                  @copied="copied"
                   @closed="closed"
                 />
               </template>

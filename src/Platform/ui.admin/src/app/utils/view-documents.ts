@@ -137,7 +137,8 @@ export function annotationText(annotation: Annotation): string {
  */
 export function hasInexactNumber(value: unknown): boolean {
   if (typeof value === 'number') {
-    return Number.isInteger(value) && !Number.isSafeInteger(value)
+    // A number too large for a double (1e400) reads as Infinity, which JSON writes as null.
+    return !Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value))
   }
   if (Array.isArray(value)) {
     return value.some(hasInexactNumber)

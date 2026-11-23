@@ -56,6 +56,8 @@ const running = ref<'check' | 'copy'>()
 let controller: AbortController | undefined
 /** Counts the changes of what a check holds for: a check that ran across one is no plan. */
 let revision = 0
+/** Counts the openings: a copy that a closed opening started does not show its result in the next one. */
+let opening = 0
 /** The selection of the copy that ran, for its comparison: the selection behind the dialog may change meanwhile. */
 let copiedSelection: { kind: ViewItemKind; keys: string[] } | undefined
 
@@ -66,7 +68,13 @@ const banner = useTemplateRef<HTMLElement>('banner')
 
 // A copy goes only to a view that the project lists: a write to any other name would create that view.
 const fixed = computed(() => (others.has(props.target) ? props.target : undefined))
-const destination = computed(() => fixed.value ?? (others.has(chosen.value) ? chosen.value : undefined))
+// A dialog opened for a comparison copies to the compared view or not at all: what the comparison saw of the target
+// (`expected`) holds for no other view.
+const destination = computed(() =>
+  props.target !== undefined ? fixed.value : others.has(chosen.value) ? chosen.value : undefined,
+)
+/** The compared view is not a view of the project (any more). */
+const lostTarget = computed(() => props.target !== undefined && others.known.value && !fixed.value)
 const production = computed(() => isDefaultView(destination.value))
 const there = computed(() => destination.value ?? 'the other view')
 const tooMany = computed(() => props.keys.length > viewTransferLimit)
@@ -87,6 +95,7 @@ watch(
   open,
   (isOpen) => {
     if (isOpen) {
+      opening++
       revision++
       plan.value = undefined
       result.value = undefined
@@ -183,6 +192,7 @@ async function start(dryRun: boolean): Promise<void> {
   }
   const selection = { kind: props.kind, keys: [...props.keys] }
   const checked = revision
+  const openedAs = opening
 
   try {
     const outcome = await run(
@@ -193,6 +203,8 @@ async function start(dryRun: boolean): Promise<void> {
         existing: existing.value,
         missingAnnotations: missingAnnotations.value,
         expected: props.expected,
+        // A copy after a check writes only what the check showed: a source changed since is skipped.
+        checked: dryRun ? undefined : plan.value?.sources,
         dryRun,
       },
       controller.signal,
@@ -213,6 +225,11 @@ async function start(dryRun: boolean): Promise<void> {
       return
     }
 
+    // The dialog was closed while the copy ran and has been opened again since, for the selection of now: the
+    // result belongs to the opening that started the copy.
+    if (openedAs !== opening) {
+      return
+    }
     plan.value = undefined
     result.value = outcome
     copiedSelection = selection
@@ -309,7 +326,7 @@ function linkOf(item: ViewCopyItem): string | undefined {
     return undefined
   }
   const section = item.kind === 'Annotation' ? 'annotations' : 'configurations'
-  return `/${context.org}/${context.project}/${outcome.target}/${section}/${item.key}`
+  return `/${context.org}/${context.project}/${outcome.target}/${section}/${encodeURIComponent(item.key)}`
 }
 
 /** The tables scroll: the region takes the focus, so keys scroll it too. */
@@ -338,6 +355,14 @@ const scrollRegion =
             icon="i-lucide-info"
             title="The project has no other view"
             description="An Administrator can create another one on the Views page."
+          />
+          <UAlert
+            v-else-if="lostTarget"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="`${target} is not another view of this project`"
+            description="The comparison was made with a view that the project does not list any more."
           />
           <UAlert
             v-else-if="tooMany"

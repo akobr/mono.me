@@ -9,7 +9,14 @@ export interface LineStats {
  * Above this many changed lines the exact count costs too much (the search is quadratic in the changes), and the
  * lines are counted without their order. Two documents that far apart are rewritten, not edited.
  */
-const maxEdits = 8_000
+const maxEdits = 2_000
+
+/**
+ * The steps one search may take: the diagonals it visits and the lines it compares. A comparison counts up to a
+ * hundred pairs on the UI thread, so the work of each is bounded whatever the texts; above it the lines are counted
+ * without their order, as above `maxEdits`.
+ */
+export const searchBudget = 2_500_000
 
 /** The lines of a text; an empty text has none. */
 const linesOf = (text: string): string[] => (text === '' ? [] : text.split('\n'))
@@ -19,7 +26,7 @@ const linesOf = (text: string): string[] => (text === '' ? [] : text.split('\n')
  * selection across views counts them for every document, since the server counts only the effective configuration of
  * one key (spec "Copy and Compare Annotations and Configurations Between Views", section 2).
  */
-export function lineStats(before: string, after: string): LineStats {
+export function lineStats(before: string, after: string, budget = searchBudget): LineStats {
   const a = linesOf(before)
   const b = linesOf(after)
 
@@ -40,7 +47,7 @@ export function lineStats(before: string, after: string): LineStats {
     return { additions: added, deletions: deleted }
   }
 
-  const edits = shortestEdit(a, b, start, deleted, added)
+  const edits = shortestEdit(a, b, start, deleted, added, budget)
   if (edits === undefined) {
     return unorderedStats(a.slice(start, endA), b.slice(start, endB))
   }
@@ -50,10 +57,19 @@ export function lineStats(before: string, after: string): LineStats {
 
 /**
  * The length of the shortest edit script of a[offset, offset + n) into b[offset, offset + m): the greedy algorithm of
- * Myers ("An O(ND) Difference Algorithm and Its Variations"), which needs O(n + m) memory. Undefined above maxEdits.
+ * Myers ("An O(ND) Difference Algorithm and Its Variations"), which needs O(n + m) memory. Undefined above maxEdits,
+ * or when the search would take more steps than the budget.
  */
-function shortestEdit(a: string[], b: string[], offset: number, n: number, m: number): number | undefined {
+function shortestEdit(
+  a: string[],
+  b: string[],
+  offset: number,
+  n: number,
+  m: number,
+  budget: number,
+): number | undefined {
   const max = Math.min(n + m, maxEdits)
+  let work = 0
   // furthest[k + max + 1] is the furthest x reached on the diagonal k = x − y
   const furthest = new Int32Array(2 * max + 3)
   const at = (k: number) => k + max + 1
@@ -63,9 +79,14 @@ function shortestEdit(a: string[], b: string[], offset: number, n: number, m: nu
       const down = k === -edits || (k !== edits && furthest[at(k - 1)]! < furthest[at(k + 1)]!)
       let x = down ? furthest[at(k + 1)]! : furthest[at(k - 1)]! + 1
       let y = x - k
+      work++
       while (x < n && y < m && a[offset + x] === b[offset + y]) {
         x++
         y++
+        work++
+      }
+      if (work > budget) {
+        return undefined
       }
       furthest[at(k)] = x
       if (x >= n && y >= m) {

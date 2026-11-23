@@ -389,19 +389,19 @@ describe('ViewCopyDialog: what is copied, and where to', () => {
     expect(await inStaging(onlyDefault)).toBe(false)
   })
 
-  it('ignores a fixed target that is not another view of the project', async () => {
-    // a mistyped ?to= of the comparison
+  it('copies nowhere for a fixed target that is not another view of the project', async () => {
+    // a mistyped ?to= of the comparison: what the comparison saw holds for that view only, so no other view takes it
     const view = await openDialog({ keys: [differs], target: 'stagin' })
     expect(title()).toBe('Copy sbt.northwind to another view')
-    expect(select(view).props('modelValue')).toBe('staging')
-    expect(text()).not.toContain('stagin ')
+    expect(text()).toContain('stagin is not another view of this project')
+    expect(button('Check')!.disabled).toBe(true)
+    expect(button('Copy')!.disabled).toBe(true)
 
     // the view of the route is no target either
     view.state.target = 'default'
     await settle()
-    expect(title()).toBe('Copy sbt.northwind to another view')
-    expect(select(view).props('modelValue')).toBe('staging')
-    expect(alerts(view)).toEqual([])
+    expect(text()).toContain('default is not another view of this project')
+    expect(button('Copy')!.disabled).toBe(true)
   })
 
   it('says that a project with one view has no other, and offers nothing to run', async () => {
@@ -1439,6 +1439,43 @@ describe('ViewCopyDialog: states that must not leak', () => {
     expect(await inStaging(onlyDefault)).toBe(false)
   })
 
+  it('shows no result of a copy that a closed opening started in the next opening', async () => {
+    const view = await openDialog({ keys: subjects })
+    const first = hold('post', stagingAnnotation('sbt.contoso'))
+    await click('Copy')
+    await first.reached
+
+    // closed by its place, and opened again before the copy is over
+    view.state.open = false
+    await settle()
+    view.state.open = true
+    await settle()
+    first.release()
+    await eventually(() => expect(footer()).toEqual(['Cancel', 'Check', 'Copy']))
+    await settle()
+
+    // the opening of now did not start it: no result, and no event that its place would take for its own
+    expect(region('Copied documents')).toBeNull()
+    expect(alerts(view)).toEqual([])
+    expect(view.copied).toEqual([])
+  })
+
+  it('copies only what its check showed: a source changed since is skipped', async () => {
+    const view = await openDialog({ keys: [differs] })
+    await check()
+    expect(rows('Checked documents')).toEqual([['Annotation', differs, 'To update', '']])
+
+    // another client changes the source after the check
+    const changed = await getAnnotation(org, project, 'default', differs, { includeInactive: true })
+    await setAnnotation(org, project, 'default', differs, { ...changed, Title: 'Changed after the check' })
+    await copy('Copy 1 to staging')
+
+    expect(rows('Copied documents')).toEqual([
+      ['Annotation', differs, 'Skipped', 'It changed in default since it was checked.'],
+    ])
+    expect(view.copied).toHaveLength(1)
+  })
+
   it('leaves no plan of a check that it was closed under', async () => {
     // one key: a check is not stopped during its last key, so this one ends with a whole plan
     const view = await openDialog({ keys: [onlyDefault] })
@@ -1730,6 +1767,24 @@ describe('useViewCopy', () => {
     await harness.run(request({ keys: [onlyDefault] }))
     expect(load).toHaveBeenCalledExactlyOnceWith(staging, { force: true })
     await eventually(() => expect(catalog.byKey.has(onlyDefault)).toBe(true))
+  })
+
+  it('forgets the snapshot of the target when it wrote there: the next visit must not show the old list', async () => {
+    const catalog = useCatalogStore()
+    await catalog.load(billing)
+    const forget = vi.spyOn(catalog, 'forgetSnapshot')
+    const { harness } = await mountCopy()
+
+    await harness.run(request({ keys: [onlyDefault], dryRun: true }))
+    expect(forget).not.toHaveBeenCalled()
+
+    await harness.run(request({ keys: [onlyDefault] }))
+    expect(forget).toHaveBeenCalledWith(staging)
+
+    // a copy that writes nothing leaves it
+    forget.mockClear()
+    await harness.run(request({ keys: [onlyDefault] }))
+    expect(forget).not.toHaveBeenCalled()
   })
 
   it('leaves the catalog alone while it holds the source: a copy does not change it', async () => {

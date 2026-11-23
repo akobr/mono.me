@@ -118,16 +118,16 @@ describe('lineStats', () => {
     }
   })
 
-  it('counts exactly up to 8,000 changed lines, whatever their order', long, () => {
-    // a reversed text keeps one line in place: 4,001 lines are 4,000 added and 4,000 removed
-    const lines = numbered(4001)
+  it('counts exactly up to 2,000 changed lines, whatever their order', long, () => {
+    // a reversed text keeps one line in place: 1,001 lines are 1,000 added and 1,000 removed
+    const lines = numbered(1001)
 
-    expect(lineStats(lines.join('\n'), lines.toReversed().join('\n'))).toEqual({ additions: 4000, deletions: 4000 })
+    expect(lineStats(lines.join('\n'), lines.toReversed().join('\n'))).toEqual({ additions: 1000, deletions: 1000 })
   })
 
-  it('counts the lines without their order above 8,000 changed lines', long, () => {
-    // 4,002 reversed lines are 8,002 changes: only the lines a side has more often than the other are counted
-    const lines = numbered(4002)
+  it('counts the lines without their order above 2,000 changed lines', long, () => {
+    // 1,002 reversed lines are 2,002 changes: only the lines a side has more often than the other are counted
+    const lines = numbered(1002)
     expect(lineStats(lines.join('\n'), lines.toReversed().join('\n'))).toEqual({ additions: 0, deletions: 0 })
 
     // the shared lines are in another order, each side has 5,000 lines of its own, and one has "x" twice
@@ -140,13 +140,18 @@ describe('lineStats', () => {
     const before = numbered(200_000, 'before ').join('\n')
     const after = numbered(150_000, 'after ').join('\n')
 
-    const started = performance.now()
-    const stats = lineStats(before, after)
-    const elapsed = performance.now() - started
+    // the search gives up at its budget; without it, it would take 350,000 rounds over as many diagonals
+    expect(lineStats(before, after)).toEqual({ additions: 150_000, deletions: 200_000 })
+  })
 
-    expect(stats).toEqual({ additions: 150_000, deletions: 200_000 })
-    // the search gives up at 8,000 changes; without the cap it would take 350,000 rounds over as many diagonals
-    expect(elapsed).toBeLessThan(5000)
+  it('counts without the order once a search would take more steps than its budget', () => {
+    // a moved block: in its order, the line diff counts it on both sides; without its order, nothing changed
+    const lines = numbered(200)
+    const moved = [...lines.slice(100), ...lines.slice(0, 100)]
+    const [before, after] = [lines.join('\n'), moved.join('\n')]
+
+    expect(lineStats(before, after)).toEqual({ additions: 100, deletions: 100 })
+    expect(lineStats(before, after, 1_000)).toEqual({ additions: 0, deletions: 0 })
   })
 
   it('skips the common start and end of long texts', () => {
