@@ -185,6 +185,9 @@ export function toAnnotationPatch(draft: AnnotationForm, base: AnnotationForm): 
     return patch
   }
 
+  // The fallback works per top-level value name: a changed value is written whole (add), so a concurrent change inside
+  // that same value is not kept, unlike the merge patch's nested diff. Nested operations would fail with 400 PatchInvalid
+  // when the parent stopped being an object meanwhile (a known limit, annotation-lifecycle.md "In the admin UI").
   const operations: JsonPatchOperation[] = scalars.map((member) => ({
     op: 'replace',
     path: `/${member}`,

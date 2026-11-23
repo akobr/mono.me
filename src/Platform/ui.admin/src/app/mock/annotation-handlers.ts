@@ -241,12 +241,13 @@ export function storeAnnotation(db: MockDb, params: ScopeParams, annotation: Ann
  */
 function updateAnnotation(db: MockDb, params: ScopeParams, previous: Annotation, annotation: Annotation): Annotation {
   const { Created: _created, Modified: _modified, Deletion: _deletion, ...body } = annotation
+  const now = new Date()
   const stored = withRelations({
     ...body,
     ProjectName: params.project,
     ViewName: params.view,
-    Created: previous.Created ?? stamp(db, new Date()),
-    Modified: stamp(db, new Date()),
+    Created: previous.Created ?? stamp(db, now),
+    Modified: stamp(db, now),
   })
 
   const changes = diffAnnotations(previous, stored)
