@@ -4,6 +4,7 @@ import { annotationHandlers } from './annotation-handlers'
 import { configurationHandlers } from './configuration-handlers'
 import { keyValueHandlers } from './key-value-handlers'
 import { accessHandlers, bindingHandlers, viewHandlers } from './handlers'
+import { inboxHandlers } from './inbox-handlers'
 import { projectSettingsHandlers } from './project-settings-handlers'
 import { transferHandlers } from './transfer-handlers'
 import { templateSchemaHandlers } from './template-schema-handlers'
@@ -17,6 +18,7 @@ export const mockHandlers: HttpHandler[] = [
   ...bindingHandlers,
   ...annotationHandlers,
   ...transferHandlers,
+  ...inboxHandlers,
   // The definition route (configuration-schema/{key}/definition) must win over configuration-schema/{key}/…
   ...configurationHandlers,
   ...templateSchemaHandlers,

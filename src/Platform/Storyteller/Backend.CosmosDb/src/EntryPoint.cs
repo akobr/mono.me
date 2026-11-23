@@ -12,6 +12,7 @@ using _42.Platform.Storyteller.KeyValues.Audit;
 using _42.Platform.Storyteller.KeyValues.Policy;
 using _42.Platform.Storyteller.KeyValues.Protection;
 using _42.Platform.Storyteller.KeyValues.Usage;
+using _42.Platform.Storyteller.Notifying;
 using _42.Platform.Storyteller.Transferring;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -178,6 +179,9 @@ public static class EntryPoint
         // Export and import jobs. The service is added by AddViewTransfers, the archives and the queue
         // by Backend.AzureStorage.
         services.AddSingleton<IViewTransferStore, CosmosViewTransferStore>();
+
+        // The inbox of a view. The publisher and the service are added by AddViewInbox.
+        services.AddSingleton<IViewInboxStore, CosmosViewInboxStore>();
 
         // Invitations: the identity provider may replace the sender (AuthKit sends the email through WorkOS).
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));

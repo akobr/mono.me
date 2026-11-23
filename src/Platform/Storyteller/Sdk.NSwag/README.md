@@ -19,7 +19,7 @@ Use the version that generated `src/ApiSdk.g.cs` (its header names it); another 
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.10.56.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true /GenerateOptionalParameters:true /ParameterDateTimeFormat:o
+nswag openapi2csclient /input:open.api.v0.10.58.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true /GenerateOptionalParameters:true /ParameterDateTimeFormat:o
 ```
 
 `/ParameterDateTimeFormat:o` writes a time of a query (`from` and `to` of the audits) in the round-trip format, with its offset and fractions of a second; the default `s` drops both, so a time with an offset other than zero was read as UTC. `/GenerateOptionalParameters:true` gives each operation one method: the parameters the document marks optional (query, header, and a body it does not mark `required`) come last with `= null`, and `cancellationToken` with `= default`. A required body therefore comes before the optional parameters (`ImportKeyValuesAsync(organization, project, view, body, mode, dryRun, keyPrefix)`, `StartViewImportAsync(organization, project, view, body, include, …)`). Leave out what you don't send, and pass a later argument by name: `GetConfigurationAsync(organization, project, view, key, cancellationToken: cancellationToken)`. The compiler also lets you leave out a body the document does not mark `required`, but the client then sends the JSON `null`, which most operations answer with `400`.
@@ -205,7 +205,7 @@ etag = patched.ETag;
 * `ClientCertificate` is added to the `HttpClientHandler` of every client for mutual TLS. It needs a private key, and it must be set before the first client is resolved, because the handler is built then.
 * `ClientCertificateHeaderName` is for development only. When it is set together with `ClientCertificate`, every request also carries the certificate (base64 DER) in that header, for a host without TLS. `sform` sets `X-ARR-ClientCert` for an `http` API on `localhost`, which the local Functions host accepts with `MachineAuth:IsCertificateHeaderFromClientAllowed`.
 
-`AddStorytellerSdk(configurationFactory, configureHttpClient)` calls `configureHttpClient` with the `IHttpClientBuilder` of each of the seven typed clients, after their primary handler (the one that carries `ClientCertificate`) is set, for example to add a `DelegatingHandler`. `sform` adds one that sends a request once more after a `401`, with a new token of a machine whose credential can renew it (client credentials or federation):
+`AddStorytellerSdk(configurationFactory, configureHttpClient)` calls `configureHttpClient` with the `IHttpClientBuilder` of each of the eight typed clients, after their primary handler (the one that carries `ClientCertificate`) is set, for example to add a `DelegatingHandler`. `sform` adds one that sends a request once more after a `401`, with a new token of a machine whose credential can renew it (client credentials or federation):
 
 ```csharp
 services.AddStorytellerSdk(null, builder => builder.AddHttpMessageHandler(

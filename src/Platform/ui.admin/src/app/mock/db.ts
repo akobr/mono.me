@@ -14,6 +14,7 @@ import type {
   SharedCertificate,
   View,
 } from '@42for.net/2splatform.sdk'
+import type { StoredInboxItem } from './inbox'
 import type { KeyValueScopeStore } from './key-values'
 import { generateAnnotations, type ScopeSeed } from './annotations'
 import { showcaseScope } from './showcase'
@@ -79,6 +80,8 @@ export interface MockDb {
   keyValueAudit?: Record<string, KeyValueAuditEvent[]>
   /** The access audit trail per organization, newest last (424-263, access-audit.ts). */
   accessAudit?: Record<string, AccessAuditEntry[]>
+  /** The inbox items per scope ("org/project/view"), in the order they were written (424-31, inbox.ts). */
+  inbox?: Record<string, StoredInboxItem[]>
 }
 
 export type MockScenario = 'default' | 'new-user' | 'invited' | 'large' | 'showcase'

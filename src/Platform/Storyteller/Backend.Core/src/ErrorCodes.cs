@@ -138,4 +138,10 @@ public static class ErrorCodes
     // Export and import of a view: warnings of written documents.
     public const string AncestorCreated = "AncestorCreated";
     public const string AnnotationRecreated = "AnnotationRecreated";
+
+    // The inbox of a view. InboxItemClosed: the item was already accepted or dismissed (409). InboxItemNotAction: only
+    // an action can be accepted (409). InboxActionNotAvailable: the deployment has no handler of the item's action (501).
+    public const string InboxItemClosed = "InboxItemClosed";
+    public const string InboxItemNotAction = "InboxItemNotAction";
+    public const string InboxActionNotAvailable = "InboxActionNotAvailable";
 }

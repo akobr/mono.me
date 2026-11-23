@@ -28,6 +28,7 @@ export const shortcutGroups: ShortcutGroup[] = [
       { keys: ['G', 'T'], description: 'Templates' },
       { keys: ['G', 'S'], description: 'Schemas' },
       { keys: ['G', 'E'], description: 'Export & Import' },
+      { keys: ['G', 'I'], description: 'Inbox' },
     ],
   },
   {

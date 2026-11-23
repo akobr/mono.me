@@ -256,6 +256,18 @@ describe('ImportResult', () => {
     expect(view.inner().emitted('importNow')).toHaveLength(1)
   })
 
+  // The inbox of a view shows the report of any import, not only of the latest one (424-31).
+  it('is headed Latest import, or by the title it is given, which also names its section', async () => {
+    const heading = (root: Element) => root.querySelector(`[id="${root.getAttribute('aria-labelledby')}"]`)
+    const latest = await mountScreen(ImportResult, { result, scope })
+    expect(heading(latest.inner().element)?.textContent).toBe('Latest import')
+    latest.host.unmount()
+
+    const report = await mountScreen(ImportResult, { result, scope, title: 'Report' })
+    expect(heading(report.inner().element)?.textContent).toBe('Report')
+    expect(report.inner().element.textContent).not.toContain('Latest import')
+  })
+
   it('lists the documents with their kind, outcome, code, message, warnings and links', async () => {
     const view = await mountScreen(ImportResult, { result: { ...result, IsDryRun: false }, scope })
     const root = view.inner().element as HTMLElement
@@ -324,10 +336,13 @@ describe('TransferToaster', () => {
       anchor.textContent?.includes('Show the result'),
     )
     expect(link?.getAttribute('href')).toBe('/acme/billing/default/modeling/export-import')
-    const keys = invalidated.mock.calls.map(([filters]) =>
-      (filters as { queryKey: string[] }).queryKey.slice(4).join('/'),
+    const keys = () =>
+      invalidated.mock.calls.map(([filters]) => (filters as { queryKey: string[] }).queryKey.slice(4).join('/'))
+    // the kinds it wrote, and the inbox of the view once the import's item there is dismissed (424-31)
+    await vi.waitFor(() =>
+      expect(new Set(keys())).toEqual(new Set(['template', 'templates', 'configuration', 'configurations', 'inbox'])),
     )
-    expect(new Set(keys)).toEqual(new Set(['template', 'templates', 'configuration', 'configurations']))
+    expect(keys().filter((key) => key === 'inbox')).toHaveLength(1)
   })
 
   it('does not report an import that the page shows', async () => {

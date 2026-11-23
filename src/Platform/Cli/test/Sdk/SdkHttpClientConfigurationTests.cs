@@ -10,7 +10,7 @@ namespace _42.Platform.Cli.UnitTests.Sdk;
 public class SdkHttpClientConfigurationTests
 {
     [Fact]
-    public void ConfigureHttpClient_RunsForEachOfTheSevenTypedClients()
+    public void ConfigureHttpClient_RunsForEachOfTheEightTypedClients()
     {
         var clients = new List<string>();
 
@@ -25,6 +25,7 @@ public class SdkHttpClientConfigurationTests
             nameof(IKeyValuesApiClient),
             nameof(ITemplatesApiClient),
             nameof(ITransfersApiClient),
+            nameof(IInboxApiClient),
         ]);
     }
 

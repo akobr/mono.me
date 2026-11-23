@@ -83,6 +83,8 @@ declare module 'vue' {
     HunkList: typeof import('./components/versions/HunkList.vue')['default']
     ImportPanel: typeof import('./components/transfer/ImportPanel.vue')['default']
     ImportResult: typeof import('./components/transfer/ImportResult.vue')['default']
+    InboxImportResult: typeof import('./components/inbox/InboxImportResult.vue')['default']
+    InboxItemRow: typeof import('./components/inbox/InboxItemRow.vue')['default']
     InvitationsTable: typeof import('./components/access/InvitationsTable.vue')['default']
     InviteDialog: typeof import('./components/access/InviteDialog.vue')['default']
     KeyText: typeof import('./components/common/KeyText.vue')['default']

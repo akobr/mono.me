@@ -61,6 +61,9 @@ internal static class OperationAccess
         Definitions.RouteIds.KeyValues.RemoveRecipient,
         Definitions.RouteIds.KeyValues.GetKeyValueAudit,
         Definitions.RouteIds.KeyValues.GetKeyValueUsage,
+        Definitions.RouteIds.Inbox.GetViewInbox,
+        Definitions.RouteIds.Inbox.AcceptViewInboxItem,
+        Definitions.RouteIds.Inbox.DismissViewInboxItem,
     ],
     StringComparer.Ordinal);
 

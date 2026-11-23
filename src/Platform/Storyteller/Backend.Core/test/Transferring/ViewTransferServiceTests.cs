@@ -1,6 +1,9 @@
 using System.IO.Compression;
+using _42.Platform.Storyteller.Backend.Core.UnitTests.Notifying;
 using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.Notifying;
 using _42.Platform.Storyteller.Transferring;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using static _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring.TransferTestData;
@@ -24,8 +27,15 @@ public class ViewTransferServiceTests
     private readonly ViewTransferOptions _options = new();
     private readonly ViewTransferService _service;
 
+    // An inbox that only keeps the pushes, and one that pushes them on to the real publisher over the items of a view.
+    private readonly RecordingViewInboxPublisher _inbox = new();
+    private readonly InMemoryViewInboxStore _items = new();
+    private readonly RecordingViewInboxPublisher _storedInbox;
+
     public ViewTransferServiceTests()
     {
+        _storedInbox = new RecordingViewInboxPublisher(
+            new ViewInboxPublisher(_items, Options.Create(new ViewInboxOptions()), _time, NullLogger<ViewInboxPublisher>.Instance));
         _annotations = new FakeAnnotationService(_reads, _imports);
         _schemas = new FakeSchemaService(_reads, _imports);
         _templates = new FakeTemplateService(_reads, _imports);
@@ -918,6 +928,466 @@ public class ViewTransferServiceTests
     }
 
     [Fact]
+    public async Task ProcessExport_PushesItsEndIntoTheInboxOnce()
+    {
+        SetEveryKind();
+        var service = WithInbox(_inbox);
+        var started = await service.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Folder, null, Actor);
+
+        // a job that waits has no item
+        _inbox.Pushes.ShouldBeEmpty();
+
+        _time.Now = Start.AddMinutes(1);
+        await service.ProcessAsync(_queue.Messages.Single());
+
+        var export = (await service.GetExportAsync("acme", "main", "default", started.Id))!;
+        var push = _inbox.Pushes.ShouldHaveSingleItem().Push;
+
+        // the notification of the end as it was saved, with its counts
+        push.ShouldBe(ViewTransferNotifications.Create(_store.Saves[^1]));
+        push.Level.ShouldBe(ViewInboxItemLevel.Success);
+        push.Title.ShouldBe("Export finished");
+        push.Text!.ShouldStartWith("2 annotations, 1 schema, 0 templates, 1 configuration, 6 versions, ");
+        push.Key.ShouldBe($"ViewExport.{started.Id}");
+        push.CreatedAt.ShouldBe(Start.AddMinutes(1));
+        push.ExpiresAt.ShouldBe(export.ExpiresAt);
+        push.CreatedBy.ShouldBe(Actor);
+        push.Job.ShouldBe(new ViewInboxJob { Kind = ViewInboxJobKind.ViewExport, Id = started.Id, FileName = export.FileName });
+    }
+
+    [Fact]
+    public async Task ProcessImport_PushesItsEndIntoTheInboxOnce()
+    {
+        _configurations.Import = (key, _) => key.Annotation.ToString() == "rst.k007"
+            ? new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: ErrorCodes.SchemaViolation, Message: "violates")
+            : new ViewImportResult(ViewImportOutcome.Created, 1);
+        var files = Enumerable.Range(0, 120).Select(index => ($"rst.k{index:D3}.conf.json", "{\"a\":1}")).ToArray();
+        using var zip = Zip(files);
+        var service = WithInbox(_inbox);
+        var started = await service.StartImportAsync("acme", "main", "default", zip, "configs.zip", null, ViewImportExisting.Overwrite, false, false, Actor);
+
+        _time.Now = Start.AddMinutes(2);
+        await service.ProcessAsync(_queue.Messages.Single());
+
+        // the saves of the progress push nothing, and a job with a failed file still succeeded
+        _store.Saves.Count(save => save.Status == ViewTransferStatus.Running).ShouldBe(4);
+        var push = _inbox.Pushes.ShouldHaveSingleItem().Push;
+        push.ShouldBe(ViewTransferNotifications.Create(_store.Saves[^1]));
+        push.Level.ShouldBe(ViewInboxItemLevel.Warning);
+        push.Title.ShouldBe("Import finished with failures");
+        push.Text.ShouldBe("configs.zip: 119 created, 0 updated, 0 unchanged, 0 skipped, 1 failed");
+        push.Key.ShouldBe($"ViewImport.{started.Id}");
+        push.CreatedAt.ShouldBe(Start.AddMinutes(2));
+        push.ExpiresAt.ShouldBe(Start.AddMinutes(2).AddHours(24));
+        push.Job.ShouldBe(new ViewInboxJob { Kind = ViewInboxJobKind.ViewImport, Id = started.Id, FileName = "configs.zip" });
+    }
+
+    [Fact]
+    public async Task ProcessExport_AnExceptionPushesTheFailureOnce()
+    {
+        _configurations.Histories = null!;
+        var service = WithInbox(_inbox);
+        var started = await service.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Folder, null, Actor);
+
+        _time.Now = Start.AddMinutes(1);
+        await service.ProcessAsync(_queue.Messages.Single());
+
+        var failed = (await service.GetExportAsync("acme", "main", "default", started.Id))!;
+        var push = _inbox.Pushes.ShouldHaveSingleItem().Push;
+        push.Level.ShouldBe(ViewInboxItemLevel.Error);
+        push.Title.ShouldBe("Export failed");
+        push.Text.ShouldBe(failed.Error);
+        push.Text!.ShouldStartWith("The export failed: ");
+        push.Key.ShouldBe($"ViewExport.{started.Id}");
+        push.CreatedAt.ShouldBe(Start.AddMinutes(1));
+
+        // a failure does not expire with its job: the inbox keeps it as long as any other item
+        push.ExpiresAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ProcessImport_AnExceptionPushesTheFailureOnce()
+    {
+        using var zip = Zip(("rst.a.conf.json", """{"a":1}"""));
+        var service = WithInbox(_inbox);
+        var started = await service.StartImportAsync("acme", "main", "default", zip, null, null, ViewImportExisting.Overwrite, false, true, Actor);
+        _storage.Archives.Clear();
+
+        await service.ProcessAsync(_queue.Messages.Single());
+
+        var push = _inbox.Pushes.ShouldHaveSingleItem().Push;
+        push.Level.ShouldBe(ViewInboxItemLevel.Error);
+        push.Title.ShouldBe("Check failed");
+        push.Text.ShouldBe("The import failed: The uploaded archive no longer exists.");
+        push.Key.ShouldBe($"ViewImport.{started.Id}");
+        push.ExpiresAt.ShouldBeNull();
+        push.Job.ShouldBe(new ViewInboxJob { Kind = ViewInboxJobKind.ViewImport, Id = started.Id });
+    }
+
+    [Fact]
+    public async Task Start_PushesTheFailureOfAJobThatCannotBeQueued()
+    {
+        _queue.Failure = new InvalidOperationException("queue down");
+        var service = WithInbox(_inbox);
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => service.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Folder, null, Actor));
+
+        var failed = _store.Saves[^1];
+        failed.Status.ShouldBe(ViewTransferStatus.Failed);
+        var push = _inbox.Pushes.ShouldHaveSingleItem().Push;
+        push.Title.ShouldBe("Export failed");
+        push.Text.ShouldBe("The job could not be queued; try again.");
+        push.Key.ShouldBe($"ViewExport.{failed.Id}");
+        push.CreatedBy.ShouldBe(Actor);
+    }
+
+    [Fact]
+    public async Task Abandon_PushesTheFailureOfARunningJobOnce()
+    {
+        var service = WithInbox(_inbox);
+        var message = await StartAsync(service, ViewTransferKind.Import);
+
+        // the worker crashed on every delivery: the job stayed running, and nothing was pushed
+        var record = (await _store.GetAsync("acme", "main", "default", ViewTransferKind.Import, message.Id))!;
+        await _store.TryReplaceAsync(record with { Import = record.Import! with { Status = ViewTransferStatus.Running, StartedAt = Start } });
+        _time.Now = Start.AddMinutes(30);
+
+        await service.AbandonAsync(message);
+
+        var push = _inbox.Pushes.ShouldHaveSingleItem().Push;
+        push.Level.ShouldBe(ViewInboxItemLevel.Error);
+        push.Title.ShouldBe("Import failed");
+        push.Text!.ShouldContain("stopped on every attempt");
+        push.Key.ShouldBe($"ViewImport.{message.Id}");
+        push.CreatedAt.ShouldBe(Start.AddMinutes(30));
+    }
+
+    [Theory]
+    [InlineData(ViewTransferKind.Export, false)]
+    [InlineData(ViewTransferKind.Export, true)]
+    [InlineData(ViewTransferKind.Import, false)]
+    [InlineData(ViewTransferKind.Import, true)]
+    public async Task EndedJob_ARedeliveredMessageAndThePoisonQueuePushTheSameItem(ViewTransferKind kind, bool isFailed)
+    {
+        var service = WithInbox(_storedInbox);
+        var message = await StartAsync(service, kind);
+
+        if (isFailed)
+        {
+            // an export cannot read the configurations, an import has lost its upload
+            _configurations.Histories = null!;
+            _storage.Archives.Clear();
+        }
+
+        _time.Now = Start.AddMinutes(1);
+        await service.ProcessAsync(message);
+        var ended = (await _store.GetAsync("acme", "main", "default", kind, message.Id))!;
+        ended.Status.ShouldBe(isFailed ? ViewTransferStatus.Failed : ViewTransferStatus.Succeeded);
+
+        // the message comes again after the end, and at last the queue gives up on it
+        _time.Now = Start.AddMinutes(9);
+        await service.ProcessAsync(message);
+        await service.AbandonAsync(message);
+
+        // three pushes of one end are one item, written once
+        var id = ViewInboxIds.ForKey(Start.AddMinutes(1), $"View{kind}.{message.Id}");
+        _storedInbox.Items.Select(item => item.Id).ShouldBe([id, id, id]);
+        var item = _items.Writes.ShouldHaveSingleItem().Record.Item;
+        item.Id.ShouldBe(id);
+        item.Level.ShouldBe(isFailed ? ViewInboxItemLevel.Error : ViewInboxItemLevel.Success);
+
+        // and the job stays as it ended
+        (await _store.GetAsync("acme", "main", "default", kind, message.Id)).ShouldBe(ended);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EndedJob_ALaterMessagePushesTheEndWhosePushWasLost(bool isGivenUp)
+    {
+        var service = WithInbox(_storedInbox);
+        var message = await StartAsync(service, ViewTransferKind.Export);
+
+        // the worker stops between the save of the end and its push
+        _storedInbox.Failure = new IOException("The worker stopped.");
+        _time.Now = Start.AddMinutes(1);
+        await service.ProcessAsync(message);
+        _items.Writes.ShouldBeEmpty();
+
+        // the message is delivered again or, after the last delivery, the queue gives up on it
+        _storedInbox.Failure = null;
+        _time.Now = Start.AddMinutes(9);
+        await (isGivenUp ? service.AbandonAsync(message) : service.ProcessAsync(message));
+
+        var item = _items.Writes.ShouldHaveSingleItem().Record.Item;
+        item.Id.ShouldBe(ViewInboxIds.ForKey(Start.AddMinutes(1), $"ViewExport.{message.Id}"));
+        item.Title.ShouldBe("Export finished");
+        item.CreatedAt.ShouldBe(Start.AddMinutes(1));
+
+        // the export that ended is left alone, with its archive
+        (await service.GetExportAsync("acme", "main", "default", message.Id))!.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        _storage.Archives.Keys.ShouldContain(ViewTransferNames.GetArchiveName(message));
+    }
+
+    [Fact]
+    public async Task ProcessImport_AnEndWhoseSaveLostItsAnswerIsStillPushed()
+    {
+        var service = WithInbox(_inbox);
+        var message = await StartAsync(service, ViewTransferKind.Import);
+
+        // the save of the end reaches the store, but its answer does not reach the worker
+        _store.Saved = saved =>
+        {
+            if (saved.Status == ViewTransferStatus.Succeeded)
+            {
+                throw new IOException("The request timed out.");
+            }
+        };
+
+        await service.ProcessAsync(message);
+
+        // the job had ended, so it is not failed, and that end is what the inbox gets
+        var import = (await service.GetImportAsync("acme", "main", "default", message.Id))!;
+        import.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        import.Error.ShouldBeNull();
+        var push = _inbox.Pushes.ShouldHaveSingleItem().Push;
+        push.Title.ShouldBe("Import finished");
+        push.Key.ShouldBe($"ViewImport.{message.Id}");
+    }
+
+    [Fact]
+    public async Task ProcessExport_AnEndWhoseSaveLostItsAnswerIsStillPushed_AndKeepsItsArchive()
+    {
+        SetEveryKind();
+        var service = WithInbox(_inbox);
+        var message = await StartAsync(service, ViewTransferKind.Export);
+
+        // the save of the end reaches the store, but its answer does not reach the worker
+        _store.Saved = saved =>
+        {
+            if (saved.Status == ViewTransferStatus.Succeeded)
+            {
+                throw new IOException("The request timed out.");
+            }
+        };
+
+        await service.ProcessAsync(message);
+
+        // the job had ended, so it is not failed, and that end is what the inbox gets
+        var export = (await service.GetExportAsync("acme", "main", "default", message.Id))!;
+        export.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        export.Error.ShouldBeNull();
+        var push = _inbox.Pushes.ShouldHaveSingleItem().Push;
+        push.Title.ShouldBe("Export finished");
+        push.Key.ShouldBe($"ViewExport.{message.Id}");
+
+        // the item leads to the archive, so the exception of the save must not take it away
+        _storage.Archives.Keys.ShouldContain(ViewTransferNames.GetArchiveName(message));
+        var (opened, archive) = await service.OpenExportArchiveAsync("acme", "main", "default", message.Id);
+        await using var content = archive;
+        opened.ShouldBe(export);
+        content.Length.ShouldBe(export.Size!.Value);
+    }
+
+    [Theory]
+    [InlineData(ViewTransferKind.Export)]
+    [InlineData(ViewTransferKind.Import)]
+    public async Task Process_PushesNothingForAJobThatAnotherWorkerTook(ViewTransferKind kind)
+    {
+        var service = WithInbox(_inbox);
+        var message = await StartAsync(service, kind);
+
+        // another worker writes the job just before this one saves its end
+        _store.Replacing = record =>
+        {
+            if (record.Status == ViewTransferStatus.Succeeded)
+            {
+                _store.TakeOver(record.Id);
+            }
+        };
+
+        await service.ProcessAsync(message);
+
+        // the end was not saved, so it is not this worker's to report
+        (await _store.GetAsync("acme", "main", "default", kind, message.Id))!.Status.ShouldBe(ViewTransferStatus.Running);
+        _inbox.Pushes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Process_PushesNothingForAFailureThatWasNotSaved()
+    {
+        _configurations.Histories = null!;
+        var service = WithInbox(_inbox);
+        var message = await StartAsync(service, ViewTransferKind.Export);
+
+        // another worker writes the job between the read and the save of the failure
+        _store.Replacing = record =>
+        {
+            if (record.Status == ViewTransferStatus.Failed)
+            {
+                _store.TakeOver(record.Id);
+            }
+        };
+
+        await service.ProcessAsync(message);
+
+        (await service.GetExportAsync("acme", "main", "default", message.Id))!.Status.ShouldBe(ViewTransferStatus.Running);
+        _inbox.Pushes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task MissingJob_PushesNothing()
+    {
+        var service = WithInbox(_inbox);
+        var message = new ViewTransferMessage("acme", "main", "default", ViewTransferKind.Export, "gone");
+
+        await service.ProcessAsync(message);
+        await service.AbandonAsync(message);
+
+        _inbox.Pushes.ShouldBeEmpty();
+        _store.Saves.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ThrowingInbox_NeitherFailsAnExportNorDeletesItsArchive()
+    {
+        SetEveryKind();
+        var failure = new IOException("inbox down");
+        var logger = new CapturingLogger<ViewTransferService>();
+        _inbox.Failure = failure;
+        var service = WithInbox(_inbox, logger);
+        var message = await StartAsync(service, ViewTransferKind.Export);
+
+        await service.ProcessAsync(message);
+
+        // the push was tried, and its failure is a warning
+        _inbox.Pushes.ShouldHaveSingleItem();
+        logger.Entries.ShouldContain(entry => entry.Level == LogLevel.Warning && ReferenceEquals(entry.Exception, failure));
+        logger.Entries.ShouldNotContain(entry => entry.Level >= LogLevel.Error);
+
+        // the export succeeded and stays downloadable
+        var export = (await service.GetExportAsync("acme", "main", "default", message.Id))!;
+        export.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        export.Error.ShouldBeNull();
+        _storage.Archives.Keys.ShouldContain(ViewTransferNames.GetArchiveName(message));
+        var (opened, archive) = await service.OpenExportArchiveAsync("acme", "main", "default", message.Id);
+        await using var content = archive;
+        opened.ShouldBe(export);
+        content.Length.ShouldBe(export.Size!.Value);
+    }
+
+    [Fact]
+    public async Task ThrowingInbox_DoesNotFailAnImport()
+    {
+        _inbox.Failure = new IOException("inbox down");
+        var service = WithInbox(_inbox);
+        var message = await StartAsync(service, ViewTransferKind.Import);
+
+        await service.ProcessAsync(message);
+
+        _inbox.Pushes.ShouldHaveSingleItem();
+        var import = (await service.GetImportAsync("acme", "main", "default", message.Id))!;
+        import.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        import.Summary.ShouldBe(new ViewImportSummary { Created = 1 });
+
+        // the upload is removed as after any import that ended
+        _storage.Archives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ThrowingInbox_KeepsTheFailureOfAJobAndWhatFollowsIt()
+    {
+        _inbox.Failure = new IOException("inbox down");
+        var service = WithInbox(_inbox);
+        var message = await StartAsync(service, ViewTransferKind.Export);
+        var archive = ViewTransferNames.GetArchiveName(message);
+        using var partial = new MemoryStream([1, 2, 3]);
+        await _storage.UploadAsync(archive, partial);
+
+        await service.AbandonAsync(message);
+
+        // the job is failed by this call whatever the inbox answers, so the partial archive of the export goes
+        _inbox.Pushes.ShouldHaveSingleItem();
+        var export = (await service.GetExportAsync("acme", "main", "default", message.Id))!;
+        export.Status.ShouldBe(ViewTransferStatus.Failed);
+        export.Error!.ShouldContain("stopped on every attempt");
+        _storage.Archives.Keys.ShouldNotContain(archive);
+    }
+
+    [Fact]
+    public async Task Process_AnEndThatCannotBeReportedIsLoggedAndNotThrown()
+    {
+        var logger = new CapturingLogger<ViewTransferService>();
+        var service = WithInbox(_inbox, logger);
+
+        // a stored job without its model counts as failed, and nothing can be said about its end
+        var record = await _store.CreateAsync(
+            new ViewTransferRecord { Organization = "acme", Project = "main", View = "default", Kind = ViewTransferKind.Export, Id = "broken" });
+
+        await service.ProcessAsync(record.ToMessage());
+        await service.AbandonAsync(record.ToMessage());
+
+        _inbox.Pushes.ShouldBeEmpty();
+        logger.Entries.Count(entry => entry.Level == LogLevel.Warning && entry.Exception is ArgumentException).ShouldBe(2);
+    }
+
+    [Theory]
+    [InlineData(ViewTransferKind.Export)]
+    [InlineData(ViewTransferKind.Import)]
+    public async Task CancelledInvocation_StillPushesTheEnd(ViewTransferKind kind)
+    {
+        var service = WithInbox(_storedInbox);
+        var message = await StartAsync(service, kind);
+        using var invocation = new CancellationTokenSource();
+
+        // the host shuts down while the end is saved; the invocation still completes, and no message comes again
+        _store.Saved = saved =>
+        {
+            if (saved.Status == ViewTransferStatus.Succeeded)
+            {
+                invocation.Cancel();
+            }
+        };
+
+        await service.ProcessAsync(message, invocation.Token);
+
+        // the store of the inbox refuses a cancelled token, so the item is there only when the push did not carry it
+        _storedInbox.Pushes.ShouldHaveSingleItem().CancellationToken.CanBeCanceled.ShouldBeFalse();
+        _items.Writes.ShouldHaveSingleItem().Record.Item.Id.ShouldBe(ViewInboxIds.ForKey(Start, $"View{kind}.{message.Id}"));
+    }
+
+    [Fact]
+    public async Task WithoutAnInbox_TheEndsOfJobsAreReportedNowhere()
+    {
+        // ten arguments, as a host without the inbox and the callers by hand build the service
+        var logger = new CapturingLogger<ViewTransferService>();
+        var service = new ViewTransferService(
+            _store,
+            _storage,
+            _queue,
+            _annotations,
+            _schemas,
+            _templates,
+            _configurations,
+            Options.Create(_options),
+            _time,
+            logger);
+        var message = await StartAsync(service, ViewTransferKind.Export);
+
+        // every place that reports an end: the end itself, the message that comes again, and the poison queue
+        await service.ProcessAsync(message);
+        await service.ProcessAsync(message);
+        await service.AbandonAsync(message);
+
+        (await service.GetExportAsync("acme", "main", "default", message.Id))!.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        _storage.Archives.Keys.ShouldContain(ViewTransferNames.GetArchiveName(message));
+
+        // a push that failed would be a warning
+        logger.Entries.ShouldNotContain(entry => entry.Level == LogLevel.Warning);
+    }
+
+    [Fact]
     public void Message_RoundTripsThroughJson()
     {
         var message = new ViewTransferMessage("acme", "main", "default", ViewTransferKind.Import, "0123");
@@ -963,6 +1433,39 @@ public class ViewTransferServiceTests
         var started = await _service.StartImportAsync("acme", "main", "default", zip, null, include, existing, force, dryRun, Actor);
         await _service.ProcessAsync(_queue.Messages.Single());
         return (await _service.GetImportAsync("acme", "main", "default", started.Id))!;
+    }
+
+    // The service over the same fakes with an inbox, as a host with the inbox builds it.
+    private ViewTransferService WithInbox(IViewInboxPublisher inbox, ILogger<ViewTransferService>? logger = null)
+    {
+        return new ViewTransferService(
+            _store,
+            _storage,
+            _queue,
+            _annotations,
+            _schemas,
+            _templates,
+            _configurations,
+            Options.Create(_options),
+            _time,
+            logger ?? NullLogger<ViewTransferService>.Instance,
+            inbox);
+    }
+
+    // Starts an export of "acme.main.default", or an import of one configuration into it, and returns its message.
+    private async Task<ViewTransferMessage> StartAsync(ViewTransferService service, ViewTransferKind kind)
+    {
+        if (kind == ViewTransferKind.Export)
+        {
+            await service.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Folder, null, Actor);
+        }
+        else
+        {
+            using var zip = Zip(("rst.a.conf.json", """{"a":1}"""));
+            await service.StartImportAsync("acme", "main", "default", zip, "configs.zip", null, ViewImportExisting.Overwrite, false, false, Actor);
+        }
+
+        return _queue.Messages[^1];
     }
 
     // An export job of the view "acme.main.default" with the include, queued without StartExportAsync.

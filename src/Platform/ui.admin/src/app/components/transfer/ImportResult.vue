@@ -20,9 +20,13 @@ import {
 /**
  * The result of an import of the view (spec 4.4 of the Export and Import of a View): a banner, the counts per kind
  * and in total, chips that filter the documents by kind and outcome, and the documents that were not unchanged, with
- * their warnings and a link to the document. A table on desktop, a list on phones.
+ * their warnings and a link to the document. A table on desktop, a list on phones. The heading is "Latest import" on
+ * the Export & Import page; the inbox of the view shows the report of any import under its own (424-31).
  */
-const props = defineProps<{ result: ViewImport; scope: Scope; canImportNow?: boolean; importing?: boolean }>()
+const props = withDefaults(
+  defineProps<{ result: ViewImport; scope: Scope; canImportNow?: boolean; importing?: boolean; title?: string }>(),
+  { title: 'Latest import' },
+)
 const emit = defineEmits<{ importNow: [] }>()
 
 const desktop = useMediaQuery('(min-width: 768px)')
@@ -190,7 +194,7 @@ const columns: TableColumn<ViewImportItem>[] = [
 <template>
   <UCard as="section" aria-labelledby="result-heading" :ui="{ body: 'space-y-4' }">
     <template #header>
-      <h2 id="result-heading" class="font-semibold text-highlighted">Latest import</h2>
+      <h2 id="result-heading" class="font-semibold text-highlighted">{{ title }}</h2>
     </template>
 
     <UAlert

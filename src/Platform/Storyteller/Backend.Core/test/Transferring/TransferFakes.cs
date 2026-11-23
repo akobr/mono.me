@@ -23,6 +23,9 @@ internal sealed class InMemoryTransferStore : IViewTransferStore
     // Called with each saved record, while the caller waits for the save.
     public Action<ViewTransferRecord>? Saved { get; set; }
 
+    // Called before a replace looks at the ETag: what another worker does between a read and the write after it.
+    public Action<ViewTransferRecord>? Replacing { get; set; }
+
     public int ActiveCount { get; set; }
 
     public Task<ViewTransferRecord> CreateAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
@@ -48,6 +51,7 @@ internal sealed class InMemoryTransferStore : IViewTransferStore
 
     public Task<ViewTransferRecord?> TryReplaceAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
     {
+        Replacing?.Invoke(record);
         var key = Key(record.Organization, record.Project, record.View, record.Kind, record.Id);
 
         if (!_records.TryGetValue(key, out var stored) || stored.ETag != record.ETag)

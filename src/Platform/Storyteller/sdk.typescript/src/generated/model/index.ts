@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.56.17030
+ * OpenAPI spec version: 0.10.58.40890
  */
 
 export * from "./accessAuditEntry";
@@ -153,6 +153,7 @@ export * from "./getTemplateVersionDiffParams";
 export * from "./getUnitsOfExecutionParams";
 export * from "./getUnitsParams";
 export * from "./getUsagesParams";
+export * from "./getViewInboxParams";
 export * from "./getViewsParams";
 export * from "./hsmSettings";
 export * from "./hsmSettingsBackend";
@@ -288,4 +289,12 @@ export * from "./viewImportStatus";
 export * from "./viewImportSummary";
 export * from "./viewImportSummaryContent";
 export * from "./viewImportWarning";
+export * from "./viewInboxItem";
+export * from "./viewInboxItemKind";
+export * from "./viewInboxItemLevel";
+export * from "./viewInboxItemMinimalRole";
+export * from "./viewInboxItemState";
+export * from "./viewInboxJob";
+export * from "./viewInboxJobKind";
+export * from "./viewInboxResponse";
 export * from "./viewUpdate";

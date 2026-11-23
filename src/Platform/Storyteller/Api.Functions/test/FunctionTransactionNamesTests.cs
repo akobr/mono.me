@@ -32,6 +32,7 @@ public class FunctionTransactionNamesTests
     [InlineData(nameof(KeyValuesHttp.SetKeyValue), null, "PUT /api/v1/{organization}/{project}/{view}/key-values/{key}")]
     [InlineData(nameof(KeyValuesHttp.GetKeyValue), "GET", "GET /api/v1/{organization}/{project}/{view}/key-values/{key}")]
     [InlineData(nameof(AnnotationsHttp.SetAnnotation), "POST", "POST /api/v1/{organization}/{project}/{view}/annotations/{key}")]
+    [InlineData(nameof(ViewInboxHttp.AcceptViewInboxItem), "POST", "POST /api/v1/{organization}/{project}/{view}/inbox/{id}/accept")]
     [InlineData("ProcessViewTransfer", null, "queue ProcessViewTransfer")]
     [InlineData("KeyValueProtectionTimer", null, "timer KeyValueProtectionTimer")]
     [InlineData("RenderSwaggerDocument", "GET", "RenderSwaggerDocument")]

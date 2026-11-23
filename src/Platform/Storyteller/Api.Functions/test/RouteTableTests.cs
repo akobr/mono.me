@@ -375,6 +375,47 @@ public partial class RouteTableTests
         routes.ShouldContain(expected);
     }
 
+    // A literal segment after the view, as the transfers have. An item has no route of its own, only its two actions.
+    [Theory]
+    [InlineData("GET v1/{}/{}/{}/inbox")]
+    [InlineData("POST v1/{}/{}/{}/inbox/{}/accept")]
+    [InlineData("POST v1/{}/{}/{}/inbox/{}/dismiss")]
+    public void InboxRoutes_AreRegistered(string expected)
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
+
+        routes.ShouldContain(expected);
+    }
+
+    // Exactly the three: no route of one item, and the list is only read.
+    [Fact]
+    public void InboxRoutes_AreTheListAndTheTwoActionsOfAnItem()
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {trigger.Route}"))
+            .Where(route => route.Contains("/inbox", StringComparison.Ordinal));
+
+        routes.ShouldBe(
+            [
+                $"GET {Definitions.Routes.Inbox.V1.Inbox}",
+                $"POST {Definitions.Routes.Inbox.V1.ItemAccept}",
+                $"POST {Definitions.Routes.Inbox.V1.ItemDismiss}",
+            ],
+            ignoreOrder: true);
+        Definitions.Routes.Inbox.V1.Inbox.ShouldBe("v1/{organization}/{project}/{view}/inbox");
+        Definitions.Routes.Inbox.V1.ItemAccept.ShouldBe("v1/{organization}/{project}/{view}/inbox/{id}/accept");
+        Definitions.Routes.Inbox.V1.ItemDismiss.ShouldBe("v1/{organization}/{project}/{view}/inbox/{id}/dismiss");
+    }
+
     private static bool IsRouteTemplate(string route)
     {
         try

@@ -112,7 +112,7 @@ npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 npm run prepare:local  # npm ci and npm run build, each only when its inputs changed (--force: always)
 ```
 
-To generate from a specific document: `SPEC=../open.api.v0.10.56.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.56.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.56.10738` → `0.10.56`).
+To generate from a specific document: `SPEC=../open.api.v0.10.58.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.58.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.58.40890` → `0.10.58`).
 
 After Orval, `npm run generate` runs `scripts/generate-catalog.mjs` (also on its own: `node scripts/generate-catalog.mjs`), which writes `src/generated/catalog/project-settings.ts` from the catalog of the conformance suite (`../conformance/project-settings.json`), formatted by Prettier as Orval formats its output. So a change of the catalog needs `npm run generate` too, and the check that `src/generated` matches a fresh generation guards the catalog module as well.
 
@@ -201,6 +201,33 @@ const zip = await getViewExportArchive('acme', 'billing', 'default', exported.Id
 
 const check = await startViewImport('acme', 'billing', 'staging', zip, { include: ['Templates'], existing: 'Skip', dryRun: true })
 const result = await getViewImport('acme', 'billing', 'staging', check.Id!)              // Summaries per kind, Items with their Warnings
+```
+
+## Inbox of a view
+
+The `inbox` tag reads the inbox of a view and closes its items: `getViewInbox`, `acceptViewInboxItem` and `dismissViewInboxItem` (`docs/Platform/Storyteller/inbox.md`). They are for users only, with the Contributor role on the project: a machine is refused with a `403`, and an item above the caller's role is a `404`. `getViewInbox` takes `state`, `Open` (the default) or `Done` for the accepted and the dismissed items, and `continuationToken`. It answers a `ViewInboxResponse`: a page of at most 50 `Items`, newest first, their `Count`, `OpenCount` (every open item the caller sees, whatever the page and the `state`), and a `ContinuationToken` while a page follows. Accept and dismiss send no body and answer the `ViewInboxItem` as the call left it. Only an open `Action` can be accepted: another item is a `409` (`errorCode` `InboxItemNotAction` or `InboxItemClosed`), and an action the deployment has no handler for a `501` (`InboxActionNotAvailable`). Every member of the generated types is optional, so check `Id` before you send it. Their Vue Query composables are under `./vue-query`: `useGetViewInbox`, `useAcceptViewInboxItem` and `useDismissViewInboxItem`. The query key of the list, `getGetViewInboxQueryKey(organization, project, view, params)`, is `['v1', organization, project, view, 'inbox']` and then the parameters when they are given, so the path of the list invalidates both states and every page. The Zod schemas are under `./zod`, and the MSW handlers under `./msw` (`getInboxMock()`, part of `getStorytellerMock()`, and `getGetViewInboxMockHandler(…)` and the rest).
+
+```ts
+import { dismissViewInboxItem, getViewInbox } from '@42for.net/2splatform.sdk'
+import { invalidateByPath, useDismissViewInboxItem, useGetViewInbox } from '@42for.net/2splatform.sdk/vue-query'
+
+const page = await getViewInbox('acme', 'billing', 'default')                            // the open items, and OpenCount for a mark
+const done = await getViewInbox('acme', 'billing', 'default', { state: 'Done' })         // the accepted and the dismissed ones
+const first = page.Items?.[0]
+
+if (first?.Id) {
+  const dismissed = await dismissViewInboxItem('acme', 'billing', 'default', first.Id)   // State is Dismissed, Closed names the caller
+}
+
+const inbox = useGetViewInbox(org, project, view, { state: 'Open' })                     // refs, getters or strings
+const dismiss = useDismissViewInboxItem({
+  mutation: {
+    // the view the call changed, which the refs may no longer name by then
+    onSuccess: (_item, { organization, project, view }) =>
+      invalidateByPath(queryClient, `/v1/${organization}/${project}/${view}/inbox`),
+  },
+})
+const close = (id: string) => dismiss.mutate({ organization: org.value, project: project.value, view: view.value, id })
 ```
 
 ## Workload identity federation
