@@ -10,6 +10,8 @@ namespace _42.Platform.Storyteller.KeyValues;
 
 public static class KeyValueProtectionEntryPoint
 {
+    public const string ManagedIdentityClientIdVariable = "AZURE_CLIENT_ID";
+
     /// <summary>
     /// Adds the Key Vault key-encryption providers of the key/value protection levels:
     /// Standard needs the vault <c>AzureKeyVaults:{KeyValues:Protection:Standard:VaultName}</c>, Hsm the vault
@@ -31,12 +33,14 @@ public static class KeyValueProtectionEntryPoint
             throw new InvalidOperationException("KeyValues:Protection:Emulator must not be set in production.");
         }
 
+        // The client id of the app's user-assigned managed identity, the variable the Azure SDK reads; production sets it.
+        var managedIdentityClientId = configuration[ManagedIdentityClientIdVariable];
         var vaults = configuration.GetSection("AzureKeyVaults");
         var standardUri = vaults[protection.Standard.VaultName];
 
         if (!string.IsNullOrWhiteSpace(standardUri))
         {
-            var client = KeyVaultClients.CreateKeyClient(new Uri(standardUri), protection.Emulator, isProduction);
+            var client = KeyVaultClients.CreateKeyClient(new Uri(standardUri), protection.Emulator, isProduction, managedIdentityClientId);
             @this.AddSingleton<IKeyEncryptionProvider>(provider => KeyVaultKeyProvider.CreateStandard(
                 client,
                 provider.GetRequiredService<IOptions<KeyValueOptions>>(),
@@ -48,14 +52,14 @@ public static class KeyValueProtectionEntryPoint
             .Where(entry => !string.IsNullOrWhiteSpace(entry.Value))
             .ToDictionary(
                 entry => entry.Key,
-                entry => KeyVaultClients.CreateKeyClient(new Uri(entry.Value), protection.Emulator, isProduction),
+                entry => KeyVaultClients.CreateKeyClient(new Uri(entry.Value), protection.Emulator, isProduction, managedIdentityClientId),
                 StringComparer.OrdinalIgnoreCase);
 
         if (!string.IsNullOrWhiteSpace(premiumUri) || managedHsms.Count > 0)
         {
             var premiumClient = string.IsNullOrWhiteSpace(premiumUri)
                 ? null
-                : KeyVaultClients.CreateKeyClient(new Uri(premiumUri), protection.Emulator, isProduction);
+                : KeyVaultClients.CreateKeyClient(new Uri(premiumUri), protection.Emulator, isProduction, managedIdentityClientId);
             @this.AddSingleton<IKeyEncryptionProvider>(provider => KeyVaultKeyProvider.CreateHsm(
                 premiumClient,
                 managedHsms,
