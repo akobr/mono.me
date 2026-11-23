@@ -681,15 +681,20 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         entry.Message.ShouldBe($"A user token exchange by the actor {ActorId} is refused: the client {ClientId} is in Auth:TokenExchange:DeniedClientIds");
     }
 
-    // A subject token without a client is never denied; AllowedClientIds is what refuses it.
+    // A subject token without a client cannot show that it is not a denied one, so the deny list refuses it; with an
+    // empty deny list it passes.
     [Fact]
-    public async Task DeniedClients_DoNotRefuseASubjectTokenWithoutAClient()
+    public async Task DeniedClients_RefuseASubjectTokenWithoutAClient()
     {
-        _exchangeOptions.DeniedClientIds = [ClientId];
         _exchangeOptions.Actors[0].AllowedClientIds = [];
         _subjects.Result = Subject(clientId: null);
-
         (await _exchange.ExchangeAsync(Request())).Succeeded.ShouldBeTrue();
+
+        _exchangeOptions.DeniedClientIds = [ClientId];
+        var refused = await _exchange.ExchangeAsync(Request());
+
+        refused.Succeeded.ShouldBeFalse();
+        refused.ErrorDescription.ShouldBe(UserTokenExchangeResult.ClientBlockedDescription);
     }
 
     [Fact]

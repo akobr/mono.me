@@ -248,14 +248,16 @@ public sealed class StorytellerUserTokenValidationTests
             && entry.Message == $"A Storyteller user token of the actor {ActorId} is refused: its client https://chatgpt.com/oauth/client.json is in Auth:TokenExchange:DeniedClientIds");
     }
 
-    // A token without a client is never denied.
+    // A token without a client cannot show that it is not a denied one: refused while the deny list has an entry.
     [Fact]
-    public async Task UserToken_WithoutAClient_IsNotDenied()
+    public async Task UserToken_WithoutAClient_IsDeniedOnlyWhileTheDenyListHasAnEntry()
     {
-        _exchangeOptions.DeniedClientIds = ["https://chatgpt.com/oauth/client.json"];
         var issued = await _issuer.IssueUserAsync(UserRequest());
-
         (await _validator.ValidateAsync(issued.AccessToken)).ShouldNotBeNull();
+
+        _exchangeOptions.DeniedClientIds = ["https://chatgpt.com/oauth/client.json"];
+
+        (await _validator.ValidateAsync(issued.AccessToken)).ShouldBeNull();
     }
 
     // A client taken out of TrustedClientIds gets UntrustedClientRestrictions on its live tokens, a trusted one keeps the
