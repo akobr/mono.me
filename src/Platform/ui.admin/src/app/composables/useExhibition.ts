@@ -41,13 +41,18 @@ export function useExhibition() {
   )
   const member = computed(() => !!projectKey.value && roleRank(session.accessMap[projectKey.value]) > 0)
   const offered = computed(() => !!exhibition.value && !member.value)
+  // Whether the deployment's exhibition is known: an answer, or a 404 (none). Pending, or after another failure, it is
+  // not, and nothing may say whether a project is the exhibition.
+  const known = computed(() => query.isSuccess.value || isNotFound(query.error.value))
 
   return {
     exhibition,
     projectKey,
     member,
     offered,
-    isExhibition: (key: string | undefined) => !!key && key === projectKey.value,
+    /** Whether the project is the exhibition; undefined while the exhibition is not known. */
+    isExhibition: (key: string | undefined): boolean | undefined =>
+      known.value ? !!key && key === projectKey.value : undefined,
     refetch: () => query.refetch(),
   }
 }

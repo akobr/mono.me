@@ -203,5 +203,22 @@ One phone run lost the existing ACC-MEM-02 to a toast missed under load in `Crea
 
 - The members table keeps its rule for the caller's own row. An Administrator leaves through Settings, not through Members. An Owner who removes their own row there is not sent away from the page, as before this change.
 - Some checks that the offer is absent (ORG-ORG-04 and the e2e test of the same name) can pass before the request for the exhibition has answered. The checks where the offer is present are real.
-- While the answer about the exhibition is pending or has failed, the confirmation of a visitor says "To come back, you need a new invitation.". The text is right again once the exhibition loads, and it comes from the same cached answer as the card on Organizations.
 - Leaving an organization, and a leave on Members, stay out of scope.
+
+## Fixes after the PR reviews (2026-11-23)
+
+CodeRabbit and Grok reviewed PR #215. What held up was fixed; the rest is listed with the reason it stays.
+
+- **A 404 after an earlier offer is kept too** (CodeRabbit). Take an offer whose data stays in the cache, then a `404` of a refetch, such as the one after a join's `404`. Every mount after the offer's `staleTime` asked again, because `retryOnMount` applies only without data. `refetchOnMount` now skips a `404` as well. A test moves the clock past the `staleTime` and fails without the option.
+- **README** (CodeRabbit): after `window.storytellerMock.setExhibition` reload the app, because the app keeps the answer about the exhibition.
+- **The left project is forgotten after the navigation** (Grok). `useLeaveProject` navigated after an invalidation of the project. It now goes to Organizations first and then drops the cached queries of the project (`forgetProject` in `app/queries/invalidation.ts`: `removeByPath` of `/v1/{org}/{project}`, then `invalidateProject`). So no query of the project's page reads it again as a non-member. A test checks that nothing under `/acme/shipping` is requested after the DELETE and that the cache holds none of it.
+- **No sentence about coming back while the exhibition is not known** (Grok). `useExhibition().isExhibition(key)` is `undefined` while the answer is pending or after a failure other than `404`. `ProjectLeave` takes `comeBack` (`'invitation'`, `'exhibition'` or nothing) and says nothing about coming back without it, instead of the invitation sentence. This removes the known limit of a visitor told they need an invitation.
+
+Not changed:
+
+- **Settings reads the exhibition on every view.** It does not: the answer is kept for five minutes and a `404` until the app reloads, so a misconfigured deployment gets one request per page load.
+- **An Administrator who loses the role while editing loses the draft without a prompt.** The role changes only with the account, and a draft that can no longer be saved has nothing to keep.
+- **The mock checks the step-up after the refusals.** This is the mock's rule since 424-264, which the comment at the top of `access-handlers.ts` states.
+- **The dialog closes after a failed leave**, and the toast says why. **A rejected `router.push` after a join leaves the user on Organizations**, where the joined project is then listed. Both are deliberate.
+
+Runs: Vitest 129 files and 2492 tests; Playwright `membership`, `settings` and `accessibility` on desktop and mobile, 206 passed; typecheck and lint clean.

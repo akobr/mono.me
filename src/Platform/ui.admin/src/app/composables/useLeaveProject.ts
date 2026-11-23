@@ -3,7 +3,7 @@ import { isNavigationFailure, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { getAccount, hasErrorCode, removeMember, type Account } from '@42for.net/2splatform.sdk'
 import { leaveWithoutPrompt } from '@/composables/useUnsavedChanges'
-import { invalidateProject } from '@/queries/invalidation'
+import { forgetProject } from '@/queries/invalidation'
 import { useSessionStore } from '@/stores/session'
 import { errorMessage } from '@/utils/errors'
 import { withoutMembership } from '@/utils/memberships'
@@ -54,11 +54,11 @@ export function useLeaveProject() {
       // removal left. The page must not keep the membership either way.
       const fresh: Account = await getAccount().catch(() => withoutMembership(account, projectKey))
       session.setAccount(fresh)
-      // Organizations reads the session's access map; the cached projects and access point refresh behind it.
-      void invalidateProject(queryClient, projectKey)
-
       toast.add({ title: leaveTexts.left(projectKey), color: 'success', icon: 'i-lucide-log-out' })
       await toOrganizations()
+      // Only once the project's page is gone: none of its queries reads the project again as a non-member.
+      const dot = projectKey.indexOf('.')
+      void forgetProject(queryClient, projectKey.slice(0, dot), projectKey.slice(dot + 1))
       return true
     } finally {
       leaving.value = false
