@@ -1020,6 +1020,7 @@ Trust never removes a restriction of the actor itself. A wider match is safe onl
 | Warning | An actor with `AllowSecrets` has no `AllowedClientIds`, and its `UntrustedClientRestrictions` lack `NoSecretReveal` | Names the actor and ends "every client may read the person's secrets through it; add NoSecretReveal to UntrustedClientRestrictions." |
 | Warning | An actor has `TrustedClientIds`, but no `UntrustedClientRestrictions` that add to its own restrictions | Names the actor and ends "TrustedClientIds has no effect without UntrustedClientRestrictions that add to the actor's own restrictions." |
 | Warning | An id of `DeniedClientIds` is also in an actor's `TrustedClientIds` or `AllowedClientIds` | Names the id and the actor and ends "it is denied." |
+| Warning | An actor with `AllowedClientIds` trusts a client that list does not name | Names the id and the actor and ends "the exchange refuses it, so its trust never applies." |
 | Information | `DeniedClientIds` has entries | The number of denied clients; the ids are in the settings. |
 
 Overlaps and lists without effect are warnings, not failures: a failed start takes down the whole API, the admin UI and `sform` with it, and the deny list must work in a hurry.

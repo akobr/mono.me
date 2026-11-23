@@ -154,18 +154,44 @@ CodeRabbit's comments, and what was done with them:
 - **The OpenAPI 400 of `POST v1/access/token`.** It names the blocked-client refusal.
 - **Not done: a `PUT` operation of `SetAnnotation` in the OpenAPI document.** The generator emits one operation per function, and that gap predates this change. The middleware refuses `PUT` like `POST`, and the catalog test checks every method of every function.
 
+### 9. The Grok review (2026-11-23)
+
+Each point was checked against the code first.
+
+**Done:**
+
+- **The texts that the MCP server matches.** The server tells a missing account and a blocked client app apart by the API's exact `error_description`. The new `Mcp/test/ApiRefusalTextsTests.cs` reads `NoAccountDescription` and `ClientBlockedDescription` from the API's source and compares them with the server's copies. A change of the wording now fails the test, instead of silently bringing back the hint about `SubjectAudiences`. A machine-readable reason in the OAuth answer was not added: it would change the contract for no gain over the test.
+- **A trusted client that `AllowedClientIds` does not name.** `TokenExchangeActorNotice` now warns: "…is not in its AllowedClientIds: the exchange refuses it, so its trust never applies." The case has a test and a row in `authentication.md`.
+- **The status of an `ObjectResult` without a code.** The request line now logs the status of its `ProblemDetails` (`422` in the new test case), not `200`.
+- **The runbook:**
+  - a verify row for the first `tools/list` against an idle API, which waits up to 5 seconds and then lists the tools;
+  - "Cut off one client" now says that a sign-in without a client is refused too while the deny list has an entry. This was changed in section 8; the reviewer saw the older code.
+
+**Already covered:**
+
+- **`HasSamePolicy` and the client lists.** `TokenExchangeOptionsTests` tests a shared audience with a different `AllowedClientIds` and `TrustedClientIds`, and `authentication.md` documents it. Production has one actor, so `decisions.md` is not the place for it.
+- **The refusal of a client id outside 1 to 256 printable ASCII characters.** `authentication.md` already lists it among the `invalid_grant` reasons and in the claims table.
+- **An empty `subject_client_id`.** The validator's refused-claims theory includes it.
+- **The log scope in the catch blocks.** It is already one helper, `DelegationLogScope`.
+
+**Not done:**
+
+- **A configurable wait of the tool list.** The 5 seconds is a constant. It costs one exchange per sign-in token, which is cached for the calls that follow. The runbook now names the wait.
+- **The `ReadOnlyHint` of the tools.** `CatalogTests` pins an explicit hint on every tool. A tool that is wrongly marked read-only can only get the API's `403 ActorReadOnly`, which is safe.
+- **"The block takes effect right away."** The docs keep "once the API runs with the new settings": the restart that a change of the app settings causes takes minutes.
+
 ## Verification
 
 | Project | Result |
 | --- | --- |
 | `Backend.Core/test` | 1693 passed |
-| `Access.Federation/test` | 529 passed |
+| `Access.Federation/test` | 530 passed |
 | `Access.AuthKit/test`, `Access.AzureAd/test`, `Access.Keycloak/test` | 242, 141 and 138 passed |
-| `Api.Functions/test` | 3441 passed |
+| `Api.Functions/test` | 3442 passed |
 | `Backend.CosmosDb/test` (the touched classes, Testcontainers vNext) | 12 and 43 passed |
 | `Sdk.NSwag/test` | 595 passed |
 | `Cli/test` | 2578 passed |
-| `Mcp/test` | 795 passed (`Mcp/testint` builds) |
+| `Mcp/test` | 797 passed (`Mcp/testint` builds) |
 | `Libraries/Platform/Storyteller` (Aspire.Hosting, Configuration, Configuration.KeyVault, Hosting) | 164, 663 (2 skipped), 87 and 565 passed |
 | `sdk.typescript` | 505 passed (1 skipped), typecheck, lint, build |
 | `ui.admin` | 2450 passed, lint, `vue-tsc` and `vite build` |
