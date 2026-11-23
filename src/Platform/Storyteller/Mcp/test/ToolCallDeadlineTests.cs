@@ -79,6 +79,28 @@ public sealed class ToolCallDeadlineTests : IDisposable
         logged.ShouldAllBe(entry => entry.TrimEnd().EndsWith(").", StringComparison.Ordinal));
     }
 
+    // The headers arrive, then the body stops: the SDK reads it synchronously, without a token, so the deadline closes it.
+    [Fact]
+    public async Task AnswerWhoseBodyStalls_EndsAtTheDeadline()
+    {
+        var body = new StallingStream();
+        _host.Api.RespondAsync = (_, _) => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StreamContent(body) { Headers = { ContentType = new("application/json") } },
+        });
+        await using var client = await _host.ConnectAsync();
+
+        var call = client.CallAsync("create_machine", Arguments("create_machine"));
+        await body.Reading.WaitAsync(Wait, TestContext.Current.CancellationToken);
+        _clock.Advance(StorytellerCallFilter.ToolCallTimeout - ExchangeTime);
+        var result = await call.WaitAsync(Wait, TestContext.Current.CancellationToken);
+
+        result.IsError.ShouldBe(true);
+        result.Text().ShouldBe(StorytellerCallFilter.ToolCallTimeoutMessage);
+        body.Disposed.ShouldBeTrue();
+        _host.Api.Requests.Count.ShouldBe(1);
+    }
+
     [Fact]
     public async Task CallsThatEachFit_EndAtTheDeadlineOfTheWholeToolCall()
     {
@@ -156,4 +178,64 @@ public sealed class ToolCallDeadlineTests : IDisposable
         "create_machine" => new { organization = "house", project = "main", scopes = new[] { "AnnotationRead" } },
         _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, null),
     };
+
+    // The start of an answer, then nothing until it is closed, as a connection that stops sending.
+    private sealed class StallingStream : Stream
+    {
+        private readonly byte[] _start = System.Text.Encoding.UTF8.GetBytes("{\"Id\":\"m-");
+        private readonly ManualResetEventSlim _closed = new();
+        private readonly TaskCompletionSource _reading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool _started;
+
+        public Task Reading => _reading.Task;
+
+        public bool Disposed => _closed.IsSet;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (!_started)
+            {
+                _started = true;
+                var length = Math.Min(count, _start.Length);
+                Array.Copy(_start, 0, buffer, offset, length);
+                return length;
+            }
+
+            _reading.TrySetResult();
+
+            // Bounded in real time, so a broken deadline fails the test instead of hanging it.
+            _closed.Wait(Wait);
+            throw new IOException("The connection was closed.");
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            _closed.Set();
+            base.Dispose(disposing);
+        }
+    }
 }

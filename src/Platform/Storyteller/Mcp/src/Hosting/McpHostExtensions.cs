@@ -144,6 +144,9 @@ public static class McpHostExtensions
             client.RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
             client.ConfigureHttpClient(http => http.Timeout = Timeout.InfiniteTimeSpan);
+
+            // Outside the resilience handler: a body is read after it, and its attempt timeout ends with the headers.
+            client.AddHttpMessageHandler(() => new DeadlineBodyHandler());
             client.AddStandardResilienceHandler(options =>
             {
                 options.Retry.DisableForUnsafeHttpMethods();
