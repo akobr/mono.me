@@ -17,7 +17,7 @@ Everything is PowerShell 7.4+ on Windows, run from `src/Platform/Deployment` of 
 | 8 | GitHub environment and the first deployment by the workflow | script + workflow | a few minutes |
 | 9 | Verify | an MCP client + checks | — |
 | 10 | Rolling back | — | — |
-| 11 | The cost of the MCP server: when its budget warns | metrics + parameters | — |
+| 11 | The cost of the MCP server: its budget, and what to do when it warns | template + metrics | — |
 
 Later, for the MCP clients ([424-302](https://linear.app/424fun/issue/424-302/arch-production-turns-on-the-mcp-token-exchange-with-no-client-allow)): [Trust a client](#trust-a-client), [Cut off one client](#cut-off-one-client) and [Cut off every unlisted client](#cut-off-every-unlisted-client). A client that isn't trusted only reads and reveals no secret.
 
@@ -151,6 +151,8 @@ param mcpCustomDomain = false
 param mcpBudgetStartDate = '<the first day of this month, e.g. 2026-12-01>'
 ```
 
+`mcpBudgetStartDate` is the first month of the server's budget (phase 11): the month of this run, or a later one if the run may slip into it; never change it while the budget exists. Production ran this phase before the budget existed: phase 11, "Adding the budget", is its run.
+
 The client lists stay as committed: `mcpUntrustedClientRestrictions = ['ReadOnly', 'NoSecretReveal']` and the three id lists empty, so every client reads, changes nothing and reveals no secret until one is trusted ([Trust a client](#trust-a-client)).
 
 Commit them to `main` through a pull request, pull `main`, then:
@@ -166,8 +168,8 @@ az deployment sub what-if --name prod-2s-main --location swedencentral `
 - `+ Microsoft.ManagedIdentity/userAssignedIdentities/prod-2s-mcp-mi`
 - `+ Microsoft.App/managedEnvironments/prod-2s-cae`: the workload profile `Consumption`, `appLogsConfiguration.destination` `azure-monitor`, `zoneRedundant` false
 - `+ Microsoft.Insights/diagnosticSettings/log-analytics` on `prod-2s-cae`: `ContainerAppConsoleLogs` and `ContainerAppSystemLogs` to `prod-2s-log`, `Dedicated`
-- `+ Microsoft.App/containerApps/prod-2s-mcp-ca`: the image of phase 3, `minReplicas` 0, `maxReplicas` 3, `cooldownPeriod` 300, the identity, the 12 environment variables of the cookbook's step 17a, the three TCP probes, **no** `secrets` and no `customDomains`
-- `+ Microsoft.Consumption/budgets/prod-2s-mcp-budget`: amount 1, `timeGrain` `Monthly`, the start date you set, the filter `MeterCategory` `In` `Azure Container Apps`, the notifications `actual50`, `actual100` and `forecasted100` to your email
+- `+ Microsoft.App/containerApps/prod-2s-mcp-ca`: the image of phase 3, `minReplicas` from `mcpMinReplicas` (0 by default), `maxReplicas` 3, `cooldownPeriod` 300, the identity, the 12 environment variables of the cookbook's step 17a, the three TCP probes, **no** `secrets` and no `customDomains`
+- `+ Microsoft.Consumption/budgets/prod-2s-mcp-budget`: amount `mcpBudgetAmount` (1, or 12 with `mcpMinReplicas = 1`), `timeGrain` `Monthly`, the start date you set, the filter `MeterCategory` `In` `Azure Container Apps`, the notifications `actual50`, `actual100` and `forecasted100` to your email
 - `+ Microsoft.Authorization/roleAssignments/<guid>`: Container Apps Contributor (`358470bc-…`) for the deployment identity, scoped to `prod-2s-mcp-ca`
 - `~ Microsoft.Web/sites/prod-2s-api-fa/config/appsettings`: `Auth__TokenExchange__Enabled` `false` → `true`, `+ Auth__TokenExchange__AdditionalIssuers__0__Issuer` (`https://palatial-omen-84.authkit.app`) and `__JwksUri` (`…/oauth2/jwks`), `+ Auth__TokenExchange__Actors__0__Id` (`mcp`), `+ …__Authentication__WorkloadIdentity__Issuer` (`https://sts.windows.net/<tenant>/`), `__Subject` (the identity's object id: what-if may show it as an expression, since the identity doesn't exist yet), `__Audience` (`api://<mcpExchangeAppId>`), `+ …__SubjectAudiences__0` (`https://mcp.2s.42for.net/mcp`), `+ …__UntrustedClientRestrictions__0` (`ReadOnly`) and `__1` (`NoSecretReveal`); no `…__AllowedClientIds__*`, `…__TrustedClientIds__*` or `Auth__TokenExchange__DeniedClientIds__*` while their lists are empty; every other setting unchanged.
 
@@ -310,9 +312,9 @@ If the job fails with `AuthorizationFailed` on `Microsoft.App/containerApps/writ
 | Secrets | ask for a secret value | refused (`NoSecretReveal`), and the secret tools are not listed |
 | No passthrough | send the MCP token to `GET https://api.2s.42for.net/api/v1/access/account` | `401` |
 | Logs | Log Analytics `prod-2s-log`: `ContainerAppConsoleLogs \| where ContainerAppName == "prod-2s-mcp-ca" \| take 50`, and the API's Application Insights | the exchange logged with the actor `mcp` and the client, no token or body in any log |
-| Scale to zero | after 10 minutes without calls: `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` | no replica |
-| The budget | `az rest --url "https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Consumption/budgets/prod-2s-mcp-budget?api-version=2026-06-01" --query "properties.{amount:amount, start:timePeriod.startDate, spent:currentSpend.amount, filter:filter.dimensions}" -o json` (`az rest` fills in the subscription) | amount `1`, your start date, spent `0` (a few cents: see the Cost row), the filter `MeterCategory` `In` `Azure Container Apps` |
-| Cost | after a few days: Cost Management → Cost analysis, scope the subscription, group by **Service name** (the meter category), the server's resources only | `Azure Container Apps` at 0 USD. If its usage shows under another meter category, the budget's filter in `main.bicep` must name that one. No row yet (free usage may not be listed) leaves the filter unconfirmed: phase 11 checks it again at the end of the month. A few cents while the server is far inside the grant (phase 11, step 1) mean Cost Management prices the free usage during the month: no misconfiguration, see phase 11, "A cost although the replica-minutes are inside the grant" |
+| Scale to zero (only with `mcpMinReplicas = 0`) | after 10 minutes without calls: `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` | no replica |
+| The budget | `az rest --url "https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Consumption/budgets/prod-2s-mcp-budget?api-version=2026-06-01" --query "properties.{amount:amount, start:timePeriod.startDate, spent:currentSpend.amount, filter:filter.dimensions}" -o json` (`az rest` fills in the subscription) | amount `mcpBudgetAmount` (12 in production), your start date, spent a few USD at most by mid-month with the replica always on (`0` with scale to zero; a few cents: see the Cost row), the filter `MeterCategory` `In` `Azure Container Apps` |
+| Cost | after a few days: Cost Management → Cost analysis, scope the subscription, group by **Service name** (the meter category), the server's resources only | `Azure Container Apps`: with the replica always on, a cost that grows by about 0.15–0.20 USD a day once the grant is used up; with scale to zero, 0 USD. If its usage shows under another meter category, the budget's filter in `main.bicep` must name that one. No row yet (free usage may not be listed) leaves the filter unconfirmed: phase 11 checks it again at the end of the month. A few cents while the server is far inside the grant (phase 11, step 1) mean Cost Management prices the free usage during the month: no misconfiguration, see phase 11, "A cost although the replica-minutes are inside the grant" |
 
 A request through the ingress ends after 240 seconds: a tool call that waits longer for the API is cut off, and the assistant checks a write with the matching read.
 
@@ -320,7 +322,7 @@ A request through the ingress ends after 240 seconds: a tool call that waits lon
 
 - **A bad image:** `az containerapp update -g prod-2s-eusec-rg -n prod-2s-mcp-ca --image <the image of an earlier revision>` (the revision list of phase 8 has their digests; `ghcr.io/akobr/2s-platform-mcp:<previous commit>` is the same image, since a commit's tag never moves). A later run of `main.bicep` keeps that image.
 - **The server unreachable at once, everything kept:** `az containerapp ingress disable -g prod-2s-eusec-rg -n prod-2s-mcp-ca`. The next run of `main.bicep` turns the ingress on again, so for longer use the next point.
-- **The exchange off in the API:** set `mcpEnabled = false` in `parameters/prod.bicepparam`, pull request, what-if (only `prod-2s-api-fa/appsettings`: `Auth__TokenExchange__Enabled` → `false`, the `AdditionalIssuers__0__*`, `Actors__0__*` and `DeniedClientIds__*` settings removed), then create: every MCP call answers that the exchange is off. The identity, the environment, the app, its certificate, the role assignment and the exchange application stay (a template run doesn't delete them). Delete them by hand if wanted: `az containerapp delete`, `az containerapp env delete`, `az identity delete -n prod-2s-mcp-mi`, the role assignment (`az role assignment list --all --assignee <deployment principal id>`), `az ad app delete --id <mcpExchangeAppId>`, the DNS records and the GitHub variable `AZURE_MCP_APP_NAME`; then set `mcpAppExists = false` and `mcpCustomDomain = false`. If the exchange application stays while the identity goes, a later identity needs phase 4's `New-TokenExchangeApplication.ps1 -McpIdentityName prod-2s-mcp-mi` again, because the application requires an assignment.
+- **The exchange off in the API:** set `mcpEnabled = false` in `parameters/prod.bicepparam`, pull request, what-if (only `prod-2s-api-fa/appsettings`: `Auth__TokenExchange__Enabled` → `false`, the `AdditionalIssuers__0__*`, `Actors__0__*` and `DeniedClientIds__*` settings removed), then create: every MCP call answers that the exchange is off. The identity, the environment, the app, its certificate, the role assignment, the budget and the exchange application stay (a template run doesn't delete them). Delete them by hand if wanted: `az containerapp delete`, `az containerapp env delete`, `az identity delete -n prod-2s-mcp-mi`, `az consumption budget delete --budget-name prod-2s-mcp-budget`, the role assignment (`az role assignment list --all --assignee <deployment principal id>`), `az ad app delete --id <mcpExchangeAppId>`, the DNS records and the GitHub variable `AZURE_MCP_APP_NAME`; then set `mcpAppExists = false`, `mcpCustomDomain = false` and, if the budget was deleted, `mcpBudgetStartDate = ''`: a new budget can't start in a past month, so the run that turns the server on again sets the month of that run (phase 4). If the exchange application stays while the identity goes, a later identity needs phase 4's `New-TokenExchangeApplication.ps1 -McpIdentityName prod-2s-mcp-mi` again, because the application requires an assignment.
 - **The custom domain off:** `mcpCustomDomain = false` and a run of `main.bicep` removes the binding; the certificate stays in the environment until it is deleted (`az containerapp env certificate delete`). This takes the server out of service: its resource URL and the API's subject audience stay `https://mcp.2s.42for.net/mcp`, so clients can't sign in, and the workflow's last check fails until the domain is bound again. To stop the server, use one of the two points above.
 - **The API rolled back past 424-302:** an API build from before it ignores the client lists, so every MCP client could change anything again and a denied client could sign in again, and it refuses the tokens that carry `ReadOnly`. Turn the exchange off first (`mcpEnabled = false`, the point above), then roll the API back; turn the exchange on again only with a build that knows `ReadOnly`.
 
@@ -383,11 +385,18 @@ Turning dynamic client registration off in WorkOS production does the same for t
 
 ## 11. The cost of the MCP server
 
-The server costs nothing while it is warm for less than about 200 hours a month: that is the monthly free grant of Container Apps at 0.25 vCPU and 0.5 GiB, per subscription. Every request wakes a replica for about 5.5 minutes, a `401` or a scanner's request too, and each warm hour past the grant costs about 0.027 USD. The [decisions](decisions.md#the-mcp-server) have the whole range, up to about 53 USD a month of compute with three replicas up all month, plus 0.40 USD per million requests past the grant's 2 million, which no setting caps; the spec is [Cost Range and Budget of the MCP Server](specs/2026-11-22%20Cost%20Range%20and%20Budget%20of%20the%20MCP%20Server.md).
+What the server costs depends on `mcpMinReplicas` (the [decisions](decisions.md#the-mcp-server) have the whole range; the spec is [Cost Range and Budget of the MCP Server](specs/2026-11-22%20Cost%20Range%20and%20Budget%20of%20the%20MCP%20Server.md)):
 
-**The budget** `prod-2s-mcp-budget` holds the subscription's Container Apps cost, which is 0 inside the grant. It emails you at 50 % and 100 % of `mcpBudgetAmount` (1 by default, in the billing currency) and when the month's forecast reaches it. Cost data of a pay-as-you-go subscription can come up to three days late, and budgets are checked once a day: an email tells about the past few days, not the last hour.
+- **1, as in production:** one replica always runs, at the idle rate between calls: about 4–6 USD a month, up to about 14 USD if it were busy all the time. Scanners cost almost nothing more; the replica is up anyway.
+- **0:** nothing while it is warm for less than about 200 hours a month, the monthly free grant of Container Apps at 0.25 vCPU and 0.5 GiB, per subscription. Every request wakes a replica for about 5.5 minutes, a `401` or a scanner's request too, and each warm hour past the grant costs about 0.027 USD.
 
-**Without an email**, at the end of the first month or two: run step 1 below. More than 12,000 replica-minutes in a month without an email means the budget's filter doesn't match: check the server's meter category in Cost analysis (phase 9, the Cost row) and fix the filter in `main.bicep`.
+Either way, three replicas busy all month cost about 53 USD of compute, plus 0.40 USD per million requests past the grant's 2 million, which no setting caps.
+
+**The budget** `prod-2s-mcp-budget` holds the subscription's Container Apps cost. It emails you at 50 % and 100 % of `mcpBudgetAmount` (in the billing currency) and when the month's forecast reaches it. Production sets 12, so an email means more than the always-on replica's idle cost (6 USD at 50 %); with scale to zero the default 1 fits, and the first email means the free grant is used up. Cost data of a pay-as-you-go subscription can come up to three days late, and budgets are checked once a day: an email tells about the past few days, not the last hour.
+
+**Adding the budget** to the running server (production, after 424-305): `mcpBudgetStartDate` (the first day of the month of the run, or a later month) and `mcpBudgetAmount = 12` are in `parameters/prod.bicepparam`; if the run happens in a later month than the committed date, set that month first. Pull `main` and run the what-if of phase 4. **Expect** `+ Microsoft.Consumption/budgets/prod-2s-mcp-budget` as in phase 4, and possibly `~ Microsoft.App/containerApps/prod-2s-mcp-ca` with `template.scale.cooldownPeriod` `300` (the platform's default written out; it makes a new revision with the same image); nothing else beyond the usual noise. Don't run it while a deployment of the workflow runs or waits for approval (phase 8). Then the create, and the checks **The budget** and **Cost** of phase 9 after a few days: with the replica always on, the server's cost shows in Cost analysis within the month, which confirms the budget's filter.
+
+**Without an email**: with scale to zero, at the end of the first month or two, run step 1 below. More than 12,000 replica-minutes in a month without an email means the budget's filter doesn't match: check the server's meter category in Cost analysis (phase 9, the Cost row) and fix the filter in `main.bicep`. With the replica always on, a Container Apps cost in Cost analysis while the budget's `spent` (phase 9) stays 0 means the same.
 
 When an email comes:
 
@@ -405,7 +414,7 @@ When an email comes:
      $peak = [math]::Max($peak, [double](($maxima | Where-Object { $_ } | Measure-Object -Maximum).Maximum))
      $multi += @($maxima | Where-Object { $_ -ge 2 }).Count
    }
-   '{0:N0} replica-minutes this month (the free grant: 12,000 a month, about 400 a day); at most {1} replicas, {2:N0} minutes with 2 or more' -f $minutes, $peak, $multi
+   '{0:N0} replica-minutes this month (the free grant: 12,000 a month, about 400 a day; one replica always on: 1,440 a day); at most {1} replicas, {2:N0} minutes with 2 or more' -f $minutes, $peak, $multi
    ```
 
 2. **Who wakes it.** The requests of the last 24 hours by status class, and in how many of those hours each came:
@@ -419,16 +428,17 @@ When an email comes:
    }
    ```
 
-   `4xx` in most hours of the day is scanner traffic (`401` without a token, `404` for other paths); `2xx` is people using the server.
+   With the replica always on, the requests tell how busy it was. With scale to zero, `4xx` in most hours of the day is scanner traffic (`401` without a token, `404` for other paths); `2xx` is people using the server.
 
 3. **What to change**, in `parameters/prod.bicepparam` through a pull request, then the what-if and the create of phase 4 (the what-if shows the changed value on `prod-2s-mcp-ca` or on the budget):
-   - **Scanners, and more than about 400 replica-minutes a day:** `param mcpCooldownSeconds = 120` (about 2.5 minutes warm per request instead of 5.5) or `60` (a request every 5 minutes then still fits the grant). The price is a cold start of 10 to 30 seconds after every pause of a session that is longer than the cool-down. Check it once after the run: one `curl.exe -s -o NUL -X POST https://mcp.2s.42for.net/mcp`, then `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` every half minute until no replica is left: about the cool-down plus up to half a minute.
-   - **People's use past the grant:** the server doing its work. Raise `mcpBudgetAmount` to what a month may cost.
-   - **A cost although the replica-minutes are inside the grant** (and no other Container App runs in the subscription): Cost Management prices the free usage during the month, and only the invoice subtracts the grant. Set `mcpBudgetAmount = 11`: the grant is worth about 5.40 USD at Sweden Central's prices, so the first email, at 50 % (5.50 USD), then comes just past it.
+   - **Busy with the replica always on** (many `2xx` in most hours, or minutes with 2 or more replicas): the server doing its work; raise `mcpBudgetAmount` to what a month may cost, or lower `mcpMaxReplicas`. Scanners alone don't make it busy, and `mcpCooldownSeconds` does nothing with `mcpMinReplicas = 1`.
+   - **With scale to zero: scanners, and more than about 400 replica-minutes a day:** `param mcpCooldownSeconds = 120` (about 2.5 minutes warm per request instead of 5.5) or `60` (a request every 5 minutes then still fits the grant). The price is a cold start of 10 to 30 seconds after every pause of a session that is longer than the cool-down. Check it once after the run: one `curl.exe -s -o NUL -X POST https://mcp.2s.42for.net/mcp`, then `az containerapp replica list -g prod-2s-eusec-rg -n prod-2s-mcp-ca -o table` every half minute until no replica is left: about the cool-down plus up to half a minute.
+   - **With scale to zero: people's use past the grant:** the server doing its work. Raise `mcpBudgetAmount` to what a month may cost.
+   - **With scale to zero: a cost although the replica-minutes are inside the grant** (and no other Container App runs in the subscription): Cost Management prices the free usage during the month, and only the invoice subtracts the grant. Set `mcpBudgetAmount = 11`: the grant is worth about 5.40 USD at Sweden Central's prices, so the first email, at 50 % (5.50 USD), then comes just past it.
    - **Two or three replicas for long** (step 1 shows at most 2 or 3 replicas and many minutes with 2 or more): more than 20 concurrent requests at a time, which the cool-down doesn't govern; lower `mcpMaxReplicas`.
    - **At once:** `az containerapp ingress disable` (phase 10) stops every request, and the server with it.
 
-If scanners stay the cost even with a short cool-down, the next steps change the templates: rule-based routing of the environment, or `minReplicas` 1 (decisions, "The MCP server").
+If scanners stay the cost even with a short cool-down, the next steps are rule-based routing of the environment (a template change), or `mcpMinReplicas = 1`, as production runs (decisions, "The MCP server").
 
 ## Later: the custom AuthKit domain
 

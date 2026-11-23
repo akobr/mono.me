@@ -178,7 +178,7 @@ param mcpUntrustedClientRestrictions string[] = [
 @description('The clients the exchange refuses for every actor, even an allowed or trusted one (Auth:TokenExchange:DeniedClientIds), compared ignoring case: the switch for one client with a stable id, not for a dynamically registered one, which registers again (runbook, "Cut off one client").')
 param mcpDeniedClientIds string[] = []
 
-@description('The fewest replicas of the MCP server: 0 (the default) scales it to zero without calls, inside the free grant, with a cold start of a few seconds on the next call; 1 keeps one replica, billed at the idle rate between calls (about 4-5 USD a month).')
+@description('The fewest replicas of the MCP server: 0 (the default) scales it to zero without calls, inside the free grant, with a cold start of 10 to 30 seconds on the next call; 1 keeps one replica, billed at the idle rate between calls (about 4-6 USD a month).')
 @minValue(0)
 @maxValue(10)
 param mcpMinReplicas int = 0
@@ -188,7 +188,7 @@ param mcpMinReplicas int = 0
 @maxValue(10)
 param mcpMaxReplicas int = 3
 
-@description('The seconds the MCP server\'s last replica stays up after the last request before it scales to zero (cooldownPeriod; 300 is the platform\'s own default). Every request wakes a replica, a scanner\'s too: lower means fewer warm seconds per request, and a cold start of 10 to 30 seconds after every pause longer than this.')
+@description('The seconds the MCP server\'s last replica stays up after the last request before it scales to zero (cooldownPeriod; 300 is the platform\'s own default). Every request wakes a replica, a scanner\'s too: lower means fewer warm seconds per request, and a cold start of 10 to 30 seconds after every pause longer than this. Only with mcpMinReplicas 0: with a minimum of 1 or more there is no scale to zero, and it has no effect.')
 @minValue(60)
 @maxValue(1800)
 param mcpCooldownSeconds int = 300
@@ -196,7 +196,7 @@ param mcpCooldownSeconds int = 300
 @description('The first day of the first month of the MCP server\'s budget (yyyy-MM-01): the month of the run that creates it, or a later one. Required with mcpEnabled; fixed once the budget exists, like budgetStartDate.')
 param mcpBudgetStartDate string = ''
 
-@description('The monthly budget of the subscription\'s Container Apps cost, the MCP server\'s, in its billing currency; alerts at 50 and 100 % of the actual cost and at 100 % of the forecast. The cost is 0 inside the monthly free grant (about 200 hours of a replica).')
+@description('The monthly budget of the subscription\'s Container Apps cost, the MCP server\'s, in its billing currency; alerts at 50 and 100 % of the actual cost and at 100 % of the forecast. With scale to zero the cost is 0 inside the monthly free grant (about 200 hours of a replica), so 1 fits; one replica always on costs about 4-6 USD a month, so production sets 12.')
 @minValue(1)
 param mcpBudgetAmount int = 1
 

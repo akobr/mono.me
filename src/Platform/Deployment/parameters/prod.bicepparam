@@ -89,7 +89,7 @@ param mcpExchangeAppId = '2399e89b-0b03-4d80-9f02-cf25a146509d'
 param mcpInitialImage = 'ghcr.io/akobr/2s-platform-mcp:20ef5b5a2e55db09753cf8ca5cadfef28b0e2b22'
 param mcpAppExists = true
 param mcpCustomDomain = true
-// One replica always runs: no cold start on the first call after an idle period, about 4-5 USD a month at the idle rate
+// One replica always runs: no cold start on the first call after an idle period, about 4-6 USD a month at the idle rate
 // beyond the free grant (decisions, "The MCP server"). 0 scales it to zero again, for 0 USD.
 param mcpMinReplicas = 1
 // The MCP server's budget prod-2s-mcp-budget (the subscription's Container Apps cost): its first month, never changed
