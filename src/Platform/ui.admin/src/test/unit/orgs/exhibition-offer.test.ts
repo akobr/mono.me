@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createApp, defineComponent, h, ref } from 'vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
+import { getGetExhibitionQueryKey } from '@42for.net/2splatform.sdk/vue-query'
 import { useExhibition } from '@/composables/useExhibition'
 import { mockHandlers } from '@/mock/all-handlers'
 import { loadDb, mockUser, resetDb, saveDb, type MockScenario } from '@/mock/db'
@@ -137,13 +138,13 @@ describe('the answer about the exhibition', () => {
     const view = await mountScreen(Host, {}, { path: '/orgs', account: loadDb().account })
     mounted.push(view)
     await settle(6)
-    return shown
+    return { shown, view }
   }
 
   const asked = () => requests.filter((request) => request === 'GET /access/exhibition').length
 
   it('keeps a 404 (none), so the next page does not ask again', async () => {
-    const shown = await mountAsker('showcase')
+    const { shown } = await mountAsker('showcase')
     await eventually(() => expect(asked()).toBe(1))
 
     shown.value = false
@@ -157,7 +158,7 @@ describe('the answer about the exhibition', () => {
 
   it('asks again after another failure', async () => {
     server.use(http.get('*/api/v1/access/exhibition', () => HttpResponse.json({ Message: 'Down' }, { status: 503 })))
-    const shown = await mountAsker('default')
+    const { shown } = await mountAsker('default')
     await eventually(() => expect(asked()).toBe(1))
     server.resetHandlers()
 
@@ -168,6 +169,45 @@ describe('the answer about the exhibition', () => {
     await eventually(() => expect(asked()).toBe(2))
     await eventually(() => expect(body()).toContain('offered'))
     expect(body()).not.toContain('not offered')
+  })
+})
+
+describe('the answer about the exhibition, after a 404 that followed an offer', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('does not ask again on a later page, also once the offer is stale', async () => {
+    const asked = () => requests.filter((request) => request === 'GET /access/exhibition').length
+    vi.useFakeTimers({ toFake: ['Date'] })
+    start('default')
+    const shown = ref(true)
+    const Asker = defineComponent({
+      setup: () => {
+        const { offered } = useExhibition()
+        return () => h('p', offered.value ? 'offered' : 'not offered')
+      },
+    })
+    const Host = defineComponent({ setup: () => () => (shown.value ? h(Asker) : null) })
+    const view = await mountScreen(Host, {}, { path: '/orgs', account: loadDb().account })
+    mounted.push(view)
+    await eventually(() => expect(body()).toBe('offered'))
+
+    // the deployment stopped offering it, and a join's 404 asked again (the data of the offer stays in the cache)
+    const db = loadDb()
+    db.exhibition = null
+    saveDb(db)
+    await view.queryClient.refetchQueries({ queryKey: getGetExhibitionQueryKey() })
+    await eventually(() => expect(body()).toBe('not offered'))
+    expect(asked()).toBe(2)
+
+    // much later, past the staleTime of the offer: another page mounts
+    vi.setSystemTime(Date.now() + 10 * 60_000)
+    shown.value = false
+    await settle()
+    shown.value = true
+    await settle(6)
+
+    expect(asked()).toBe(2)
+    expect(body()).toBe('not offered')
   })
 })
 

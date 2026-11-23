@@ -23,9 +23,11 @@ export function useExhibition() {
     query: {
       meta: { silent: true },
       staleTime: 5 * 60_000,
-      // vue-query fetches a query in error again on every mount, and staleTime keeps data only: a 404 (none) is an
-      // answer, so it is kept as well. Each request of a deployment whose exhibition is not offered logs a Warning.
+      // A 404 (none) is an answer, so no mount asks again after it; each request of a deployment whose exhibition is
+      // not offered logs a Warning. Without data vue-query asks a query in error again on mount (retryOnMount); with
+      // the data of an earlier success, it asks once that data is stale (refetchOnMount), also after a 404 since.
       retryOnMount: (cached) => !isNotFound(cached.state.error),
+      refetchOnMount: (cached) => !isNotFound(cached.state.error),
     },
     request: { timeoutMs: exhibitionTimeoutMs },
   })
