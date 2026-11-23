@@ -154,6 +154,12 @@ The review corrected three statements (`311b9d71e`): the fallback, the attempts,
   - *Validate `ValidFrom` before `ExpiresAt` on the merged annotation, on the server.* Two patches can now each move one end of the window and leave it inverted, which two whole writes could not. The fix belongs in `AnnotationRules` and changes creates and imports too, so it is left for a follow-up of the API.
   - *Do not re-create a nested object for a deletion-only edit.* A merge patch `{"Values":{"limits":{"cpu":null}}}` over a `limits` someone removed meanwhile stores `limits: {}`. One request cannot express "remove if the parent still exists" (a JSON Patch `remove` fails on a missing parent), so this stays a known limit.
   - *Keep the JSON Patch fallback at nested paths.* Already a known limit (below); the guide now says so.
+- **Grok review of PR #217** (2026-11-23, of commit `18c50c12`, before the CodeRabbit fixes). Already fixed by then: the race of the mock's other writers (`withDb` serializes every handler, not only the `PATCH`) and `/Values/__proto__` in the mock's JSON Patch. Fixed now:
+  - A bulk action's error names the keys deleted meanwhile (they left the list) apart from the writes that failed (to try again).
+  - `patchLabels` refreshes the detail queries of a key whose fresh copy needs no change, not only the list.
+  - Comments on the JSON Patch fallback (a changed value is written whole) and on the form diffing its own values (a later Zod transform does not reach the save).
+  - The mock's `updateAnnotation` stamps `Created` and `Modified` with one instant.
+- **Grok, left as follow-ups** (also out of scope in the spec): `If-Match` on form saves (needs `ETag` exposed to the browser and a conflict dialog), and `If-None-Match: *` on **Create new**.
 
 ### Deviations from the spec
 
