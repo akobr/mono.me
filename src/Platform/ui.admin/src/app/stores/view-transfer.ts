@@ -26,7 +26,10 @@ export const useViewTransferStore = defineStore('view-transfer', () => {
         Array.isArray(saved)
           ? saved.filter(
               (entry): entry is [string, string[]] =>
-                Array.isArray(entry) && typeof entry[0] === 'string' && Array.isArray(entry[1]),
+                Array.isArray(entry) &&
+                typeof entry[0] === 'string' &&
+                Array.isArray(entry[1]) &&
+                entry[1].every((key: unknown) => typeof key === 'string'),
             )
           : [],
       )

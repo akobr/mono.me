@@ -57,6 +57,8 @@ const target = computed({
 
 // With one other view there is nothing to pick; with several, the target last used in the project is the likely one.
 // A ?to= that names a view is kept, also one that is not listed: the Views page can link to a discovered view.
+// Unlike the copy dialog, the memory may preselect the production view here on purpose: a comparison only reads, and
+// a copy from it to `default` still needs a Check first (ViewCopyDialog).
 watch(
   [others.names, target, landed],
   ([names, to, here]) => {

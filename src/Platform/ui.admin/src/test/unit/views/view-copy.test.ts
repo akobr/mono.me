@@ -176,6 +176,7 @@ describe('copyToView: annotations', () => {
       stopped: false,
       // what the run read in the source, which a copy after a check compares with
       sources: { [onlySource]: annotationText(original) },
+      targets: { [onlySource]: null },
     })
     // the views, the deleted keys, two reads, the deleted state of the key right before its create, and one write
     expect(await requests.lines()).toEqual([
@@ -679,6 +680,7 @@ describe('copyToView: annotations', () => {
       ],
       stopped: false,
       sources: expect.any(Object),
+      targets: expect.any(Object),
     })
     // the deleted keys at the start, and the deleted state of the one key it creates right before its create
     expect((await requests.lookups()).map(line)).toEqual([
@@ -773,6 +775,7 @@ describe('copyToView: configurations', () => {
       items: [configuration(differing, 'Created')],
       stopped: false,
       sources: { [differing]: canonicalJson(document) },
+      targets: { [differing]: 0 },
     })
     // POST has no condition, so the copy reads the document back: one written meanwhile would be merged into
     expect(await requests.lines()).toEqual([
@@ -785,7 +788,9 @@ describe('copyToView: configurations', () => {
       `GET /staging/configuration/${differing}/versions/0`,
       `POST /staging/configuration/${differing}`,
       `GET /staging/configuration/${differing}`,
-      expect.stringMatching(new RegExp(`^GET /staging/configuration/${differing.replace(/\./g, '\\.')}/versions/\\d+$`)),
+      expect.stringMatching(
+        new RegExp(`^GET /staging/configuration/${differing.replace(/\./g, '\\.')}/versions/\\d+$`),
+      ),
     ])
     const [write] = await requests.writes()
     expect(write!.body).toEqual(document)
@@ -853,9 +858,7 @@ describe('copyToView: configurations', () => {
 
     const result = await copy({ kind: 'configurations', keys: [differing] })
 
-    expect(result.items).toEqual([
-      configuration(differing, 'Skipped', 'Its annotation is not in staging any more.'),
-    ])
+    expect(result.items).toEqual([configuration(differing, 'Skipped', 'Its annotation is not in staging any more.')])
     expect(await requests.writes()).toEqual([])
   })
 
@@ -1299,6 +1302,54 @@ describe('copyToView: what a check showed, and what changed since', () => {
     expect(await requests.writes()).toEqual([])
   })
 
+  it('skips a configuration that changed in the target since the check: production gets only what was shown', async () => {
+    const plan = await copy({ kind: 'configurations', keys: [differing, 'usg.northwind.invoicing'], dryRun: true })
+    expect(Object.keys(plan.targets).toSorted()).toEqual([differing, 'usg.northwind.invoicing'].toSorted())
+    // another client changes the target of one key after the check
+    await setConfiguration(org, project, 'staging', differing, { changedInTheTarget: true })
+    const requests = recordRequests()
+
+    const result = await copy({
+      kind: 'configurations',
+      keys: [differing, 'usg.northwind.invoicing'],
+      checked: plan.sources,
+      checkedTargets: plan.targets,
+    })
+
+    expect(result.items).toEqual([
+      configuration(differing, 'Skipped', 'It changed in staging since it was checked.'),
+      configuration('usg.northwind.invoicing', 'Unchanged'),
+    ])
+    expect(await requests.writes()).toEqual([])
+  })
+
+  it('skips an annotation that the target got since the check, and takes one that holds the source by now', async () => {
+    const plan = await copy({ kind: 'annotations', keys: [onlySource, differs], dryRun: true })
+    expect(plan.targets[onlySource]).toBeNull()
+    // another client creates the missing one in the target with other content, and copies the other one by hand
+    const missing = await annotationOf('default', onlySource)
+    await setAnnotation(org, project, 'staging', onlySource, { ...missing, Title: 'Written by someone else' })
+    const changed = await annotationOf('default', differs)
+    await setAnnotation(org, project, 'staging', differs, changed)
+    const requests = recordRequests()
+
+    const result = await copy({
+      kind: 'annotations',
+      keys: [onlySource, differs],
+      checked: plan.sources,
+      checkedTargets: plan.targets,
+    })
+
+    expect(result.items).toEqual(
+      expect.arrayContaining([
+        annotation(onlySource, 'Skipped', 'It changed in staging since it was checked.'),
+        annotation(differs, 'Unchanged'),
+      ]),
+    )
+    expect(result.items).toHaveLength(2)
+    expect(await requests.writes()).toEqual([])
+  })
+
   it('does not create a key that was deleted in the target after the run looked up the deleted keys', async () => {
     // the lookup at the start finds nothing; the one right before the create finds the key deleted meanwhile
     server.use(
@@ -1387,7 +1438,7 @@ describe('copyToView: the run', () => {
       { onProgress: (done, total) => progress.push([done, total]) },
     )
 
-    expect(result).toEqual({ target: 'staging', dryRun: false, items: [], stopped: false, sources: {} })
+    expect(result).toEqual({ target: 'staging', dryRun: false, items: [], stopped: false, sources: {}, targets: {} })
     // no lookup without keys: the API refuses an empty list
     expect(await requests.lines()).toEqual(['GET /views'])
     expect(progress).toEqual([[0, 0]])
