@@ -406,6 +406,32 @@ test('Compare with view and Copy to view are off in a project with one view', as
   }
 })
 
+test('a Reader compares, and gets no copy', async ({ page }) => {
+  // northwind.portal: the mock user is a Reader, and the project has only its default view. A comparison only reads,
+  // so a Reader compares, as on Compare views (424-272); a copy writes to the other view.
+  const portal = '/northwind/portal/default'
+  await openApp(page, `${portal}/annotations/rst.invoicing`)
+  await page.getByRole('button', { name: 'More actions' }).click()
+  const compare = page.getByRole('menuitem', { name: /^Compare with view/ })
+  await expect(compare).toBeDisabled()
+  await expect(compare).toContainText('The project has no other view')
+  await expect(page.getByRole('menuitem', { name: /^Copy to view/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+
+  await goto(page, `${portal}/configurations/rst.invoicing`)
+  await page.getByRole('button', { name: 'More actions' }).click()
+  await expect(page.getByRole('menuitem', { name: /^Compare with view/ })).toBeDisabled()
+  await expect(page.getByRole('menuitem', { name: /^Copy to view/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+
+  // An address of a comparison opens for a Reader too, with the documents and without any copy.
+  await goto(page, `${portal}/modeling/compare/selection?kind=annotations&to=staging&key=rst.invoicing`)
+  await expect(title(page, '1 annotation: default → staging')).toBeVisible()
+  await expect(heading(page, 'rst.invoicing')).toContainText('Only in default')
+  await expect(page.getByText('Only the selected keys are compared.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Copy/ })).toHaveCount(0)
+})
+
 test('a comparison without keys says how to start one, and when a long selection is gone', async ({ page }) => {
   await openApp(page, `${comparison}?kind=annotations&to=staging`)
   await expect(title(page, 'Nothing to compare')).toBeVisible()

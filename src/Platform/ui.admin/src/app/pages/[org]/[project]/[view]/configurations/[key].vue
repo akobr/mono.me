@@ -20,8 +20,8 @@ const annotation = computed(() => catalog.byKey.get(key.value))
 const base = computed(() => `/${context.org}/${context.project}/${context.view}/configurations/${key.value}`)
 const query = computed(() => ({ q: route.query.q }))
 
-// More actions, as on the annotation detail: the link and the key for everyone, and "Compare with view" and "Copy to
-// view" for Contributors (spec "Copy and Compare Annotations and Configurations Between Views", section 8).
+// More actions, as on the annotation detail: the link, the key and "Compare with view" for everyone, and "Copy to
+// view" for Contributors (spec "Copy and Compare Annotations and Configurations Between Views", section 8; 424-272).
 const transfer = useViewTransfer('configurations', () => [key.value])
 const copying = transfer.copying
 // The menu item that opened the copy dialog is gone when the dialog closes: the focus goes back to the menu's button.
@@ -42,7 +42,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
       onSelect: () => void copy(key.value),
     },
   ],
-  ...(canEdit.value ? [transfer.items.value] : []),
+  transfer.items.value,
 ])
 
 const tabs = computed(() => [

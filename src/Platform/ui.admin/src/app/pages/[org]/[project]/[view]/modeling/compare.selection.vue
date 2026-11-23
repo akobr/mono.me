@@ -28,6 +28,8 @@ const router = useRouter()
 const context = useContextStore()
 const transfer = useViewTransferStore()
 const others = useOtherViews()
+// Every member of the project compares (424-272); a copy writes to the target, which needs the Contributor role.
+const canCopy = useCan('edit')
 
 // The view of this page is the one of its route, which Swap views changes together with ?to=. The context guard puts
 // the next org, project and view in the store before a navigation lands; until the store and the route agree again,
@@ -132,12 +134,17 @@ const names = computed(() => ({
   target: target.value ?? '',
   own: kind.value === 'configurations' && request.value.content === 'own',
 }))
-const legend = computed(() =>
-  kind.value === 'configurations' && request.value.content === 'effective'
-    ? `What ${names.value.target} and ${names.value.source} read. A copy moves only own configurations.`
-    : 'Only the selected keys are compared. A copy moves what is green and never deletes: a document that only ' +
-      `${names.value.target} has stays.`,
-)
+// What a copy would do is said only to whom the page offers one.
+const legend = computed(() => {
+  if (kind.value === 'configurations' && request.value.content === 'effective') {
+    const read = `What ${names.value.target} and ${names.value.source} read.`
+    return canCopy.value ? `${read} A copy moves only own configurations.` : read
+  }
+  return canCopy.value
+    ? 'Only the selected keys are compared. A copy moves what is green and never deletes: a document that only ' +
+        `${names.value.target} has stays.`
+    : 'Only the selected keys are compared.'
+})
 const progress = computed(() =>
   loaded.value < files.value.length ? `Compared ${loaded.value} of ${files.value.length}…` : '',
 )
@@ -352,7 +359,9 @@ onMounted(() => {
             :description="
               request.lost
                 ? 'The selection is gone. A comparison of many rows opens only in the browser tab that started it.'
-                : 'Select rows on Annotations or Configurations and choose Compare with view.'
+                : canCopy
+                  ? 'Select rows on Annotations or Configurations and choose Compare with view.'
+                  : 'Open an annotation or a configuration and choose Compare with view in its More actions.'
             "
           >
             <UButton
@@ -422,7 +431,7 @@ onMounted(() => {
                 <div class="flex items-center gap-2">
                   <span class="font-mono text-base font-semibold text-success" aria-hidden="true">+</span>
                   <span class="text-sm font-medium text-highlighted">{{ context.view }}</span>
-                  <span class="text-xs text-muted">after a copy</span>
+                  <span class="text-xs text-muted">{{ canCopy ? 'after a copy' : 'this view' }}</span>
                 </div>
               </div>
 
@@ -467,7 +476,7 @@ onMounted(() => {
                     What the filter shows and a copy would change; the reason is text too, for a keyboard. As in the
                     sections, there is no copy until the target is known to be a view of the project.
                   -->
-                  <div class="ms-auto flex flex-wrap items-center gap-2">
+                  <div v-if="canCopy" class="ms-auto flex flex-wrap items-center gap-2">
                     <span v-if="copyBlocked" :id="blockedId" class="text-xs text-muted">{{ copyBlocked }}</span>
                     <UTooltip :text="copyBlocked" :disabled="!copyBlocked">
                       <UButton
@@ -510,7 +519,7 @@ onMounted(() => {
                     :target="target"
                     :layout="layout"
                     :open="isOpen(file)"
-                    :copyable="copies(file) && others.has(target)"
+                    :copyable="canCopy && copies(file) && others.has(target)"
                     :scroll-root="scrollRoot"
                     @toggle="toggle(file)"
                     @copy="copy([file.key])"
@@ -519,6 +528,7 @@ onMounted(() => {
 
                 <!-- The target is the compared one, and the copy skips what changed there since it was shown here. -->
                 <ViewCopyDialog
+                  v-if="canCopy"
                   v-model:open="copying"
                   :kind="kind"
                   :keys="copyKeys"
