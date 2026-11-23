@@ -288,7 +288,7 @@ The address holds the kind, the target and the keys, and `content=effective` for
 - **When {target} already has it:** **Overwrite**, the default, replaces its content with the content of the source. **Skip** leaves it as it is. A document with the same content is left alone either way.
 - **Copy missing annotations too** (configurations only, checked): a configuration needs its annotation. When the target does not have it, the annotation is copied first. Without the box, such a configuration is skipped.
 - **Check** runs the copy without writing anything and lists what it would do with every document: **To create**, **To update**, **Unchanged**, **To skip** or **Fails**, with the reason. **Copy** then names what it writes, for example **Copy 5 to staging**, or says **Nothing to copy**. A change of the target or of an option discards the check. A check reads both views and decides as the copy does, but it does not ask the API: the schemas of the target and the API's other checks of a write run only when **Copy** writes, so a document that **Check** shows as **To update** can still fail.
-- **Copy** copies the keys one after another, ancestors before their descendants. After a **Check**, it copies what the check showed: a document whose source changed since is skipped, "It changed in {source} since it was checked." Check again to copy its new content.
+- **Copy** copies the keys one after another, ancestors before their descendants. After a **Check**, it copies what the check showed: a document that changed since in the source or in the target is skipped, "It changed in {view} since it was checked." (unless the target holds the source's content by then, which is **Unchanged**). Check again to copy it.
 
 What a copy moves:
 
