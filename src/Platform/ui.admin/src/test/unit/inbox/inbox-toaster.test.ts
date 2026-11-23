@@ -6,11 +6,17 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { QueryClient } from '@tanstack/vue-query'
 import { useToast } from '@nuxt/ui/composables'
-import { getViewExport, getViewInbox, startViewExport, type ViewExport } from '@42for.net/2splatform.sdk'
+import {
+  getViewExport,
+  getViewInbox,
+  startViewExport,
+  type AccountAccessMap,
+  type ViewExport,
+} from '@42for.net/2splatform.sdk'
 import AppSidebar from '@/components/shell/AppSidebar.vue'
 import TransferToaster from '@/components/transfer/TransferToaster.vue'
 import { mockHandlers } from '@/mock/all-handlers'
-import { createSeed, loadDb, saveDb } from '@/mock/db'
+import { createSeed, loadDb, mockUser, saveDb } from '@/mock/db'
 import { exportNotification, inboxOf, pushInboxItem, type StoredInboxItem } from '@/mock/inbox'
 import { resetTransfers } from '@/mock/transfer-handlers'
 import { createZip, textFile } from '@/mock/zip'
@@ -91,7 +97,7 @@ const zip = () =>
   })
 
 async function mountToaster(scope: Scope = billing) {
-  const view = await mountScreen(TransferToaster, {}, { scope, accessMap })
+  const view = await mountScreen(TransferToaster, {}, { scope, accessMap, account: { Id: mockUser.id, AccessMap: accessMap as AccountAccessMap } })
   mounted.push(view)
   return view
 }
@@ -252,7 +258,11 @@ describe('TransferToaster and the inbox', () => {
 
   it('does not light the mark of the menu for a job the tab reported, and lights it for one it did not', async () => {
     const Shell = defineComponent({ setup: () => () => [h(AppSidebar), h(TransferToaster)] })
-    const view = await mountScreen(Shell, {}, { scope: empty as AppMountOptions['scope'], accessMap })
+    const view = await mountScreen(Shell, {}, {
+      scope: empty as AppMountOptions['scope'],
+      accessMap,
+      account: { Id: mockUser.id, AccessMap: accessMap as AccountAccessMap },
+    })
     mounted.push(view)
     const dot = () => document.body.querySelector('a[href$="/empty/inbox"] [data-slot="linkLeadingChip"]')
     await vi.waitFor(() => expect(reads(empty)).toHaveLength(1))
@@ -295,7 +305,7 @@ describe('dismissJobItem', () => {
     fakeWait()
 
     let isDone = false
-    const dismissal = dismissJobItem(new QueryClient(), billing, job.Id!)
+    const dismissal = dismissJobItem(new QueryClient(), billing, job.Id!, mockUser.id)
     void dismissal.then(() => (isDone = true))
     await answered(() => looks === 1)
 
@@ -321,7 +331,7 @@ describe('dismissJobItem', () => {
     fakeWait()
 
     let isDone = false
-    const dismissal = dismissJobItem(new QueryClient(), billing, 'no-such-job')
+    const dismissal = dismissJobItem(new QueryClient(), billing, 'no-such-job', mockUser.id)
     void dismissal.then(() => (isDone = true))
     await answered(() => reads(billing).length === 1)
     await vi.advanceTimersByTimeAsync(jobItemRetryMs)
@@ -347,12 +357,27 @@ describe('dismissJobItem', () => {
     })
     saveDb(db)
 
-    await dismissJobItem(new QueryClient(), billing, job.Id!)
+    await dismissJobItem(new QueryClient(), billing, job.Id!, mockUser.id)
 
     const items = inboxOf(loadDb(), billing)
     expect(items.find((item) => item.Id === action.Id)?.State).toBe('Open')
     expect(items.find((item) => item.Title === 'Export finished')?.State).toBe('Dismissed')
     expect(posts()).toEqual(['dismiss'])
+  })
+
+  it('dismisses nothing that another account started, and nothing without an account', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
+    const job = await exportEnded(billing)
+
+    // the item is shared by everybody who sees it, so a dismissal stamped with another person is never made for them
+    const other = dismissJobItem(new QueryClient(), billing, job.Id!, 'user_02OTHER')
+    await vi.advanceTimersByTimeAsync(jobItemRetryMs)
+    await other
+    await dismissJobItem(new QueryClient(), billing, job.Id!, undefined)
+
+    expect(inboxOf(loadDb(), billing).find((item) => item.Title === 'Export finished')?.State).toBe('Open')
+    expect(posts()).toEqual([])
+    vi.useRealTimers()
   })
 
   it('resolves when the dismissal itself is refused, because somebody closed the item first', async () => {
@@ -366,7 +391,7 @@ describe('dismissJobItem', () => {
       ),
     )
 
-    await expect(dismissJobItem(new QueryClient(), billing, job.Id!)).resolves.toBeUndefined()
+    await expect(dismissJobItem(new QueryClient(), billing, job.Id!, mockUser.id)).resolves.toBeUndefined()
     expect(posts()).toEqual(['dismiss'])
   })
 })

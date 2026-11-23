@@ -59,10 +59,17 @@ export function invalidateInbox(client: QueryClient, scope: Scope): Promise<void
   return invalidateByPath(client, inboxPath(scope))
 }
 
-/** The open notification of a job, among the newest open items of the view. */
-async function findJobItem(scope: Scope, jobId: string): Promise<ViewInboxItem | undefined> {
+/** The open notification of a job that the account started, among the newest open items of the view. */
+async function findJobItem(scope: Scope, jobId: string, accountId: string): Promise<ViewInboxItem | undefined> {
   const page = await getViewInbox(scope.org, scope.project, scope.view, { state: 'Open' satisfies InboxFilter })
-  return page.Items?.find((item) => item.Kind === 'Notification' && item.Job?.Id === jobId && !!item.Id)
+  return page.Items?.find(
+    (item) =>
+      item.Kind === 'Notification' &&
+      item.Job?.Id === jobId &&
+      item.CreatedBy?.Kind === 'Account' &&
+      item.CreatedBy.Id === accountId &&
+      !!item.Id,
+  )
 }
 
 /**
@@ -71,13 +78,22 @@ async function findJobItem(scope: Scope, jobId: string): Promise<ViewInboxItem |
  * pushes the item right after it saves the end of the job, so an item that is not there yet is looked for once more
  * after two seconds. Every failure is ignored: without the dismissal the item only stays open. The lists of the view
  * are read again afterwards, whatever happened.
+ *
+ * The state of an item is shared by everybody who sees it, and the dismissal is stamped with this person, without a
+ * click of theirs. So only a notification of a job that this account started is dismissed: never an item that
+ * somebody else caused, and nothing without a known account.
  */
-export async function dismissJobItem(client: QueryClient, scope: Scope, jobId: string): Promise<void> {
+export async function dismissJobItem(
+  client: QueryClient,
+  scope: Scope,
+  jobId: string,
+  accountId: string | undefined,
+): Promise<void> {
   try {
-    let item = await findJobItem(scope, jobId)
-    if (!item) {
+    let item = accountId ? await findJobItem(scope, jobId, accountId) : undefined
+    if (accountId && !item) {
       await wait(jobItemRetryMs)
-      item = await findJobItem(scope, jobId)
+      item = await findJobItem(scope, jobId, accountId)
     }
     if (item?.Id) {
       await dismissViewInboxItem(scope.org, scope.project, scope.view, item.Id)

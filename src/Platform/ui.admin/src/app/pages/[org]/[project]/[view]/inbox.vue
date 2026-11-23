@@ -35,7 +35,7 @@ const transfers = useTransfersStore()
 const queryClient = useQueryClient()
 const confirm = useConfirm()
 const toast = useToast()
-const canRead = useCan('edit')
+const canUseInbox = useCan('edit')
 const isAdministrator = useCan('Administrator')
 
 const tab = computed({
@@ -45,8 +45,8 @@ const tab = computed({
 })
 const filter = computed<InboxFilter>(() => (tab.value === 'done' ? 'Done' : 'Open'))
 
-const open = useViewInbox(() => context.scope, 'Open', { enabled: canRead, poll: true })
-const done = useViewInbox(() => context.scope, 'Done', { enabled: () => canRead.value && filter.value === 'Done' })
+const open = useViewInbox(() => context.scope, 'Open', { enabled: canUseInbox, poll: true })
+const done = useViewInbox(() => context.scope, 'Done', { enabled: () => canUseInbox.value && filter.value === 'Done' })
 const shown = computed(() => (filter.value === 'Done' ? done : open))
 const page = computed(() => shown.value.data.value)
 const isPending = computed(() => shown.value.isPending.value)
@@ -54,7 +54,7 @@ const failure = computed(() => (shown.value.isError.value ? shown.value.error.va
 
 // A 403 of the open items, which are always read, or of the list that is shown.
 const forbidden = computed(() => isForbidden(open.error.value) || isForbidden(failure.value))
-const locked = computed(() => !canRead.value || forbidden.value)
+const locked = computed(() => !canUseInbox.value || forbidden.value)
 
 // As the mark of the menu: no count while the answer it came from is replaced by an error.
 const openCount = computed(() => (open.isError.value ? 0 : (open.data.value?.OpenCount ?? 0)))
@@ -251,7 +251,7 @@ async function download(item: ViewInboxItem) {
     <template #header>
       <AppNavbar title="Inbox">
         <template #right>
-          <UTooltip v-if="canRead" text="Refresh">
+          <UTooltip v-if="canUseInbox" text="Refresh">
             <UButton
               icon="i-lucide-refresh-cw"
               color="neutral"

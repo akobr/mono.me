@@ -9,6 +9,7 @@ import ImportPanel from '@/components/transfer/ImportPanel.vue'
 import ImportResult from '@/components/transfer/ImportResult.vue'
 import TransferToaster from '@/components/transfer/TransferToaster.vue'
 import { mockHandlers } from '@/mock/all-handlers'
+import { mockUser } from '@/mock/db'
 import { resetTransfers } from '@/mock/transfer-handlers'
 import { createZip, textFile } from '@/mock/zip'
 import ExportImportPage from '@/pages/[org]/[project]/[view]/modeling/export-import.vue'
@@ -324,7 +325,8 @@ describe('TransferToaster', () => {
     })
 
   it('reports an import that no page shows with a link to the page, and refreshes the kinds it wrote', async () => {
-    const view = await mountScreen(TransferToaster, {})
+    // the account that started the import, whose item the toaster dismisses
+    const view = await mountScreen(TransferToaster, {}, { account: { Id: mockUser.id, AccessMap: { 'acme.billing': 'Owner' } } })
     const invalidated = vi.spyOn(view.queryClient, 'invalidateQueries')
     const transfers = useTransfersStore()
 

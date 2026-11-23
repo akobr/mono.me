@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { dismissJobItem, invalidateInbox } from '@/queries/inbox'
 import { invalidateImport } from '@/queries/invalidation'
 import { useCatalogStore } from '@/stores/catalog'
+import { useSessionStore } from '@/stores/session'
 import type { Scope } from '@/stores/context'
 import { useTransfersStore, type ExportJob, type ImportJob, type TransferJob } from '@/stores/transfers'
 import { exportCounts, exportImportPath, importCounts } from '@/utils/transfers'
@@ -20,6 +21,7 @@ const toast = useToast()
 const queryClient = useQueryClient()
 const catalog = useCatalogStore()
 const transfers = useTransfersStore()
+const session = useSessionStore()
 
 const inCatalog = (scope: Scope) =>
   catalog.scope?.org === scope.org && catalog.scope.project === scope.project && catalog.scope.view === scope.view
@@ -93,7 +95,9 @@ const isReported = (job: TransferJob) =>
 
 /** The inbox of the job's view, read again, after the item of a reported job was dismissed. Never a toast. */
 function settleInbox(job: TransferJob) {
-  void (isReported(job) ? dismissJobItem(queryClient, job.scope, job.id) : invalidateInbox(queryClient, job.scope))
+  void (isReported(job)
+    ? dismissJobItem(queryClient, job.scope, job.id, session.account?.Id)
+    : invalidateInbox(queryClient, job.scope))
 }
 
 const stop = transfers.onFinished((job: TransferJob) => {
