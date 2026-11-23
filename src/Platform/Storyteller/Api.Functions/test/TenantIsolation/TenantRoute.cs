@@ -9,6 +9,10 @@ public sealed record TenantRoute(string Function, string Family, TenantGate Gate
 
     public string ContentType { get; init; } = "application/json";
 
+    // The answer of the control on A when the request reaches no service: the function's own input check (400) or its own
+    // read past the gate (404) refuses the representative request. Null: the control must reach a service.
+    public int? ControlStatus { get; init; }
+
     public IReadOnlyDictionary<string, string> Query { get; init; } = new Dictionary<string, string>();
 
     public override string ToString() => Function;

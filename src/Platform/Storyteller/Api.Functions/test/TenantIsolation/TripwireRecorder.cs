@@ -22,21 +22,19 @@ internal sealed class TripwireRecorder
     // Records the call in the current request and throws, so nothing past the gate runs.
     public static Exception Trip(string service, MethodInfo member, object?[]? arguments)
     {
-        var call = new TripwireCall(service, member.Name, Values(arguments));
-        Current?._calls.Enqueue(call);
-        return new TenantIsolationTripwireException(call);
-    }
+        var parameters = member.GetParameters();
+        var byName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
 
-    private static List<string> Values(object?[]? arguments)
-    {
-        var values = new List<string>();
-
-        foreach (var argument in arguments ?? [])
+        for (var i = 0; i < parameters.Length; i++)
         {
-            Collect(argument, values, depth: 0);
+            var values = new List<string>();
+            Collect(arguments is not null && i < arguments.Length ? arguments[i] : null, values, depth: 0);
+            byName[parameters[i].Name ?? $"arg{i}"] = values;
         }
 
-        return values;
+        var call = new TripwireCall(service, member.Name, byName);
+        Current?._calls.Enqueue(call);
+        return new TenantIsolationTripwireException(call);
     }
 
     private static void Collect(object? value, List<string> values, int depth)

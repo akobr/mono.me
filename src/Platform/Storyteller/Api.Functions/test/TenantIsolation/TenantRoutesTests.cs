@@ -1,3 +1,9 @@
+using System.Reflection;
+
+using _42.Platform.Storyteller.Api.V1;
+
+using Microsoft.Azure.Functions.Worker;
+
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests.TenantIsolation;
 
 // The table of the tenant isolation tests holds every HTTP function of the API exactly once, so a new function fails here
@@ -12,6 +18,20 @@ public class TenantRoutesTests
 
         table.ShouldBeUnique();
         table.Order(StringComparer.Ordinal).ShouldBe(TenantRoutes.Functions.Keys.Order(StringComparer.Ordinal));
+    }
+
+    // The discovery of the table finds every kind of method the worker can run, static ones too: a scan of every method of
+    // every type finds no HTTP function it leaves out.
+    [Fact]
+    public void Discovery_FindsEveryHttpFunction_StaticOnesToo()
+    {
+        var all = typeof(AccessHttp).Assembly.GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            .Where(method => method.GetCustomAttribute<FunctionAttribute>() is not null && TenantRoutes.Trigger(method) is not null)
+            .Select(method => method.GetCustomAttribute<FunctionAttribute>()!.Name)
+            .Order(StringComparer.Ordinal);
+
+        TenantRoutes.Functions.Keys.Order(StringComparer.Ordinal).ShouldBe(all);
     }
 
     [Fact]
