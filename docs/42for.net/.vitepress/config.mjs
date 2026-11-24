@@ -100,6 +100,24 @@ export default defineConfig({
               { text: 'Device fleet', link: '/platform/examples/device-fleet' },
             ]
           },
+          {
+            text: 'Developer guide',
+            collapsed: true,
+            items: [
+              { text: 'Start here', link: '/platform/documentation/' },
+              { text: 'Quick start', link: '/platform/documentation/quick-start' },
+              { text: 'Configuration provider', link: '/platform/documentation/configuration' },
+              { text: 'Key Vault secrets', link: '/platform/documentation/key-vault' },
+              { text: 'Hosting', link: '/platform/documentation/hosting' },
+              { text: 'Aspire', link: '/platform/documentation/aspire' },
+              { text: 'Configuration formats', link: '/platform/documentation/formats' },
+              { text: 'C# SDK', link: '/platform/documentation/csharp-sdk' },
+              { text: 'TypeScript SDK', link: '/platform/documentation/typescript-sdk' },
+              { text: 'sform & CI', link: '/platform/documentation/cli' },
+              { text: 'AI assistants (MCP)', link: '/platform/documentation/mcp' },
+              { text: 'Cheat sheet', link: '/platform/documentation/cheat-sheet' },
+            ]
+          },
           { text: 'Live demo', link: '/platform/live-demo' },
           { text: 'Road map', link: '/platform/road-map' },
         ]

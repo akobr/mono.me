@@ -136,3 +136,12 @@
   from {opacity: 0} 
   to {opacity: 1}
 }
+/* Developer guide: tables fit the page; long code in a cell wraps instead of scrolling. */
+.dev-guide .vp-doc table td code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.dev-guide .vp-doc table th,
+.dev-guide .vp-doc table td {
+    padding: 8px 10px;
+}
